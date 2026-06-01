@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+.pnp.*
+bun.lockb.bak
+
+# Build output
+dist/
+dist-*/
+build/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.vitest/
+
+# Design reference (not source — extracted from the design share)
+.design-ref/
+
+# Editor / OS
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local env / secrets
+.env
+.env.*
+!.env.example

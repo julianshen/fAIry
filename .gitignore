@@ -27,3 +27,6 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Personal, per-project Claude Code settings (not shared)
+.claude/settings.local.json

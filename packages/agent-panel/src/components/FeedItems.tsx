@@ -10,27 +10,32 @@ type Item<T extends FeedItem["type"]> = Extract<FeedItem, { type: T }>;
 type Vars = CSSProperties & Record<`--${string}`, string>;
 
 export function MsgItem({ item }: { item: Item<"user"> | Item<"say"> }): ReactElement {
-  const isUser = item.type === "user";
-  const agent = isUser ? null : AGENTS[item.agent];
+  if (item.type === "user") {
+    return (
+      <div className="msg user">
+        <span className="msg-av user">
+          <Icon name="user" size={14} />
+        </span>
+        <div className="msg-col">
+          <div className="msg-text">
+            <RichText text={item.text} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  const agent = AGENTS[item.agent];
   return (
-    <div
-      className={"msg " + (isUser ? "user" : "agent")}
-      style={agent ? ({ "--mn": agent.color } as Vars) : undefined}
-    >
-      <span
-        className={"msg-av" + (isUser ? " user" : "")}
-        style={agent ? { background: agent.color } : undefined}
-      >
-        {isUser ? <Icon name="user" size={14} /> : agent!.glyph}
+    <div className="msg agent" style={{ "--mn": agent.color } as Vars}>
+      <span className="msg-av" style={{ background: agent.color }}>
+        {agent.glyph}
       </span>
       <div className="msg-col">
-        {!isUser && agent && (
-          <div className="msg-meta">
-            <span className="msg-name">{agent.name}</span>
-            <span className="msg-role">{agent.role}</span>
-            {item.time && <span className="msg-time">{item.time}</span>}
-          </div>
-        )}
+        <div className="msg-meta">
+          <span className="msg-name">{agent.name}</span>
+          <span className="msg-role">{agent.role}</span>
+          {item.time && <span className="msg-time">{item.time}</span>}
+        </div>
         <div className="msg-text">
           <RichText text={item.text} />
         </div>
@@ -132,7 +137,18 @@ export function ActionsItem({
   const agent = AGENTS[item.agent];
   return (
     <div className="actions" data-open={item.open ? "1" : "0"}>
-      <div className="act-head" onClick={onToggle}>
+      <div
+        className="act-head"
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+      >
         <span className="ag-pip" style={{ background: agent.color }}>
           <Icon name={agent.icon} size={11} sw={2} />
         </span>

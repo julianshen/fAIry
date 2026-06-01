@@ -71,6 +71,7 @@ export function Composer({
           rows={1}
           value={value}
           placeholder="Ask Fairy to do something on this page…"
+          aria-label="Ask Fairy to do something on this page"
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {

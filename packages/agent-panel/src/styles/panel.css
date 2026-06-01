@@ -80,7 +80,7 @@ button { font-family: inherit; }
 .rail-agent {
   display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px 0 6px;
   border-radius: 999px; border: 1px solid var(--border-2); background: var(--s2);
-  cursor: pointer; transition: .18s; color: var(--dim); font-size: var(--fs-xs); font-weight: 550;
+  transition: .18s; color: var(--dim); font-size: var(--fs-xs); font-weight: 550;
 }
 .rail-agent:hover { border-color: var(--border-3); }
 .rail-agent[data-active="1"] {

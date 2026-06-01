@@ -119,6 +119,17 @@ describe("ActionsItem", () => {
     await userEvent.click(screen.getByText("Navigating", { exact: false }));
     expect(onToggle).toHaveBeenCalledOnce();
   });
+
+  it("exposes the header as a keyboard-operable button", async () => {
+    const onToggle = vi.fn();
+    render(<ActionsItem item={item} actionStyle="timeline" onToggle={onToggle} />);
+    const header = screen.getByRole("button", { name: /navigating/i });
+    expect(header).toHaveAttribute("tabindex", "0");
+    header.focus();
+    await userEvent.keyboard("{Enter}");
+    await userEvent.keyboard(" ");
+    expect(onToggle).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("ResultItem", () => {

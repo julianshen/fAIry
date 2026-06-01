@@ -132,8 +132,8 @@ export function Panel(props: PanelProps): ReactElement {
           onStop={props.onStop}
           planFirst={planFirst}
           setPlanFirst={setPlanFirst}
-          {...(site ? { site } : {})}
-          {...(model ? { model } : {})}
+          site={site}
+          model={model}
         />
       </div>
     </div>

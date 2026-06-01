@@ -13,7 +13,8 @@ export function initialState(): PanelState {
 /** Index of the last item satisfying `pred`, or -1. */
 function findLastIndex(items: FeedItem[], pred: (it: FeedItem) => boolean): number {
   for (let i = items.length - 1; i >= 0; i--) {
-    if (pred(items[i]!)) return i;
+    const it = items[i];
+    if (it && pred(it)) return i;
   }
   return -1;
 }

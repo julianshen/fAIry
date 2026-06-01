@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "description": "Fairy agent panel — React UI for the browser agent conversation/activity surface.",
+  "types": "./src/index.ts",
+  "module": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles": "./src/styles/index.css"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

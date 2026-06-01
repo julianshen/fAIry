@@ -32,9 +32,13 @@ live "Tweaks" editor) is intentionally **not** ported. A dev-only harness under
 
 ## Usage
 
+The package exports its TypeScript source via the `exports` map — fine for
+in-monorepo consumers whose own bundler (Vite) compiles it. A standalone library
+build (Vite library mode + `.d.ts`) is a follow-up for any out-of-tree consumer.
+
 ```tsx
 import { Panel, usePanelController } from "@fairy/agent-panel";
-import "@fairy/agent-panel/src/styles/index.css";
+import "@fairy/agent-panel/styles";
 
 function App() {
   const ctrl = usePanelController();

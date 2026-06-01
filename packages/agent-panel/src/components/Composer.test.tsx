@@ -24,6 +24,11 @@ describe("Composer input", () => {
     expect(input.value).toBe("draft text");
   });
 
+  it("has an accessible name for screen readers", () => {
+    setup();
+    expect(screen.getByRole("textbox", { name: /ask fairy/i })).toBeInTheDocument();
+  });
+
   it("reports edits through setValue", async () => {
     const setValue = vi.fn();
     setup({ setValue });

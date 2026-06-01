@@ -10,10 +10,21 @@ import { resolvePaths } from "./paths";
  * and the native macOS shell.
  */
 function main(): void {
+  let home: string;
+  try {
+    home = os.homedir();
+  } catch (err) {
+    console.error(
+      "[fairy:pi-daemon] FATAL: could not determine the user's home directory.",
+      err,
+    );
+    process.exit(1);
+  }
+
   const paths = resolvePaths({
     platform: process.platform,
     env: process.env,
-    home: os.homedir(),
+    home,
   });
   console.log("[fairy:pi-daemon] resolved paths:");
   console.log(`  appData:    ${paths.appData}`);

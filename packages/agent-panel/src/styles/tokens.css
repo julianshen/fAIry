@@ -1,0 +1,115 @@
+/* ============================================================
+   Fairy — design tokens
+   Theme via [data-theme] on <html>; accent / font / width / density
+   injected as inline CSS vars from React.
+   ============================================================ */
+
+:root {
+  --accent: #7c6cff;
+  --panel-w: 432px;
+  --font-ui: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", monospace;
+
+  /* agent identities (stable across themes) */
+  --sage:  #a78bfa;   /* planner / orchestrator */
+  --atlas: #5b9dff;   /* navigator */
+  --quill: #34d3b5;   /* reader / extractor */
+  --forge: #f7b955;   /* operator / forms */
+
+  /* density */
+  --pad: 16px;
+  --gap: 12px;
+  --msg-gap: 16px;
+  --radius: 18px;
+  --radius-sm: 11px;
+  --fs: 14px;
+  --fs-sm: 12.5px;
+  --fs-xs: 11px;
+  --lh: 1.55;
+}
+
+[data-density="compact"] {
+  --pad: 12px;
+  --gap: 9px;
+  --msg-gap: 11px;
+  --fs: 13px;
+  --fs-sm: 12px;
+  --fs-xs: 10.5px;
+  --lh: 1.5;
+}
+[data-density="comfy"] {
+  --pad: 20px;
+  --gap: 15px;
+  --msg-gap: 22px;
+  --fs: 15px;
+  --fs-sm: 13px;
+  --lh: 1.62;
+}
+
+/* ---------- DARK (default) ---------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --page-bg: #07080a;
+  --page-grid: rgba(255,255,255,.025);
+
+  --s0: #101216;          /* deepest panel base */
+  --s1: #15171d;          /* panel surface */
+  --s2: #1c1f27;          /* raised cards */
+  --s3: #242832;          /* hover / input */
+  --glass: rgba(20,22,28,.72);
+  --glass-strong: rgba(16,18,23,.88);
+
+  --text:   #f2f3f6;
+  --dim:    #a8adba;
+  --faint:  #6c717f;
+  --ghost:  #474b57;
+
+  --border:  rgba(255,255,255,.07);
+  --border-2: rgba(255,255,255,.11);
+  --border-3: rgba(255,255,255,.16);
+
+  --accent-fg: #fff;
+  --accent-soft: color-mix(in oklab, var(--accent) 16%, transparent);
+  --accent-line: color-mix(in oklab, var(--accent) 38%, transparent);
+  --accent-text: color-mix(in oklab, var(--accent) 72%, white 28%);
+
+  --shadow: 0 1px 0 rgba(255,255,255,.04) inset,
+            0 24px 70px -24px rgba(0,0,0,.85),
+            0 8px 24px -12px rgba(0,0,0,.6);
+  --ok: #36c98e;
+  --warn: #f7b955;
+}
+
+/* ---------- LIGHT ---------- */
+[data-theme="light"] {
+  color-scheme: light;
+  --page-bg: #eceef2;
+  --page-grid: rgba(0,0,0,.025);
+
+  --s0: #ffffff;
+  --s1: #ffffff;
+  --s2: #f7f8fa;
+  --s3: #eef0f4;
+  --glass: rgba(255,255,255,.78);
+  --glass-strong: rgba(255,255,255,.92);
+
+  --text:   #15171c;
+  --dim:    #5c616e;
+  --faint:  #888e9c;
+  --ghost:  #b7bcc8;
+
+  --border:  rgba(15,18,30,.08);
+  --border-2: rgba(15,18,30,.12);
+  --border-3: rgba(15,18,30,.18);
+
+  --accent-fg: #fff;
+  --accent-soft: color-mix(in oklab, var(--accent) 12%, white);
+  --accent-line: color-mix(in oklab, var(--accent) 30%, transparent);
+  --accent-text: color-mix(in oklab, var(--accent) 82%, black 18%);
+
+  --shadow: 0 1px 0 rgba(255,255,255,.7) inset,
+            0 30px 80px -28px rgba(20,24,40,.32),
+            0 10px 30px -16px rgba(20,24,40,.22);
+  --ok: #1f9d63;
+  --warn: #c2841a;
+}

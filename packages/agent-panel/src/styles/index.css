@@ -1,0 +1,13 @@
+/* Single import surface for the panel's styles. */
+@import "./tokens.css";
+@import "./panel.css";
+@import "./content.css";
+
+/* Base reset scoped to the panel root so embedding hosts stay unaffected. */
+.fairy-root * { box-sizing: border-box; }
+.fairy-root {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+::selection { background: var(--accent-soft); }

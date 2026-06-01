@@ -1,0 +1,21 @@
+/* Dev harness page chrome — not shipped with the package. */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: #07080a;
+}
+.harness-stage {
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(120% 90% at 70% 10%, #14131c, #07080a 60%);
+}
+.harness-stage .fairy-root {
+  height: min(760px, calc(100vh - 48px));
+  display: flex;
+}
+.harness-stage .panel {
+  height: 100%;
+}

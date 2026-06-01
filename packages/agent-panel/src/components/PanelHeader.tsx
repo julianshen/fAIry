@@ -40,11 +40,6 @@ export function PanelHeader(props: PanelHeaderProps): ReactElement {
     paused: "Paused",
     done: "Task complete",
   };
-  const tabCount: Record<HeaderView, number> = {
-    chat: counts.chat,
-    activity: counts.activity,
-    plan: counts.plan,
-  };
 
   return (
     <div className="panel-head" data-header={headerStyle}>
@@ -113,14 +108,14 @@ export function PanelHeader(props: PanelHeaderProps): ReactElement {
             onClick={() => setView(key)}
           >
             {label}
-            {tabCount[key] > 0 && <span className="cnt">{tabCount[key]}</span>}
+            {counts[key] > 0 && <span className="cnt">{counts[key]}</span>}
           </button>
         ))}
       </div>
 
       <div className="head-status" data-run={run}>
         <span className="dot" />
-        {agent && run !== "idle" && run !== "done" ? <AgentPip id={active!} size={16} /> : null}
+        {agent && run !== "idle" && run !== "done" ? <AgentPip id={agent.id} size={16} /> : null}
         <span>{statusText[run]}</span>
         <span className="grow" />
         {run !== "idle" && (

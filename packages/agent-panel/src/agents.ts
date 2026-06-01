@@ -2,8 +2,8 @@ import type { Agent, AgentId } from "./types";
 
 /**
  * The Fairy team. Colors reference CSS vars defined in tokens.css so themes
- * stay consistent; `hex` mirrors each for inline contexts (pips drawn with a
- * background style). Identities are stable across light/dark.
+ * stay consistent (pips set them as a `background` style). Identities are
+ * stable across light/dark.
  */
 export const AGENTS: Record<AgentId, Agent> = {
   sage: {
@@ -13,7 +13,6 @@ export const AGENTS: Record<AgentId, Agent> = {
     glyph: "S",
     icon: "brain",
     color: "var(--sage)",
-    hex: "#a78bfa",
     desc: "Reads your goal, writes the plan, and routes each step to the right specialist.",
   },
   atlas: {
@@ -23,7 +22,6 @@ export const AGENTS: Record<AgentId, Agent> = {
     glyph: "A",
     icon: "nav",
     color: "var(--atlas)",
-    hex: "#5b9dff",
     desc: "Drives the browser — opens pages, clicks, scrolls, and applies filters.",
   },
   quill: {
@@ -33,7 +31,6 @@ export const AGENTS: Record<AgentId, Agent> = {
     glyph: "P",
     icon: "eye",
     color: "var(--quill)",
-    hex: "#34d3b5",
     desc: "Scans the DOM, extracts structured data, summarizes and ranks results.",
   },
   forge: {
@@ -43,7 +40,6 @@ export const AGENTS: Record<AgentId, Agent> = {
     glyph: "E",
     icon: "edit",
     color: "var(--forge)",
-    hex: "#f7b955",
     desc: "Fills forms, selects options, and completes flows — pausing for anything sensitive.",
   },
 };

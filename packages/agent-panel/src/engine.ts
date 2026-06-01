@@ -10,31 +10,33 @@ export function initialState(): PanelState {
   return { items: [], run: "idle", active: null, seq: 0 };
 }
 
+/** Index of the last item satisfying `pred`, or -1. */
+function findLastIndex(items: FeedItem[], pred: (it: FeedItem) => boolean): number {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (pred(items[i]!)) return i;
+  }
+  return -1;
+}
+
+/** Index of the most recent action group still accepting rows. */
+function runningActionsIndex(items: FeedItem[]): number {
+  return findLastIndex(items, (it) => it.type === "actions" && it.running);
+}
+
+/** Index of the most recent plan card. */
+function lastPlanIndex(items: FeedItem[]): number {
+  return findLastIndex(items, (it) => it.type === "plan");
+}
+
 /** Mark a running action group (if any) complete: rows done, spinner off. */
 function finalizeActions(items: FeedItem[]): FeedItem[] {
+  // Common case (no open group): nothing to do — avoid the array copy.
+  if (runningActionsIndex(items) === -1) return items;
   return items.map((it) =>
     it.type === "actions" && it.running
       ? { ...it, running: false, rows: it.rows.map((r) => ({ ...r, state: "done" })) }
       : it,
   );
-}
-
-/** Index of the most recent action group still accepting rows. */
-function runningActionsIndex(items: FeedItem[]): number {
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (items[i]!.type === "actions" && (items[i] as Extract<FeedItem, { type: "actions" }>).running) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-/** Index of the most recent plan card. */
-function lastPlanIndex(items: FeedItem[]): number {
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (items[i]!.type === "plan") return i;
-  }
-  return -1;
 }
 
 /**
@@ -187,7 +189,14 @@ export function reduce(state: PanelState, action: PanelAction): PanelState {
         ...(action.sub ? { sub: action.sub } : {}),
         state: "active",
       };
-      const rows = [...group.rows.map((r) => ({ ...r, state: "done" as const })), row];
+      // Only the trailing row can still be "active"; flip just that one
+      // instead of re-copying every prior (already-done) row.
+      const prev = group.rows;
+      const last = prev[prev.length - 1];
+      const rows: ActRow[] =
+        last && last.state !== "done"
+          ? [...prev.slice(0, -1), { ...last, state: "done" }, row]
+          : [...prev, row];
       return {
         ...state,
         active: action.agent,

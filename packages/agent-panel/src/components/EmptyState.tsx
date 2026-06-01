@@ -1,9 +1,35 @@
 import type { CSSProperties, ReactElement } from "react";
 import { AGENTS, AGENT_ORDER } from "../agents";
-import type { EmptyVariant, SuggestionGroup } from "../types";
+import type { EmptyVariant, Suggestion, SuggestionGroup } from "../types";
 import { Icon } from "./Icon";
 
 type Vars = CSSProperties & Record<`--${string}`, string>;
+
+/** A single tappable suggestion row (used in the list and as the grid feature). */
+function SuggestionButton({
+  suggestion,
+  onPick,
+  accent = false,
+}: {
+  suggestion: Suggestion;
+  onPick: (task: string) => void;
+  accent?: boolean;
+}): ReactElement {
+  return (
+    <button className="sug" onClick={() => onPick(suggestion.task)}>
+      <span className="si" style={accent ? ({ "--ag": "var(--accent)" } as Vars) : undefined}>
+        <Icon name={suggestion.icon} size={17} />
+      </span>
+      <span className="st">
+        <b>{suggestion.title}</b>
+        <span>{suggestion.sub}</span>
+      </span>
+      <span className="go">
+        <Icon name="arrowR" size={16} />
+      </span>
+    </button>
+  );
+}
 
 export interface EmptyStateProps {
   variant: EmptyVariant;
@@ -65,20 +91,7 @@ export function EmptyState({ variant, suggestions, onPick }: EmptyStateProps): R
             );
           })}
         </div>
-        {featured && (
-          <button className="sug" onClick={() => onPick(featured.task)}>
-            <span className="si" style={{ "--ag": "var(--accent)" } as Vars}>
-              <Icon name={featured.icon} size={17} />
-            </span>
-            <span className="st">
-              <b>{featured.title}</b>
-              <span>{featured.sub}</span>
-            </span>
-            <span className="go">
-              <Icon name="arrowR" size={16} />
-            </span>
-          </button>
-        )}
+        {featured && <SuggestionButton suggestion={featured} onPick={onPick} accent />}
       </div>
     );
   }
@@ -98,18 +111,7 @@ export function EmptyState({ variant, suggestions, onPick }: EmptyStateProps): R
         <div key={gi} className="sug-list">
           <div className="sug-cap">{grp.cap}</div>
           {grp.items.map((s) => (
-            <button key={s.id} className="sug" onClick={() => onPick(s.task)}>
-              <span className="si">
-                <Icon name={s.icon} size={17} />
-              </span>
-              <span className="st">
-                <b>{s.title}</b>
-                <span>{s.sub}</span>
-              </span>
-              <span className="go">
-                <Icon name="arrowR" size={16} />
-              </span>
-            </button>
+            <SuggestionButton key={s.id} suggestion={s} onPick={onPick} />
           ))}
         </div>
       ))}

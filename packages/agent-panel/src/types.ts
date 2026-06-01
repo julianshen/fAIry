@@ -23,8 +23,6 @@ export interface Agent {
   icon: IconName;
   /** CSS color (a `var(--…)` reference) for surfaces. */
   color: string;
-  /** Resolved hex of the same color, for inline non-var contexts. */
-  hex: string;
   desc: string;
 }
 

@@ -68,6 +68,9 @@ export function Panel(props: PanelProps): ReactElement {
     return state.items.filter((it) => allowed.includes(it.type));
   }, [tabbed, view, state.items]);
 
+  // The elapsed timer re-renders every second; don't re-scan the feed each time.
+  const feedCounts = useMemo(() => counts(state.items), [state.items]);
+
   // Keep the newest message in view.
   useEffect(() => {
     const el = bodyRef.current;
@@ -98,7 +101,7 @@ export function Panel(props: PanelProps): ReactElement {
           run={state.run}
           active={state.active}
           elapsed={elapsed}
-          counts={counts(state.items)}
+          counts={feedCounts}
           view={view}
           setView={setView}
           onPause={props.onPause}

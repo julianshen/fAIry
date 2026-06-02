@@ -23,7 +23,9 @@ describe("HttpServer", () => {
   let store: ReturnType<typeof fakeStore>;
   let base: string;
 
-  async function start(opts: { allowedOrigins?: string[]; pairing?: PairingStore } = {}) {
+  async function start(
+    opts: { allowedOrigins?: string[]; pairing?: PairingStore; info?: () => unknown } = {},
+  ) {
     store = fakeStore({
       providers: [{ id: "anthropic", apiKey: "sk-ant-secret" }],
       defaultModel: "claude-opus-4-8",
@@ -33,6 +35,7 @@ describe("HttpServer", () => {
       settings: store,
       allowedOrigins: opts.allowedOrigins,
       pairing: opts.pairing,
+      info: opts.info,
     });
     const port = await server.listen();
     base = `http://127.0.0.1:${port}`;
@@ -306,6 +309,32 @@ describe("HttpServer", () => {
     it("returns 405 for GET /pair", async () => {
       await start({ pairing: createPairingStore({ token: TOKEN, code: "PAIRCODE" }) });
       expect((await call("GET", "/pair", { token: null })).status).toBe(405);
+    });
+  });
+
+  describe("GET /info", () => {
+    const INFO = { bridgePort: 111, conversationPort: 222 };
+
+    it("returns the injected info to an authenticated client", async () => {
+      await start({ info: () => INFO });
+      const res = await call("GET", "/info");
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(INFO);
+    });
+
+    it("requires the bearer token", async () => {
+      await start({ info: () => INFO });
+      expect((await call("GET", "/info", { token: null })).status).toBe(401);
+    });
+
+    it("is 404 when no info provider is configured", async () => {
+      await start();
+      expect((await call("GET", "/info")).status).toBe(404);
+    });
+
+    it("returns 405 for a non-GET method", async () => {
+      await start({ info: () => INFO });
+      expect((await call("POST", "/info")).status).toBe(405);
     });
   });
 });

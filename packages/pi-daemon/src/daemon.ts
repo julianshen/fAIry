@@ -93,10 +93,12 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
       chrome ? chrome.requestTool(tool, args) : Promise.reject(new Error("no browser connected")),
   });
 
-  // Pi is spawned pointed back at the piBridge. Its port is known only once
-  // piBridge is listening (below); spawn runs later (when a panel connects), so
-  // the closure reads the resolved value.
+  // The WS ports are known only once those servers are listening (below); the
+  // spawn closure and the /info provider run later (a panel connects / a paired
+  // client asks), so they read these vars after they're resolved.
+  let bridgePort = 0;
   let piBridgePort = 0;
+  let conversationPort = 0;
   const conversation = new ConversationServer({
     token,
     host,
@@ -113,6 +115,8 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     allowedOrigins,
     maxBodyBytes: opts.maxBodyBytes,
     pairing: opts.pairing,
+    // Lets a paired client discover the ephemeral WS ports it must connect to.
+    info: () => ({ bridgePort, conversationPort }),
     port: opts.ports?.http,
   });
 
@@ -133,10 +137,13 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     throw (failure as PromiseRejectedResult).reason;
   }
   const port = (i: number): number => (results[i] as PromiseFulfilledResult<number>).value;
-  piBridgePort = port(1); // resolve the spawn closure's port before any conversation
+  // Resolve the ports the spawn closure / /info provider read, before either runs.
+  bridgePort = port(0);
+  piBridgePort = port(1);
+  conversationPort = port(2);
 
   return {
-    ports: { bridge: port(0), piBridge: port(1), conversation: port(2), http: port(3) },
+    ports: { bridge: bridgePort, piBridge: piBridgePort, conversation: conversationPort, http: port(3) },
     close: closeAll,
   };
 }

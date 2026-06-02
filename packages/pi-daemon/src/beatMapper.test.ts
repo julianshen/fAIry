@@ -47,6 +47,21 @@ describe("BeatMapper — tools", () => {
     expect(beats.filter((b) => b.kind === "act")).toHaveLength(2);
   });
 
+  it("reopens an action group when a tool follows text in the same turn", () => {
+    const beats = run(
+      { type: "tool_use", id: "t1", name: "navigate", input: { url: "https://x.com" } },
+      { type: "text_delta", text: "looking at the results" },
+      { type: "tool_use", id: "t2", name: "click", input: { selector: "#go" } },
+    );
+    // The intervening text finalizes the panel's group, so the 2nd tool needs a fresh one.
+    expect(beats.filter((b) => b.kind === "actGroup")).toHaveLength(2);
+  });
+
+  it("returns an empty target when the primary arg is explicitly null", () => {
+    const [, act] = run({ type: "tool_use", id: "t", name: "x", input: { query: null } });
+    expect(act).toMatchObject({ kind: "act", target: "" });
+  });
+
   it("derives the row target from a primary argument", () => {
     const [, act] = run({ type: "tool_use", id: "t", name: "click", input: { selector: "#go" } });
     expect(act).toMatchObject({ kind: "act", target: "#go" });

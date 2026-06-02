@@ -42,7 +42,7 @@ function verbFor(tool: string): string {
 /** Best-effort primary argument to display as the action target. */
 function targetFor(input: Record<string, unknown>): string {
   const primary = input.url ?? input.selector ?? input.target ?? input.text ?? input.query;
-  return primary === undefined ? "" : String(primary);
+  return primary == null ? "" : String(primary);
 }
 
 /**
@@ -59,9 +59,15 @@ export class BeatMapper {
   apply(event: AgentEvent): PanelBeat[] {
     switch (event.type) {
       case "text_delta": {
-        const beats: PanelBeat[] = this.text === "" ? [{ kind: "thinking", agent: AGENT }] : [];
-        this.text += event.text;
-        return beats;
+        if (this.text !== "") {
+          this.text += event.text;
+          return [];
+        }
+        // First delta of a message: the panel finalizes any running action group
+        // on this `thinking` beat, so our group flag must follow.
+        this.text = event.text;
+        this.groupOpen = false;
+        return [{ kind: "thinking", agent: AGENT }];
       }
       case "tool_use": {
         const beats = this.flush();
@@ -98,6 +104,9 @@ export class BeatMapper {
     if (this.text === "") return [];
     const beat: PanelBeat = { kind: "say", agent: AGENT, text: this.text };
     this.text = "";
+    // The panel finalizes the running action group on this `say`, so a later
+    // tool call in the same turn must open a fresh group.
+    this.groupOpen = false;
     return [beat];
   }
 }

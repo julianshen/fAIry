@@ -53,7 +53,7 @@ async function main(): Promise<void> {
     // ephemeral bridge/conversation WS ports). Overridable via FAIRY_HTTP_PORT.
     // M4: once the Chrome extension exists, also pass its exact origin as
     // `allowedOrigins` so /pair + CORS accept only the real extension.
-    const httpPort = Number(process.env.FAIRY_HTTP_PORT) || DEFAULT_HTTP_PORT;
+    const httpPort = Number.parseInt(process.env.FAIRY_HTTP_PORT ?? "", 10) || DEFAULT_HTTP_PORT;
     const daemon = await createDaemon({
       token,
       settings,

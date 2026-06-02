@@ -123,27 +123,33 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
   const servers = [bridge, piBridge, conversation, http];
   const closeAll = (): Promise<void> => Promise.all(servers.map((s) => s.close())).then(() => undefined);
 
-  const results = await Promise.allSettled([
-    bridge.listen(),
-    piBridge.listen(),
-    conversation.listen(),
-    http.listen(),
-  ]);
-  const failure = results.find((r) => r.status === "rejected");
-  if (failure) {
-    // Swallow any teardown error so it can't shadow the actual bind failure.
-    /* v8 ignore next */
-    await closeAll().catch(() => {});
-    throw (failure as PromiseRejectedResult).reason;
-  }
-  const port = (i: number): number => (results[i] as PromiseFulfilledResult<number>).value;
-  // Resolve the ports the spawn closure / /info provider read, before either runs.
-  bridgePort = port(0);
-  piBridgePort = port(1);
-  conversationPort = port(2);
+  // Start the given servers concurrently; if any fails to bind, tear the rest
+  // down (so a half-started set can't leak) and rethrow the bind error.
+  const settle = async (starts: Array<Promise<number>>): Promise<PromiseSettledResult<number>[]> => {
+    const results = await Promise.allSettled(starts);
+    const failure = results.find((r) => r.status === "rejected");
+    if (failure) {
+      /* v8 ignore next */
+      await closeAll().catch(() => {});
+      throw (failure as PromiseRejectedResult).reason;
+    }
+    return results;
+  };
+  const val = (rs: PromiseSettledResult<number>[], i: number): number =>
+    (rs[i] as PromiseFulfilledResult<number>).value;
+
+  // Bring up the WS servers first; their ports feed /info and the Pi spawner.
+  const ws = await settle([bridge.listen(), piBridge.listen(), conversation.listen()]);
+  bridgePort = val(ws, 0);
+  piBridgePort = val(ws, 1);
+  conversationPort = val(ws, 2);
+
+  // Only now start the HTTP anchor — so a client reaching its fixed port can
+  // never see /info report unresolved (0) WS ports.
+  const httpPort = val(await settle([http.listen()]), 0);
 
   return {
-    ports: { bridge: bridgePort, piBridge: piBridgePort, conversation: conversationPort, http: port(3) },
+    ports: { bridge: bridgePort, piBridge: piBridgePort, conversation: conversationPort, http: httpPort },
     close: closeAll,
   };
 }

@@ -1,5 +1,6 @@
-import { chmodSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { writeJsonFile } from "./fsAtomic";
 
 export interface ProviderConfig {
   /** Provider id Pi knows (e.g. "anthropic", "openai"). */
@@ -37,19 +38,6 @@ export function buildSettings(config: PiConfig): Record<string, unknown> {
 }
 
 /**
- * Atomically write a JSON file: serialize to a sibling temp file (created fresh
- * at `mode`, so a secrets file is never briefly world-readable), then `rename`
- * it over the target. The rename is atomic on the same filesystem, so the
- * target is never partially written or left with looser permissions.
- */
-function writeJson(file: string, data: unknown, mode?: number): void {
-  const tmp = `${file}.tmp`;
-  writeFileSync(tmp, JSON.stringify(data, null, 2), mode !== undefined ? { mode } : undefined);
-  if (mode !== undefined) chmodSync(tmp, mode);
-  renameSync(tmp, file);
-}
-
-/**
  * Materialize Pi's `settings.json` and `auth.json` into `agentDir` (the daemon's
  * isolated `PI_CODING_AGENT_DIR`). The daemon owns this directory wholesale — it
  * is not the user's global `~/.pi` — so the files are written from `config` as
@@ -57,6 +45,6 @@ function writeJson(file: string, data: unknown, mode?: number): void {
  */
 export function writePiConfig(agentDir: string, config: PiConfig): void {
   mkdirSync(agentDir, { recursive: true });
-  writeJson(path.join(agentDir, "auth.json"), buildAuth(config), 0o600);
-  writeJson(path.join(agentDir, "settings.json"), buildSettings(config));
+  writeJsonFile(path.join(agentDir, "auth.json"), buildAuth(config), 0o600);
+  writeJsonFile(path.join(agentDir, "settings.json"), buildSettings(config));
 }

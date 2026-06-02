@@ -29,20 +29,33 @@ export class LineDecoder {
   push(chunk: string): unknown[] {
     this.buffer += chunk;
     const out: unknown[] = [];
+    // Advance a cursor and slice the consumed prefix once at the end, rather
+    // than re-copying the tail on every line — keeps a many-lines-per-chunk
+    // burst linear instead of O(n²).
+    let start = 0;
     let nl: number;
-    while ((nl = this.buffer.indexOf("\n")) !== -1) {
-      let line = this.buffer.slice(0, nl);
-      this.buffer = this.buffer.slice(nl + 1);
+    while ((nl = this.buffer.indexOf("\n", start)) !== -1) {
+      let line = this.buffer.slice(start, nl);
+      start = nl + 1;
       if (line.endsWith("\r")) line = line.slice(0, -1);
       if (line.length === 0) continue;
       try {
         out.push(JSON.parse(line));
       } catch (err) {
         const error = err as Error;
-        if (this.onError) this.onError(line, error);
-        else throw new Error(`LineDecoder: malformed JSON line: ${error.message}`);
+        if (this.onError) {
+          this.onError(line, error);
+        } else {
+          // Drop everything consumed (incl. the bad line) before throwing so a
+          // caller that catches and keeps pushing doesn't re-process it.
+          this.buffer = this.buffer.slice(start);
+          throw new Error(`LineDecoder: malformed JSON line: ${error.message}`, {
+            cause: error,
+          });
+        }
       }
     }
+    if (start > 0) this.buffer = this.buffer.slice(start);
     return out;
   }
 

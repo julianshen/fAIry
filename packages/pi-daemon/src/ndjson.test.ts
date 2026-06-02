@@ -50,6 +50,24 @@ describe("LineDecoder", () => {
     expect(() => d.push("not json\n")).toThrow(/malformed/i);
   });
 
+  it("preserves the original parse error as the thrown error's cause", () => {
+    const d = new LineDecoder();
+    try {
+      d.push("not json\n");
+      expect.unreachable();
+    } catch (err) {
+      expect((err as Error).cause).toBeInstanceOf(SyntaxError);
+    }
+  });
+
+  it("drops the consumed lines after a thrown error so a caught stream resumes cleanly", () => {
+    const d = new LineDecoder();
+    expect(() => d.push('{"a":1}\nbad\n{"b":2}\n')).toThrow(/malformed/i);
+    // The good line before the error was returned-then-lost on throw; the line
+    // after it stays buffered and is delivered on the next push — not re-parsed.
+    expect(d.push('{"c":3}\n')).toEqual([{ b: 2 }, { c: 3 }]);
+  });
+
   it("routes malformed lines to onError and keeps the surrounding valid ones", () => {
     const errors: Array<{ line: string; message: string }> = [];
     const d = new LineDecoder((line, err) => errors.push({ line, message: err.message }));

@@ -14,9 +14,16 @@
 | `pi-daemon` | `jsonLineProcess` — injectable subprocess NDJSON transport | ✅ merged (#5) |
 | `pi-daemon` | `piSession` — Pi RPC over the transport (typed `AgentEvent` stream) | ✅ merged (#7) |
 | `pi-daemon` | `piConfig` — `settings.json`/`auth.json` writer (atomic, `0600`) | ✅ merged (#8) |
+| `pi-daemon` | `bridge` — `ToolRequest`/`ToolResponse` + `RequestCorrelator` | ✅ merged (#10) |
+| `pi-daemon` | `authenticatedSession` + `bridgeSession` — token handshake base + bridge session | ✅ merged (#11, #17) |
+| `pi-daemon` | `wsServer` + `bridgeServer` — generic loopback WS server + bridge adapter | ✅ merged (#12, #18) |
+| `pi-daemon` | `beatMapper` — `AgentEvent` → panel beats | ✅ merged (#14) |
+| `pi-daemon` | `conversation` + `conversationSession` — controller + WS endpoint logic | ✅ merged (#15, #16) |
 
-**M1 (daemon core) is complete**: `paths` → `ndjson` → `jsonLineProcess` →
-`piSession` → `piConfig`.
+**M1 (daemon core) complete** (`paths` → `ndjson` → `jsonLineProcess` →
+`piSession` → `piConfig`). **M2 transport complete** and **M3 logic complete**
+(`bridge`/sessions/servers, `beatMapper`, `conversation`/`conversationSession`).
+Remaining daemon work is integration/wiring — see M2/M3 below. 155 pi-daemon tests.
 
 ## Milestones
 
@@ -38,7 +45,9 @@
 - [x] **Bridge protocol types** — `ToolRequest` / `ToolResponse` (#10).
 - [x] **`RequestCorrelator`** — request/response correlation, timeouts, reject-all (#10).
 - [x] **`BridgeSession`** — authenticated connection (token-first, auth timeout) (#11).
-- [x] **`BridgeServer`** — loopback `ws` adapter + Origin check (#12).
+- [x] **`BridgeServer`** — loopback adapter over the generic `wsServer` + Origin check (#12, #18).
+- [x] **Shared infra** — `authenticatedSession` (token-handshake base, #17) and
+      `wsServer` (generic ws accept/lifecycle/origin, #18), reused by both sessions/servers.
 - [ ] **Pi browser extension** — the `-e` script registering the `browser` tool
       that bridges each call to the daemon. (Port/adapt POC `horizon-bridge.ts`.
       Runs inside Pi → integration-tested, not pure-unit.)
@@ -48,19 +57,19 @@
 
 ### M3 — Daemon ↔ clients API (detailed)
 
-- [ ] **`AgentEvent` → beat mapper** *(pure, next)* — translate `PiSession`
-      events (`text_delta`/`tool_use`/`tool_result`/`turn_end`/`error`) into the
-      panel's `beat` model. Buffers text deltas → `say`; tool calls → `actGroup`
-      + `act` rows; `turn_end` → `status`. **Decision deferred:** v1 attributes
-      all beats to a single agent (`sage`); multi-agent team attribution
-      (per-specialist + handoffs) needs Pi sub-agents or a tool→agent heuristic.
-- [ ] **Conversation controller** — owns a `PiSession` + the bridge for one
-      task; `start`/`answer`/`pause`/`takeover`/`stop`; pipes mapped beats out.
-- [ ] **WS conversation endpoint** — stream beats to the panel; receive commands.
-- [ ] **HTTP settings/status** — providers/models (via `piConfig`), health.
-- [ ] **Token/pairing surface** — expose the minted token for extension + shell.
+- [x] **`AgentEvent` → beat mapper** (`beatMapper`, #14) — `PiSession` events →
+      panel beats (text deltas buffered → `say`; tools → `actGroup`+`act`;
+      `turn_end` → `status`). **Deferred:** v1 attributes all beats to one agent
+      (`sage`); multi-agent attribution needs Pi sub-agents or a tool→agent heuristic.
+- [x] **Conversation controller** (`conversation`, #15) — owns a `PiSession`,
+      pipes mapped beats out; `start`/`stop` (v1: pause/take-over map to stop).
+- [x] **WS conversation endpoint** (`conversationSession`, #16) — token handshake,
+      commands in / beats out, driving the controller; served via `wsServer`.
+- [ ] **HTTP settings/status** — providers/models (via `piConfig`), health. *(testable)*
+- [ ] **Token/pairing surface** — mint + expose the per-session token. *(testable)*
 - [ ] **Daemon entry wiring** (`main.ts`) — compose token + paths + `writePiConfig`
-      + `BridgeServer` + `PiSession` into a running daemon (`bun run start`).
+      + `wsServer`(×2: bridge + conversation) + `PiSession` into a running
+      `bun run start` daemon. *(integration: real Pi + sockets)*
 - [ ] **Lifecycle** — single-instance lock, graceful shutdown.
 
 ### M4 — Chrome extension

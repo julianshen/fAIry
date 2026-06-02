@@ -1,6 +1,7 @@
 import type { AddressInfo } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { BridgeConnection } from "./authenticatedSession";
+import { isAllowedOrigin } from "./origin";
 
 export interface WsServerOptions {
   /** Port to bind; 0 (default) picks an ephemeral port. */
@@ -44,12 +45,6 @@ export class WsServer {
 
   constructor(private readonly opts: WsServerOptions) {}
 
-  private allowOrigin(origin: string | undefined): boolean {
-    const allowed = this.opts.allowedOrigins;
-    if (allowed) return origin !== undefined && allowed.includes(origin);
-    return !(origin && /^https?:\/\//i.test(origin));
-  }
-
   /** Start listening; resolves with the bound port. */
   listen(): Promise<number> {
     // `wss` is only set on 'listening'; the `starting` flag also rejects a
@@ -60,7 +55,7 @@ export class WsServer {
       const wss = new WebSocketServer({
         host: this.opts.host ?? "127.0.0.1",
         port: this.opts.port ?? 0,
-        verifyClient: (info: { origin: string }) => this.allowOrigin(info.origin),
+        verifyClient: (info: { origin: string }) => isAllowedOrigin(info.origin, this.opts.allowedOrigins),
       });
       const onStartupError = (err: Error) => {
         this.starting = false;

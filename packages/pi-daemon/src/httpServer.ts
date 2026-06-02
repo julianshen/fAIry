@@ -1,0 +1,132 @@
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
+import { isAllowedOrigin } from "./origin";
+import { redactConfig, type SettingsStore } from "./settings";
+import type { PiConfig } from "./piConfig";
+
+export interface HttpServerOptions {
+  /** Expected bearer token; clients send `Authorization: Bearer <token>`. */
+  token: string;
+  /** Source of truth for provider/model config (injected, kept pure/testable). */
+  settings: SettingsStore;
+  /** Port to bind; 0 (default) picks an ephemeral port. */
+  port?: number;
+  /** Loopback host. Defaults to 127.0.0.1 — local-only. */
+  host?: string;
+  /** Exact `Origin` values allowed; defaults to blocking web origins (see {@link isAllowedOrigin}). */
+  allowedOrigins?: string[];
+}
+
+/**
+ * Loopback HTTP server for the daemon's control plane: `GET /status` (health),
+ * `GET /settings` (the redacted provider/model config), and `PUT /settings`
+ * (replace it). Every request passes the same Origin guard as the WS servers
+ * and must carry the per-session bearer token.
+ */
+export class HttpServer {
+  private server: Server | undefined;
+  private starting = false;
+
+  constructor(private readonly opts: HttpServerOptions) {}
+
+  /** Start listening; resolves with the bound port. */
+  listen(): Promise<number> {
+    if (this.server || this.starting) return Promise.reject(new Error("HttpServer is already listening"));
+    this.starting = true;
+    return new Promise((resolve, reject) => {
+      const server = createServer((req, res) => this.handle(req, res));
+      const onStartupError = (err: Error) => {
+        this.starting = false;
+        server.close();
+        reject(err);
+      };
+      server.on("error", onStartupError);
+      server.listen(this.opts.port ?? 0, this.opts.host ?? "127.0.0.1", () => {
+        // Swap the startup handler for a runtime no-op so a later error can't
+        // reject an already-resolved promise.
+        server.off("error", onStartupError);
+        /* v8 ignore next */
+        server.on("error", () => {});
+        this.server = server;
+        this.starting = false;
+        resolve((server.address() as AddressInfo).port);
+      });
+    });
+  }
+
+  /** Stop accepting requests and close the server. */
+  close(): Promise<void> {
+    const server = this.server;
+    if (!server) return Promise.resolve();
+    this.server = undefined;
+    return new Promise((resolve) => server.close(() => resolve()));
+  }
+
+  private handle(req: IncomingMessage, res: ServerResponse): void {
+    if (!isAllowedOrigin(req.headers.origin, this.opts.allowedOrigins)) {
+      return send(res, 403, { error: "forbidden_origin" });
+    }
+    if (req.headers.authorization !== `Bearer ${this.opts.token}`) {
+      return send(res, 401, { error: "unauthorized" });
+    }
+
+    // Node always sets url/method on a server request; the defaults are type
+    // guards for the optional `IncomingMessage` fields, not reachable states.
+    /* v8 ignore next 2 */
+    const path = (req.url ?? "/").split("?")[0] ?? "/";
+    const method = req.method ?? "GET";
+
+    if (path === "/status") {
+      if (method !== "GET") return send(res, 405, { error: "method_not_allowed" });
+      return send(res, 200, { status: "ok" });
+    }
+    if (path === "/settings") {
+      if (method === "GET") return send(res, 200, redactConfig(this.opts.settings.get()));
+      if (method === "PUT") return this.putSettings(req, res);
+      return send(res, 405, { error: "method_not_allowed" });
+    }
+    return send(res, 404, { error: "not_found" });
+  }
+
+  private putSettings(req: IncomingMessage, res: ServerResponse): void {
+    readBody(req)
+      .then((raw) => {
+        const config = parseConfig(raw);
+        if (!config) return send(res, 400, { error: "invalid_config" });
+        this.opts.settings.save(config);
+        send(res, 200, redactConfig(this.opts.settings.get()));
+      })
+      /* v8 ignore next */
+      .catch(() => send(res, 400, { error: "invalid_body" }));
+  }
+}
+
+/** Parse a request body into a PiConfig, or null if it isn't one. */
+function parseConfig(raw: string): PiConfig | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  if (!Array.isArray((parsed as { providers?: unknown }).providers)) return null;
+  return parsed as PiConfig;
+}
+
+function send(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { "content-type": "application/json" });
+  res.end(JSON.stringify(body));
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (chunk) => {
+      data += chunk;
+    });
+    req.on("end", () => resolve(data));
+    /* v8 ignore next */
+    req.on("error", reject);
+  });
+}

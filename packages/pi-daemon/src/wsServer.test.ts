@@ -12,12 +12,19 @@ describe("WsServer (real WebSocket)", () => {
   it("adapts each accepted socket to a working BridgeConnection", async () => {
     let conn: BridgeConnection | undefined;
     const received: string[] = [];
-    let closed = false;
+    let resolveMessage!: () => void;
+    let resolveClose!: () => void;
+    const gotMessage = new Promise<void>((r) => (resolveMessage = r));
+    const gotClose = new Promise<void>((r) => (resolveClose = r));
+
     server = new WsServer({
       onConnection: (c) => {
         conn = c;
-        c.onMessage((d) => received.push(d));
-        c.onClose(() => (closed = true));
+        c.onMessage((d) => {
+          received.push(d);
+          resolveMessage();
+        });
+        c.onClose(() => resolveClose());
       },
     });
     const port = await server.listen();
@@ -31,14 +38,20 @@ describe("WsServer (real WebSocket)", () => {
     const [raw] = (await once(client, "message")) as [Buffer];
     expect(raw.toString()).toBe("world");
 
-    // client -> server
+    // client -> server (await the connection's own onMessage, no arbitrary delay)
     client.send("hello");
-    await new Promise((r) => setTimeout(r, 20));
+    await gotMessage;
     expect(received).toContain("hello");
 
     client.close();
-    await new Promise((r) => setTimeout(r, 20));
-    expect(closed).toBe(true);
+    await gotClose; // the connection's onClose fired
+  });
+
+  it("rejects a second, un-awaited listen() while one is in progress", async () => {
+    server = new WsServer({ onConnection: () => {} });
+    const first = server.listen();
+    await expect(server.listen()).rejects.toThrow(/already/i);
+    await first;
   });
 
   it("rejects a browser (http/https) Origin by default", async () => {

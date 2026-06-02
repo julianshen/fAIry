@@ -20,6 +20,10 @@ export interface WsServerOptions {
 
 /** Adapt a `ws` socket to the transport-agnostic BridgeConnection interface. */
 function adapt(socket: WebSocket): BridgeConnection {
+  // A socket 'error' (e.g. an abrupt disconnect / ECONNRESET) with no listener
+  // throws an unhandled exception and crashes the daemon — swallow it.
+  /* v8 ignore next */
+  socket.on("error", () => {});
   return {
     send: (data) => socket.send(data),
     onMessage: (handler) => socket.on("message", (raw: Buffer) => handler(raw.toString())),
@@ -36,6 +40,7 @@ function adapt(socket: WebSocket): BridgeConnection {
  */
 export class WsServer {
   private wss: WebSocketServer | undefined;
+  private starting = false;
 
   constructor(private readonly opts: WsServerOptions) {}
 
@@ -47,20 +52,31 @@ export class WsServer {
 
   /** Start listening; resolves with the bound port. */
   listen(): Promise<number> {
-    if (this.wss) return Promise.reject(new Error("WsServer is already listening"));
+    // `wss` is only set on 'listening'; the `starting` flag also rejects a
+    // second un-awaited listen() so two servers can't bind.
+    if (this.wss || this.starting) return Promise.reject(new Error("WsServer is already listening"));
+    this.starting = true;
     return new Promise((resolve, reject) => {
       const wss = new WebSocketServer({
         host: this.opts.host ?? "127.0.0.1",
         port: this.opts.port ?? 0,
         verifyClient: (info: { origin: string }) => this.allowOrigin(info.origin),
       });
-      wss.on("connection", (socket) => this.opts.onConnection(adapt(socket)));
-      wss.on("error", (err) => {
+      const onStartupError = (err: Error) => {
+        this.starting = false;
         wss.close();
         reject(err);
-      });
+      };
+      wss.on("error", onStartupError);
+      wss.on("connection", (socket) => this.opts.onConnection(adapt(socket)));
       wss.on("listening", () => {
+        // Swap the startup handler for a runtime one so a later server error
+        // doesn't reject an already-resolved promise / silently close us.
+        wss.off("error", onStartupError);
+        /* v8 ignore next */
+        wss.on("error", () => {});
         this.wss = wss;
+        this.starting = false;
         resolve((wss.address() as AddressInfo).port);
       });
     });

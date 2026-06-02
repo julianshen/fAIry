@@ -35,6 +35,10 @@ interface Pending {
  * is fed in via `resolve`. Transport-agnostic — it only needs a `send`
  * function — so it's testable without a real WebSocket. On disconnect, call
  * `rejectAll` to fail everything in flight.
+ *
+ * Use one correlator per channel: ids are unique only within a correlator's own
+ * pending map, so sharing one across two sockets (or two across one) breaks
+ * correlation.
  */
 export class RequestCorrelator {
   private seq = 0;
@@ -66,7 +70,7 @@ export class RequestCorrelator {
     const p = this.pending.get(response.id);
     if (!p) return false;
     this.pending.delete(response.id);
-    if (p.timer) clearTimeout(p.timer);
+    clearTimeout(p.timer); // no-op when undefined
     if (response.ok) p.resolve(response.result);
     else p.reject(new Error(response.error ?? "tool request failed"));
     return true;
@@ -75,7 +79,7 @@ export class RequestCorrelator {
   /** Reject every in-flight request (e.g. the extension disconnected). */
   rejectAll(reason: string): void {
     for (const p of this.pending.values()) {
-      if (p.timer) clearTimeout(p.timer);
+      clearTimeout(p.timer); // no-op when undefined
       p.reject(new Error(reason));
     }
     this.pending.clear();

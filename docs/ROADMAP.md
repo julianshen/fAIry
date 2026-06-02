@@ -91,8 +91,11 @@ Remaining daemon work is integration/wiring — see M2/M3 below (150+ pi-daemon 
       Pi's `settings.json`/`auth.json`. `main.ts` mints+surfaces the token, spawns
       real `pi --mode rpc -e <browser-bridge>`, and installs `SIGINT`/`SIGTERM`
       shutdown. *(Pi → bridge tool routing now closed via the Pi extension above.)*
-- [ ] **Lifecycle** — single-instance lock, fuller graceful shutdown (basic
-      signal-driven `close()` landed with the wiring above).
+- [x] **Lifecycle** — single-instance lock (`singleInstance`): a PID lockfile
+      under `appData`; exclusive-create to acquire, `process.kill(pid,0)` liveness
+      to reclaim a stale lock from a crashed run, released on shutdown. `main.ts`
+      refuses to start (exit 1) when a live instance holds it. Signal-driven
+      graceful `close()` already landed with the wiring (#22).
 
 ### M4 — Chrome extension
 

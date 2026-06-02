@@ -7,6 +7,7 @@ import { createDaemon, type PiBridgeInfo, type RunningDaemon } from "./daemon";
 import type { ChildLike } from "./jsonLineProcess";
 import { resolvePaths, type DaemonPaths } from "./paths";
 import { createFileSettingsStore } from "./settingsStore";
+import { acquireSingleInstanceLock, type LockHandle } from "./singleInstance";
 import { mintToken, writeToken } from "./tokenStore";
 
 /**
@@ -23,24 +24,38 @@ async function main(): Promise<void> {
   // a first-run conversation would otherwise spawn Pi against a missing directory.
   mkdirSync(paths.workspace, { recursive: true });
 
-  const token = mintToken();
-  writeToken(paths.appData, token);
+  // Only one daemon may own this appData (shared token/config/sockets). Bail if
+  // another live instance holds the lock; a stale lock from a crash is reclaimed.
+  const lock = acquireSingleInstanceLock({ lockFile: path.join(paths.appData, "daemon.lock") });
+  if (!lock) {
+    console.error("[fairy:pi-daemon] another instance is already running — exiting.");
+    process.exit(1);
+  }
 
-  const settings = createFileSettingsStore({
-    configFile: path.join(paths.appData, "config.json"),
-    piAgentDir: paths.piAgentDir,
-  });
+  try {
+    const token = mintToken();
+    writeToken(paths.appData, token);
 
-  const daemon = await createDaemon({ token, settings, spawnPi: piSpawner(paths) });
+    const settings = createFileSettingsStore({
+      configFile: path.join(paths.appData, "config.json"),
+      piAgentDir: paths.piAgentDir,
+    });
 
-  console.log("[fairy:pi-daemon] listening (loopback):");
-  console.log(`  bridge:       ws://127.0.0.1:${daemon.ports.bridge}`);
-  console.log(`  pi-bridge:    tcp://127.0.0.1:${daemon.ports.piBridge}`);
-  console.log(`  conversation: ws://127.0.0.1:${daemon.ports.conversation}`);
-  console.log(`  http:         http://127.0.0.1:${daemon.ports.http}`);
-  console.log(`  appData:      ${paths.appData}`);
+    const daemon = await createDaemon({ token, settings, spawnPi: piSpawner(paths) });
 
-  installShutdown(daemon);
+    console.log("[fairy:pi-daemon] listening (loopback):");
+    console.log(`  bridge:       ws://127.0.0.1:${daemon.ports.bridge}`);
+    console.log(`  pi-bridge:    tcp://127.0.0.1:${daemon.ports.piBridge}`);
+    console.log(`  conversation: ws://127.0.0.1:${daemon.ports.conversation}`);
+    console.log(`  http:         http://127.0.0.1:${daemon.ports.http}`);
+    console.log(`  appData:      ${paths.appData}`);
+
+    installShutdown(daemon, lock);
+  } catch (err) {
+    // Don't leave the lock held if startup failed before installShutdown.
+    lock.release();
+    throw err;
+  }
 }
 
 /** The Pi `browser` extension script, shipped alongside the daemon. */
@@ -76,8 +91,8 @@ function homedirOrExit(): string {
   }
 }
 
-/** Close the daemon on SIGINT/SIGTERM so sockets/Pi don't linger. */
-function installShutdown(daemon: RunningDaemon): void {
+/** Close the daemon + release the lock on SIGINT/SIGTERM so nothing lingers. */
+function installShutdown(daemon: RunningDaemon, lock: LockHandle): void {
   let closing = false;
   const shutdown = (signal: string): void => {
     if (closing) {
@@ -88,9 +103,13 @@ function installShutdown(daemon: RunningDaemon): void {
     }
     closing = true;
     console.log(`[fairy:pi-daemon] ${signal} — shutting down.`);
+    const finish = (code: number): never => {
+      lock.release();
+      process.exit(code);
+    };
     daemon.close().then(
-      () => process.exit(0),
-      () => process.exit(1),
+      () => finish(0),
+      () => finish(1),
     );
   };
   process.on("SIGINT", () => shutdown("SIGINT"));

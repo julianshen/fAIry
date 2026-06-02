@@ -34,3 +34,6 @@ export type { PanelBeat, PanelAgentId, PanelRun } from "./beatMapper";
 
 export { ConversationController } from "./conversation";
 export type { ConversationControllerOptions } from "./conversation";
+
+export { ConversationSession } from "./conversationSession";
+export type { ConversationDriver, ConversationSessionOptions } from "./conversationSession";

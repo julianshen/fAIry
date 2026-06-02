@@ -64,7 +64,12 @@ function homedirOrExit(): string {
 function installShutdown(daemon: RunningDaemon): void {
   let closing = false;
   const shutdown = (signal: string): void => {
-    if (closing) return;
+    if (closing) {
+      // A second signal while a slow/stuck close() is in flight forces exit, so
+      // the daemon stays killable from the terminal.
+      console.error(`[fairy:pi-daemon] ${signal} again — forcing exit.`);
+      process.exit(1);
+    }
     closing = true;
     console.log(`[fairy:pi-daemon] ${signal} — shutting down.`);
     daemon.close().then(

@@ -73,7 +73,9 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
   const results = await Promise.allSettled([bridge.listen(), conversation.listen(), http.listen()]);
   const failure = results.find((r) => r.status === "rejected");
   if (failure) {
-    await closeAll();
+    // Swallow any teardown error so it can't shadow the actual bind failure.
+    /* v8 ignore next */
+    await closeAll().catch(() => {});
     throw (failure as PromiseRejectedResult).reason;
   }
   const port = (i: number): number => (results[i] as PromiseFulfilledResult<number>).value;

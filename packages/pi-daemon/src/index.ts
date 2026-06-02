@@ -19,3 +19,6 @@ export type { AgentEvent, PiSessionHandlers } from "./piSession";
 
 export { buildAuth, buildSettings, writePiConfig } from "./piConfig";
 export type { PiConfig, ProviderConfig, PiAuth } from "./piConfig";
+
+export { RequestCorrelator } from "./bridge";
+export type { ToolRequest, ToolResponse, CorrelatorOptions } from "./bridge";

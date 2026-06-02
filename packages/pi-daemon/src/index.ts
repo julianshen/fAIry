@@ -22,6 +22,14 @@ export type { PiConfig, ProviderConfig, PiAuth } from "./piConfig";
 
 export { mintToken, writeToken, TOKEN_FILENAME } from "./tokenStore";
 
+export { redactConfig } from "./settings";
+export type { SettingsStore, RedactedConfig, RedactedProvider } from "./settings";
+
+export { isAllowedOrigin } from "./origin";
+
+export { HttpServer } from "./httpServer";
+export type { HttpServerOptions } from "./httpServer";
+
 export { RequestCorrelator } from "./bridge";
 export type { ToolRequest, ToolResponse, CorrelatorOptions } from "./bridge";
 

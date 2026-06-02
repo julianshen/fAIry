@@ -65,7 +65,11 @@ Remaining daemon work is integration/wiring — see M2/M3 below (150+ pi-daemon 
       pipes mapped beats out; `start`/`stop` (v1: pause/take-over map to stop).
 - [x] **WS conversation endpoint** (`conversationSession`, #16) — token handshake,
       commands in / beats out, driving the controller; served via `wsServer`.
-- [ ] **HTTP settings/status** — providers/models (via `piConfig`), health. *(testable)*
+- [x] **HTTP settings/status** (`httpServer`) — loopback `node:http` control plane:
+      `GET /status`, `GET /settings` (redacted — `redactConfig` collapses each
+      key to a `hasKey` flag, secrets never leave the daemon), `PUT /settings`
+      (replace, persisted via an injected `SettingsStore`). Bearer-token auth +
+      the shared `isAllowedOrigin` guard (extracted from `wsServer`).
 - [x] **Token mint + file surface** (`tokenStore`) — per-session 256-bit
       base64url token (`mintToken`); atomically written `0600` to `token.json`
       under `appData` (`writeToken`) for the trusted shell to read and inject.

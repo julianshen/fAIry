@@ -60,8 +60,9 @@ export class PiSession {
       this.proc.send({ type: "prompt", message: prompt, streamingBehavior: "steer" });
       return;
     }
-    this.running = true;
+    // Send first: if it throws (e.g. stdin gone), `running` stays false.
     this.proc.send({ type: "prompt", message: prompt });
+    this.running = true;
   }
 
   /** Cancel the in-flight turn. */
@@ -108,6 +109,9 @@ export class PiSession {
   }
 
   private dispatch(msg: Msg): void {
+    // Pi could emit a valid JSON line that isn't an object (null, a number);
+    // guard before reading `.type`.
+    if (!msg || typeof msg !== "object") return;
     switch (msg.type as string) {
       case "message_update":
         return this.onMessageUpdate(msg);
@@ -152,14 +156,15 @@ export class PiSession {
 
   private onToolEnd(msg: Msg): void {
     const result = msg.result as { content?: ResultBlock[]; details?: unknown } | undefined;
-    const blocks = result?.content ?? [];
-    const image = blocks.find((b) => b.type === "image" && typeof b.data === "string");
+    // `content` is normally an array of blocks; tolerate a malformed payload.
+    const blocks = Array.isArray(result?.content) ? result.content : [];
+    const image = blocks.find((b) => b?.type === "image" && typeof b.data === "string");
     let output: unknown;
     if (image) {
       const details = (result?.details ?? {}) as { width?: number; height?: number };
       output = { format: "png", base64: image.data, width: details.width ?? 0, height: details.height ?? 0 };
     } else {
-      const text = blocks.map((b) => b.text ?? "").join("");
+      const text = blocks.map((b) => b?.text ?? "").join("");
       output = text || result;
     }
     this.emit({
@@ -171,7 +176,10 @@ export class PiSession {
   }
 
   private onAutoRetryEnd(msg: Msg): void {
-    if (msg.aborted && typeof msg.finalError === "string") {
+    // Pi marks an exhausted retry with `aborted` (observed) and/or
+    // `success: false` (per docs); accept either alongside a finalError.
+    const failed = msg.aborted === true || msg.success === false;
+    if (failed && typeof msg.finalError === "string") {
       this.emit({ type: "error", message: `Agent retry failed: ${msg.finalError}` });
       this.endTurn("error");
     }

@@ -249,6 +249,41 @@ describe("PiSession — edge cases", () => {
     expect(sent()).toHaveLength(before);
   });
 
+  it("does not crash on a null or non-object stdout line", () => {
+    const { session, events, child } = setup();
+    session.startTurn("go");
+    expect(() => child.stdout.feed("null\n")).not.toThrow();
+    expect(() => child.stdout.feed("42\n")).not.toThrow();
+    expect(events).toEqual([]);
+  });
+
+  it("tolerates a non-array tool result content", () => {
+    const { session, events, feed } = setup();
+    session.startTurn("go");
+    feed({ type: "tool_execution_end", toolCallId: "t1", result: { content: "oops" }, isError: false });
+    expect(events).toContainEqual({
+      type: "tool_result",
+      id: "t1",
+      output: { content: "oops" },
+      isError: false,
+    });
+  });
+
+  it("leaves running false if the prompt send fails", () => {
+    const { session, child } = setup();
+    (child as { stdin: unknown }).stdin = null;
+    expect(() => session.startTurn("go")).toThrow();
+    expect(session.isRunning).toBe(false);
+  });
+
+  it("ends the turn on a success:false auto_retry_end", () => {
+    const { session, events, feed } = setup();
+    session.startTurn("go");
+    feed({ type: "auto_retry_end", success: false, finalError: "503" });
+    expect(events).toContainEqual({ type: "error", message: "Agent retry failed: 503" });
+    expect(events).toContainEqual({ type: "turn_end", reason: "error" });
+  });
+
   it("ignores unrecognized and non-text/error message updates", () => {
     const { session, events, feed } = setup();
     session.startTurn("go");

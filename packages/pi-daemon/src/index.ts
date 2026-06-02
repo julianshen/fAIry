@@ -28,3 +28,6 @@ export type { BridgeConnection, BridgeSessionOptions } from "./bridgeSession";
 
 export { BridgeServer } from "./bridgeServer";
 export type { BridgeServerOptions } from "./bridgeServer";
+
+export { BeatMapper } from "./beatMapper";
+export type { PanelBeat, PanelAgentId, PanelRun } from "./beatMapper";

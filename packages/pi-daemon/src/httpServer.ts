@@ -16,7 +16,13 @@ export interface HttpServerOptions {
   port?: number;
   /** Loopback host. Defaults to 127.0.0.1 — local-only. */
   host?: string;
-  /** Exact `Origin` values allowed; defaults to blocking web origins (see {@link isAllowedOrigin}). */
+  /**
+   * Exact `Origin` values allowed; defaults to blocking web origins (see
+   * {@link isAllowedOrigin}). Note: this gates the Origin only — it does not
+   * emit CORS headers or answer `OPTIONS` preflights, so a browser can't yet
+   * call these endpoints. The intended consumer is the native shell (no CORS);
+   * browser access waits on the pairing endpoint, which will add CORS.
+   */
   allowedOrigins?: string[];
   /** Maximum accepted `PUT` body size in bytes (default 1 MiB). */
   maxBodyBytes?: number;

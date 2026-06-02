@@ -37,6 +37,13 @@ bun run --filter agent-panel test # run a package's tests
 
 Each package documents its own commands in its `README` / `package.json`.
 
+## Documentation
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the design: components,
+  flows, protocols/seams, isolation, POC reuse, and open questions.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — status, milestones (M1–M6), the
+  **non-goals** that bound scope, and the decision log.
+
 ## Conventions
 
 - **Trunk-based with PRs.** No direct commits of feature work to `main`; every

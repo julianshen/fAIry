@@ -7,6 +7,14 @@ describe("encodeLine", () => {
     );
   });
 
+  it("throws on values that don't serialize to JSON instead of emitting a bad line", () => {
+    // JSON.stringify returns undefined for these — appending "\n" would emit
+    // the literal "undefined\n", which the other end can't parse.
+    expect(() => encodeLine(undefined)).toThrow(TypeError);
+    expect(() => encodeLine(() => {})).toThrow(TypeError);
+    expect(() => encodeLine(Symbol("x"))).toThrow(TypeError);
+  });
+
   it("round-trips with the decoder", () => {
     const d = new LineDecoder();
     const value = { id: "1", tool: "click", args: { x: 10 } };

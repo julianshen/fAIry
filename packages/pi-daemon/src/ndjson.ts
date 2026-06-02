@@ -8,9 +8,17 @@
 
 export type LineErrorHandler = (line: string, error: Error) => void;
 
-/** Serialize a value as one NDJSON line (JSON + trailing "\n"). */
+/**
+ * Serialize a value as one NDJSON line (JSON + trailing "\n"). Throws if the
+ * value has no JSON representation (`undefined`, a function, a symbol) rather
+ * than emitting the literal `"undefined\n"` for the other end to choke on.
+ */
 export function encodeLine(value: unknown): string {
-  return JSON.stringify(value) + "\n";
+  const json = JSON.stringify(value);
+  if (json === undefined) {
+    throw new TypeError("encodeLine: value has no JSON representation");
+  }
+  return json + "\n";
 }
 
 /**
@@ -42,6 +50,7 @@ export class LineDecoder {
       try {
         out.push(JSON.parse(line));
       } catch (err) {
+        // JSON.parse only ever throws SyntaxError, so this assertion is safe.
         const error = err as Error;
         if (this.onError) {
           this.onError(line, error);

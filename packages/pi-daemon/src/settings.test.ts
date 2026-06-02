@@ -1,4 +1,4 @@
-import { isPiConfig, redactConfig } from "./settings";
+import { isPiConfig, mergeProviderKeys, redactConfig } from "./settings";
 import type { PiConfig } from "./piConfig";
 
 describe("redactConfig", () => {
@@ -75,5 +75,36 @@ describe("isPiConfig", () => {
     expect(isPiConfig({ providers: [], defaultModel: 5 })).toBe(false);
     expect(isPiConfig({ providers: [], enabledModels: "gpt-5" })).toBe(false);
     expect(isPiConfig({ providers: [], enabledModels: ["ok", 2] })).toBe(false);
+  });
+});
+
+describe("mergeProviderKeys", () => {
+  it("keeps an explicitly provided non-blank key (a change)", () => {
+    const merged = mergeProviderKeys(
+      { providers: [{ id: "a", apiKey: "old" }] },
+      { providers: [{ id: "a", apiKey: "new" }] },
+    );
+    expect(merged.providers).toEqual([{ id: "a", apiKey: "new" }]);
+  });
+
+  it("restores the stored key when the incoming key is blank (round-trip)", () => {
+    const merged = mergeProviderKeys(
+      { providers: [{ id: "a", apiKey: "stored" }] },
+      { providers: [{ id: "a", apiKey: "" }] },
+    );
+    expect(merged.providers).toEqual([{ id: "a", apiKey: "stored" }]);
+  });
+
+  it("leaves a blank key blank for a provider with no stored key", () => {
+    const merged = mergeProviderKeys({ providers: [] }, { providers: [{ id: "new", apiKey: "" }] });
+    expect(merged.providers).toEqual([{ id: "new", apiKey: "" }]);
+  });
+
+  it("carries through the incoming non-provider fields", () => {
+    const merged = mergeProviderKeys(
+      { providers: [] },
+      { providers: [], defaultModel: "m", enabledModels: ["x"] },
+    );
+    expect(merged).toEqual({ providers: [], defaultModel: "m", enabledModels: ["x"] });
   });
 });

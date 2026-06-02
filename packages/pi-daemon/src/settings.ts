@@ -56,6 +56,26 @@ export function isPiConfig(value: unknown): value is PiConfig {
 }
 
 /**
+ * Merge a settings update onto the current config, preserving secrets the client
+ * couldn't have seen. `GET /settings` is redacted (keys → `hasKey`), so a client
+ * editing a non-secret field can only send a blank key back. The contract: a
+ * blank incoming key keeps the provider's stored key, a non-blank key sets it,
+ * and omitting a provider removes it. Without this, a settings UI would silently
+ * wipe every API key whenever it saved.
+ */
+export function mergeProviderKeys(current: PiConfig, incoming: PiConfig): PiConfig {
+  const storedKeys = new Map(current.providers.map((p) => [p.id, p.apiKey]));
+  return {
+    ...incoming,
+    providers: incoming.providers.map((p) => {
+      if (normalizedApiKey(p) !== "") return p;
+      const stored = storedKeys.get(p.id);
+      return stored !== undefined ? { ...p, apiKey: stored } : p;
+    }),
+  };
+}
+
+/**
  * The daemon's settings source of truth, injected into the HTTP endpoint so the
  * transport stays pure/testable. `get` returns the current config; `save`
  * persists an update (the production impl writes Pi's config via `writePiConfig`

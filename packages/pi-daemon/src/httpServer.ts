@@ -1,11 +1,14 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { isAllowedOrigin } from "./origin";
-import { isPiConfig, redactConfig, type SettingsStore } from "./settings";
+import { isPiConfig, mergeProviderKeys, redactConfig, type SettingsStore } from "./settings";
 import type { PiConfig } from "./piConfig";
 
 /** Default maximum `PUT` body size — the settings payload is tiny. */
 const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
+
+/** Loopback hosts the control plane may bind — it must never be reachable off-machine. */
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
 
 export interface HttpServerOptions {
   /** Expected bearer token; clients send `Authorization: Bearer <token>`. */
@@ -43,6 +46,10 @@ export class HttpServer {
   /** Start listening; resolves with the bound port. */
   listen(): Promise<number> {
     if (this.server || this.starting) return Promise.reject(new Error("HttpServer is already listening"));
+    const host = this.opts.host ?? "127.0.0.1";
+    if (!LOOPBACK_HOSTS.has(host)) {
+      return Promise.reject(new Error(`HttpServer host must be loopback, got "${host}"`));
+    }
     this.starting = true;
     return new Promise((resolve, reject) => {
       const server = createServer((req, res) => this.handle(req, res));
@@ -52,7 +59,7 @@ export class HttpServer {
         reject(err);
       };
       server.on("error", onStartupError);
-      server.listen(this.opts.port ?? 0, this.opts.host ?? "127.0.0.1", () => {
+      server.listen(this.opts.port ?? 0, host, () => {
         // Swap the startup handler for a runtime no-op so a later error can't
         // reject an already-resolved promise.
         server.off("error", onStartupError);
@@ -105,8 +112,15 @@ export class HttpServer {
         if (raw === null) return send(res, 413, { error: "payload_too_large" });
         const config = parseConfig(raw);
         if (!config) return send(res, 400, { error: "invalid_config" });
-        this.opts.settings.save(config);
-        send(res, 200, redactConfig(this.opts.settings.get()));
+        // Persistence/redaction errors are server-side — keep them out of the
+        // body-parse catch below, which would mislabel them as a 400.
+        try {
+          const store = this.opts.settings;
+          store.save(mergeProviderKeys(store.get(), config));
+          send(res, 200, redactConfig(store.get()));
+        } catch {
+          send(res, 500, { error: "internal_error" });
+        }
       })
       /* v8 ignore next */
       .catch(() => send(res, 400, { error: "invalid_body" }));

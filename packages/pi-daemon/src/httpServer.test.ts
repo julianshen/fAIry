@@ -189,6 +189,38 @@ describe("HttpServer", () => {
     await expect(server.close()).resolves.toBeUndefined();
   });
 
+  it("preserves an existing provider key when the update sends a blank key", async () => {
+    await start(); // store seeded with anthropic -> sk-ant-secret
+    const res = await call("PUT", "/settings", {
+      body: { providers: [{ id: "anthropic", apiKey: "" }], defaultModel: "new-model" },
+    });
+    expect(res.status).toBe(200);
+    expect(store.saved[0]?.providers).toEqual([{ id: "anthropic", apiKey: "sk-ant-secret" }]);
+    expect(store.saved[0]?.defaultModel).toBe("new-model");
+    expect(await res.json()).toEqual({
+      providers: [{ id: "anthropic", hasKey: true }],
+      defaultModel: "new-model",
+    });
+  });
+
+  it("returns 500 (not 400) when the store fails to persist", async () => {
+    const throwing: SettingsStore = {
+      get: () => ({ providers: [] }),
+      save: () => {
+        throw new Error("disk full");
+      },
+    };
+    server = new HttpServer({ token: TOKEN, settings: throwing });
+    base = `http://127.0.0.1:${await server.listen()}`;
+    const res = await call("PUT", "/settings", { body: { providers: [] } });
+    expect(res.status).toBe(500);
+  });
+
+  it("refuses to bind a non-loopback host", async () => {
+    server = new HttpServer({ token: TOKEN, settings: fakeStore({ providers: [] }), host: "0.0.0.0" });
+    await expect(server.listen()).rejects.toThrow(/loopback/);
+  });
+
   it("rejects a second listen while already listening", async () => {
     await start();
     await expect(server.listen()).rejects.toThrow(/already listening/);

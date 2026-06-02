@@ -16,6 +16,10 @@ describe("isAllowedOrigin", () => {
       // Scheme check is case-insensitive.
       expect(isAllowedOrigin("HTTPS://evil.example")).toBe(false);
     });
+
+    it("rejects the opaque 'null' origin (file:/sandboxed documents)", () => {
+      expect(isAllowedOrigin("null")).toBe(false);
+    });
   });
 
   describe("with an explicit allowlist", () => {

@@ -35,24 +35,33 @@
 
 ### M2 — Browser bridge
 
-- [ ] **Bridge protocol types** — `ToolRequest` / `ToolResponse` schema (shared,
-      framework-agnostic).
-- [ ] **Bridge server** — loopback server in the daemon that routes tool
-      requests to the connected Chrome extension and correlates responses.
-- [ ] **Pi browser extension** — the `-e` extension registering the `browser`
-      tool that calls the bridge. (Port/adapt POC `horizon-bridge.ts`.)
-- [ ] Port **all 27 POC browser tools** to the bridge (v1).
+- [x] **Bridge protocol types** — `ToolRequest` / `ToolResponse` (#10).
+- [x] **`RequestCorrelator`** — request/response correlation, timeouts, reject-all (#10).
+- [x] **`BridgeSession`** — authenticated connection (token-first, auth timeout) (#11).
+- [x] **`BridgeServer`** — loopback `ws` adapter + Origin check (#12).
+- [ ] **Pi browser extension** — the `-e` script registering the `browser` tool
+      that bridges each call to the daemon. (Port/adapt POC `horizon-bridge.ts`.
+      Runs inside Pi → integration-tested, not pure-unit.)
 
-### M3 — Daemon ↔ clients API
+> The **27 tool handlers** are extension-side (M4), not daemon work — the bridge
+> is generic (`ToolRequest`/`ToolResponse`).
 
-- [ ] **Transport** — WebSocket for the conversation/event stream + extension
-      tool bridge; HTTP REST for settings/status.
-- [ ] **Auth** — daemon mints a per-session token; one-time pairing approved in
-      the Settings UI; the token gates all requests.
-- [ ] Conversation API (start task, stream beats, answer confirm, pause, take
-      over, stop) — a **single conversation bound to the active tab**.
-- [ ] Settings/status API (providers/models, daemon health).
-- [ ] Map the Pi event stream → panel **beat model** (the `agent-panel` contract).
+### M3 — Daemon ↔ clients API (detailed)
+
+- [ ] **`AgentEvent` → beat mapper** *(pure, next)* — translate `PiSession`
+      events (`text_delta`/`tool_use`/`tool_result`/`turn_end`/`error`) into the
+      panel's `beat` model. Buffers text deltas → `say`; tool calls → `actGroup`
+      + `act` rows; `turn_end` → `status`. **Decision deferred:** v1 attributes
+      all beats to a single agent (`sage`); multi-agent team attribution
+      (per-specialist + handoffs) needs Pi sub-agents or a tool→agent heuristic.
+- [ ] **Conversation controller** — owns a `PiSession` + the bridge for one
+      task; `start`/`answer`/`pause`/`takeover`/`stop`; pipes mapped beats out.
+- [ ] **WS conversation endpoint** — stream beats to the panel; receive commands.
+- [ ] **HTTP settings/status** — providers/models (via `piConfig`), health.
+- [ ] **Token/pairing surface** — expose the minted token for extension + shell.
+- [ ] **Daemon entry wiring** (`main.ts`) — compose token + paths + `writePiConfig`
+      + `BridgeServer` + `PiSession` into a running daemon (`bun run start`).
+- [ ] **Lifecycle** — single-instance lock, graceful shutdown.
 
 ### M4 — Chrome extension
 

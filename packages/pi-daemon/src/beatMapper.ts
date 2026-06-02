@@ -10,6 +10,8 @@ export type PanelAgentId = "sage" | "atlas" | "quill" | "forge";
 export type PanelRun = "idle" | "running" | "paused" | "done";
 
 export type PanelBeat =
+  // Emitted by the conversation controller (not the mapper) when a task starts.
+  | { kind: "user"; text: string }
   | { kind: "thinking"; agent: PanelAgentId }
   | { kind: "say"; agent: PanelAgentId; text: string }
   | { kind: "actGroup"; agent: PanelAgentId; title: string }

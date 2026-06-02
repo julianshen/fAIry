@@ -24,6 +24,25 @@ describe("RequestCorrelator — sending", () => {
     void correlator.request("b", {});
     expect(sent.map((r) => r.id)).toEqual(["req-1", "req-2"]);
   });
+
+  it("cleans up and rejects if send throws (no leaked pending entry)", async () => {
+    const correlator = new RequestCorrelator({
+      send: () => {
+        throw new Error("socket closed");
+      },
+    });
+    await expect(correlator.request("x", {})).rejects.toThrow("socket closed");
+    expect(correlator.pendingCount).toBe(0);
+  });
+
+  it("wraps a non-Error thrown by send", async () => {
+    const correlator = new RequestCorrelator({
+      send: () => {
+        throw "boom";
+      },
+    });
+    await expect(correlator.request("x", {})).rejects.toThrow("boom");
+  });
 });
 
 describe("RequestCorrelator — resolving", () => {

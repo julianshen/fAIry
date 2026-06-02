@@ -58,7 +58,14 @@ export class RequestCorrelator {
             }, this.opts.timeoutMs)
           : undefined;
       this.pending.set(id, { resolve, reject, timer });
-      this.opts.send({ id, tool, args });
+      try {
+        this.opts.send({ id, tool, args });
+      } catch (err) {
+        // Delivery failed synchronously — don't leave the entry/timer dangling.
+        this.pending.delete(id);
+        clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
     });
   }
 

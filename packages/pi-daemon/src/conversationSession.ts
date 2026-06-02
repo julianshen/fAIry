@@ -61,10 +61,15 @@ export class ConversationSession {
     if (!this.authed) {
       const m = msg as { type?: string; token?: string };
       if (m?.type === "auth" && m.token === this.opts.token) {
-        this.authed = true;
         clearTimeout(this.authTimer);
-        this.driver = this.opts.createDriver((beat) => this.sendBeat(beat));
-        this.opts.connection.send(JSON.stringify({ type: "auth_ok" }));
+        try {
+          // Driver creation spawns Pi and can fail; only authenticate on success.
+          this.driver = this.opts.createDriver((beat) => this.sendBeat(beat));
+          this.authed = true;
+          this.opts.connection.send(JSON.stringify({ type: "auth_ok" }));
+        } catch {
+          this.opts.connection.close();
+        }
       } else {
         this.opts.connection.close();
       }
@@ -82,6 +87,8 @@ export class ConversationSession {
   }
 
   private sendBeat(beat: PanelBeat): void {
+    // The driver emits beats asynchronously; drop any that arrive after close.
+    if (!this.authed) return;
     this.opts.connection.send(JSON.stringify({ type: "beat", beat }));
   }
 
@@ -89,6 +96,7 @@ export class ConversationSession {
     clearTimeout(this.authTimer);
     this.authed = false;
     this.driver?.dispose();
+    this.driver = undefined;
     this.opts.onClose?.();
   }
 }

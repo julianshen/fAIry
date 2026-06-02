@@ -94,6 +94,20 @@ describe("ConversationSession — handshake", () => {
     conn.emit("not json");
     expect(conn.closed).toBe(true);
   });
+
+  it("closes (and stays unauthenticated) if creating the driver throws", () => {
+    const conn = new FakeConnection();
+    const session = new ConversationSession({
+      token: TOKEN,
+      connection: conn,
+      createDriver: () => {
+        throw new Error("pi spawn failed");
+      },
+    });
+    expect(() => conn.emit({ type: "auth", token: TOKEN })).not.toThrow();
+    expect(session.isAuthenticated).toBe(false);
+    expect(conn.closed).toBe(true);
+  });
 });
 
 describe("ConversationSession — auth timeout", () => {
@@ -167,6 +181,15 @@ describe("ConversationSession — beats out", () => {
     auth(conn);
     driver.emitBeat({ kind: "say", agent: "sage", text: "hi" });
     expect(conn.parsed()).toContainEqual({ type: "beat", beat: { kind: "say", agent: "sage", text: "hi" } });
+  });
+
+  it("does not send beats after the connection has closed", () => {
+    const { conn, driver } = setup();
+    auth(conn);
+    conn.close();
+    const before = conn.sent.length;
+    driver.emitBeat({ kind: "say", agent: "sage", text: "late" });
+    expect(conn.sent.length).toBe(before);
   });
 });
 

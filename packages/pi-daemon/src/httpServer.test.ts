@@ -1,4 +1,5 @@
 import { HttpServer } from "./httpServer";
+import { createPairingStore, type PairingStore } from "./pairing";
 import type { SettingsStore } from "./settings";
 import type { PiConfig } from "./piConfig";
 
@@ -22,12 +23,17 @@ describe("HttpServer", () => {
   let store: ReturnType<typeof fakeStore>;
   let base: string;
 
-  async function start(opts: { allowedOrigins?: string[] } = {}) {
+  async function start(opts: { allowedOrigins?: string[]; pairing?: PairingStore } = {}) {
     store = fakeStore({
       providers: [{ id: "anthropic", apiKey: "sk-ant-secret" }],
       defaultModel: "claude-opus-4-8",
     });
-    server = new HttpServer({ token: TOKEN, settings: store, allowedOrigins: opts.allowedOrigins });
+    server = new HttpServer({
+      token: TOKEN,
+      settings: store,
+      allowedOrigins: opts.allowedOrigins,
+      pairing: opts.pairing,
+    });
     const port = await server.listen();
     base = `http://127.0.0.1:${port}`;
   }
@@ -231,5 +237,75 @@ describe("HttpServer", () => {
     const inUse = Number(new URL(base).port);
     const other = new HttpServer({ token: TOKEN, settings: store, port: inUse });
     await expect(other.listen()).rejects.toBeDefined();
+  });
+
+  describe("CORS + pairing", () => {
+    const EXT = "chrome-extension://abcdefg";
+
+    it("answers an OPTIONS preflight with 204 + CORS headers", async () => {
+      await start();
+      const res = await call("OPTIONS", "/pair", { token: null, origin: EXT });
+      expect(res.status).toBe(204);
+      expect(res.headers.get("access-control-allow-origin")).toBe(EXT);
+      expect(res.headers.get("access-control-allow-headers")).toMatch(/authorization/i);
+    });
+
+    it("emits CORS headers on a normal response for an allowed browser origin", async () => {
+      await start();
+      const res = await call("GET", "/status", { origin: EXT });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("access-control-allow-origin")).toBe(EXT);
+    });
+
+    it("does not emit CORS headers when there is no Origin (native shell)", async () => {
+      await start();
+      const res = await call("GET", "/status");
+      expect(res.headers.get("access-control-allow-origin")).toBeNull();
+    });
+
+    it("POST /pair redeems a valid code for the token — without a bearer token", async () => {
+      await start({ pairing: createPairingStore({ token: TOKEN, code: "PAIRCODE" }) });
+      const res = await call("POST", "/pair", { token: null, origin: EXT, body: { code: "PAIRCODE" } });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ token: TOKEN });
+    });
+
+    it("POST /pair rejects a wrong/expired code with 401", async () => {
+      await start({ pairing: createPairingStore({ token: TOKEN, code: "PAIRCODE" }) });
+      const res = await call("POST", "/pair", { token: null, body: { code: "wrong" } });
+      expect(res.status).toBe(401);
+    });
+
+    it("POST /pair rejects a malformed body with 400", async () => {
+      await start({ pairing: createPairingStore({ token: TOKEN, code: "PAIRCODE" }) });
+      expect((await call("POST", "/pair", { token: null, body: { code: 42 } })).status).toBe(400);
+      expect((await call("POST", "/pair", { token: null, body: "{not json" })).status).toBe(400);
+      expect((await call("POST", "/pair", { token: null, body: "42" })).status).toBe(400); // non-object JSON
+      expect((await call("POST", "/pair", { token: null, body: "[1,2]" })).status).toBe(400); // array, not an object
+    });
+
+    it("POST /pair over the body size limit is 413", async () => {
+      store = fakeStore({ providers: [] });
+      server = new HttpServer({
+        token: TOKEN,
+        settings: store,
+        maxBodyBytes: 8,
+        pairing: createPairingStore({ token: TOKEN, code: "PAIRCODE" }),
+      });
+      base = `http://127.0.0.1:${await server.listen()}`;
+      const res = await call("POST", "/pair", { token: null, body: { code: "x".repeat(50) } });
+      expect(res.status).toBe(413);
+    });
+
+    it("POST /pair is 404 when pairing is not enabled", async () => {
+      await start(); // no pairing store
+      const res = await call("POST", "/pair", { token: null, body: { code: "x" } });
+      expect(res.status).toBe(404);
+    });
+
+    it("returns 405 for GET /pair", async () => {
+      await start({ pairing: createPairingStore({ token: TOKEN, code: "PAIRCODE" }) });
+      expect((await call("GET", "/pair", { token: null })).status).toBe(405);
+    });
   });
 });

@@ -80,10 +80,14 @@ Remaining daemon work is integration/wiring — see M2/M3 below (150+ pi-daemon 
       base64url token (`mintToken`); atomically written `0600` to `token.json`
       under `appData` (`writeToken`) for the trusted shell to read and inject.
       Shares the atomic-write helper with `piConfig` via `fsAtomic`.
-- [ ] **Extension pairing handshake** — the untrusted Chrome extension can't read
-      `token.json`, so it redeems a short-lived, single-use pairing code to obtain
-      the token. Needs a client-facing entry point → builds on the HTTP endpoint
-      above; the WS auth handshake itself already exists (`authenticatedSession`).
+- [x] **Extension pairing handshake** (`pairing`) — the extension can't read
+      `token.json`, so the daemon writes a strong single-use pairing code to
+      `pairing.json` (`0600`); the shell shows it, the user pastes it into the
+      extension, which redeems it at the unauthenticated **`POST /pair`** (the
+      code is the credential) for the session token. This added **CORS + `OPTIONS`
+      preflight** to `httpServer` (deferred from the HTTP unit) — allowed browser
+      origins now get `Access-Control-*` headers, so the extension can call it
+      cross-origin.
 - [x] **Daemon entry wiring** (`daemon` + `main`) — `createDaemon` composes the
       `BridgeServer`, the new `ConversationServer` (`WsServer` + `ConversationSession`
       + `ConversationController`), and the `HttpServer` under one token/Origin policy;

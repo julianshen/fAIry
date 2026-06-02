@@ -39,6 +39,11 @@ export { isLoopbackHost } from "./loopback";
 export { acquireSingleInstanceLock } from "./singleInstance";
 export type { SingleInstanceLockOptions, LockHandle } from "./singleInstance";
 
+export { createPairingStore } from "./pairing";
+export type { PairingStore, PairingStoreOptions } from "./pairing";
+
+export { timingSafeStrEqual } from "./secureCompare";
+
 export { PiBridgeServer } from "./piBridgeServer";
 export type { PiBridgeServerOptions } from "./piBridgeServer";
 

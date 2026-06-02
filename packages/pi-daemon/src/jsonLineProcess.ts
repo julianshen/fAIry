@@ -27,7 +27,12 @@ export interface JsonLineHandlers {
   onStderr?: (text: string) => void;
   /** The child exited (its stdout/stderr are done). */
   onExit?: (code: number | null) => void;
-  /** A spawn-level failure or a malformed stdout line. */
+  /**
+   * An asynchronous failure: the child's `error` event (e.g. the process
+   * failed to start) or a malformed stdout line (carrying the offending line,
+   * with the parse error as `cause`). A *synchronous* throw from the injected
+   * spawner surfaces from the constructor, not here.
+   */
   onError?: (error: Error) => void;
 }
 
@@ -46,7 +51,11 @@ export class JsonLineProcess {
     private readonly handlers: JsonLineHandlers,
   ) {
     this.child = spawn();
-    const decoder = new LineDecoder((_line, err) => this.handlers.onError?.(err));
+    const decoder = new LineDecoder((line, err) =>
+      this.handlers.onError?.(
+        new Error(`malformed stdout line: ${line}`, { cause: err }),
+      ),
+    );
 
     this.child.stdout?.setEncoding("utf8");
     this.child.stdout?.on("data", (chunk) => {

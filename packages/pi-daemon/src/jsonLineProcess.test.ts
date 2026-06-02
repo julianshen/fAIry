@@ -75,11 +75,13 @@ describe("JsonLineProcess", () => {
     expect(errs).toEqual(["pi: warning\n"]);
   });
 
-  it("reports a malformed stdout line to onError without throwing", () => {
-    const errs: string[] = [];
-    const { child } = setup({ onError: (e) => errs.push(e.message) });
+  it("reports a malformed stdout line to onError, including the offending line", () => {
+    const errs: Error[] = [];
+    const { child } = setup({ onError: (e) => errs.push(e) });
     expect(() => child.stdout.feed("not json\n")).not.toThrow();
     expect(errs).toHaveLength(1);
+    expect(errs[0]!.message).toContain("not json");
+    expect(errs[0]!.cause).toBeInstanceOf(SyntaxError);
   });
 
   it("invokes onExit with the exit code", () => {

@@ -6,13 +6,18 @@ export interface ReadableLine {
   on(event: "data", listener: (chunk: string) => void): unknown;
 }
 
-/** Minimal child-process surface — structurally satisfied by both
- *  `child_process.ChildProcess` and Bun's spawned process. */
+/**
+ * Minimal child-process surface — structurally satisfied by Node's
+ * `child_process.ChildProcess`, which Bun also provides via its `node:child_process`
+ * compatibility layer (so the daemon spawns through `node:child_process`, NOT
+ * `Bun.spawn`, whose native stdio are WHATWG `ReadableStream`s with a different API).
+ */
 export interface ChildLike {
   stdin: { write(chunk: string): void } | null;
   stdout: ReadableLine | null;
   stderr: ReadableLine | null;
-  on(event: "exit", listener: (code: number | null) => void): unknown;
+  /** Emitted after the child exits AND its stdio streams have closed. */
+  on(event: "close", listener: (code: number | null) => void): unknown;
   on(event: "error", listener: (err: Error) => void): unknown;
   kill(signal?: string): boolean;
 }
@@ -25,13 +30,18 @@ export interface JsonLineHandlers {
   onMessage: (value: unknown) => void;
   /** Raw stderr text from the child. */
   onStderr?: (text: string) => void;
-  /** The child exited (its stdout/stderr are done). */
+  /**
+   * The child exited and its output is fully drained (wired to `close`, not
+   * `exit`, so the final NDJSON line is delivered first).
+   */
   onExit?: (code: number | null) => void;
   /**
-   * An asynchronous failure: the child's `error` event (e.g. the process
-   * failed to start) or a malformed stdout line (carrying the offending line,
-   * with the parse error as `cause`). A *synchronous* throw from the injected
-   * spawner surfaces from the constructor, not here.
+   * An asynchronous failure: the child's `error` event (e.g. the process failed
+   * to start) or a malformed stdout line (carrying the offending line, with the
+   * parse error as `cause`). When omitted, such failures surface loudly — a
+   * malformed line throws and an unhandled `error` event propagates — rather
+   * than being silently swallowed. A *synchronous* throw from the injected
+   * spawner surfaces from the constructor.
    */
   onError?: (error: Error) => void;
 }
@@ -51,10 +61,14 @@ export class JsonLineProcess {
     private readonly handlers: JsonLineHandlers,
   ) {
     this.child = spawn();
-    const decoder = new LineDecoder((line, err) =>
-      this.handlers.onError?.(
-        new Error(`malformed stdout line: ${line}`, { cause: err }),
-      ),
+    const onError = this.handlers.onError;
+
+    // Route malformed lines to onError (with the offending line) when there's a
+    // handler; otherwise pass undefined so the decoder throws loudly.
+    const decoder = new LineDecoder(
+      onError
+        ? (line, err) => onError(new Error(`malformed stdout line: ${line}`, { cause: err }))
+        : undefined,
     );
 
     this.child.stdout?.setEncoding("utf8");
@@ -65,13 +79,19 @@ export class JsonLineProcess {
     this.child.stderr?.setEncoding("utf8");
     this.child.stderr?.on("data", (text) => this.handlers.onStderr?.(text));
 
-    this.child.on("exit", (code) => this.handlers.onExit?.(code));
-    this.child.on("error", (err) => this.handlers.onError?.(err));
+    this.child.on("close", (code) => this.handlers.onExit?.(code));
+
+    // Only intercept 'error' when there's somewhere to route it; otherwise let
+    // an unhandled 'error' event surface (Node's default) instead of eating it.
+    if (onError) this.child.on("error", (err) => onError(err));
   }
 
   /** Send a value to the child as one NDJSON line. */
   send(value: unknown): void {
-    this.child.stdin?.write(encodeLine(value));
+    if (!this.child.stdin) {
+      throw new Error("JsonLineProcess: cannot send — child stdin is not available");
+    }
+    this.child.stdin.write(encodeLine(value));
   }
 
   /** Terminate the child. */

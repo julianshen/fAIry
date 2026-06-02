@@ -84,18 +84,34 @@ describe("JsonLineProcess", () => {
     expect(errs[0]!.cause).toBeInstanceOf(SyntaxError);
   });
 
-  it("invokes onExit with the exit code", () => {
+  it("invokes onExit on 'close' (after stdio has drained), with the exit code", () => {
     let code: number | null = -1;
     const { child } = setup({ onExit: (c) => (code = c) });
-    child.emit("exit", 0);
+    child.emit("close", 0);
     expect(code).toBe(0);
   });
 
-  it("routes a spawn-level error to onError", () => {
+  it("routes a spawn-level error to onError when a handler is set", () => {
     const errs: string[] = [];
     const { child } = setup({ onError: (e) => errs.push(e.message) });
     child.emit("error", new Error("ENOENT"));
     expect(errs).toEqual(["ENOENT"]);
+  });
+
+  it("lets a spawn 'error' surface unhandled when no onError handler is set", () => {
+    const { child } = setup(); // no onError → no 'error' listener registered
+    expect(() => child.emit("error", new Error("ENOENT"))).toThrow("ENOENT");
+  });
+
+  it("throws on a malformed stdout line when no onError handler is set", () => {
+    const { child } = setup(); // no onError → decoder throws loudly
+    expect(() => child.stdout.feed("garbage\n")).toThrow(/malformed/i);
+  });
+
+  it("send() throws when the child has no stdin", () => {
+    const { child, proc } = setup();
+    (child as { stdin: unknown }).stdin = null;
+    expect(() => proc.send({ x: 1 })).toThrow(/stdin/i);
   });
 
   it("kill() terminates the child", () => {

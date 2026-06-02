@@ -29,6 +29,9 @@ export type { BridgeConnection, AuthenticatedSessionOptions } from "./authentica
 export { BridgeSession } from "./bridgeSession";
 export type { BridgeSessionOptions } from "./bridgeSession";
 
+export { WsServer } from "./wsServer";
+export type { WsServerOptions } from "./wsServer";
+
 export { BridgeServer } from "./bridgeServer";
 export type { BridgeServerOptions } from "./bridgeServer";
 

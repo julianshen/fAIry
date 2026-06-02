@@ -18,7 +18,7 @@ class FakeConnection implements BridgeConnection {
     this.onCls = handler;
   }
   close(): void {
-    if (this.closed) return;
+    // Fire each call so tests can simulate a transport emitting close twice.
     this.closed = true;
     this.onCls?.();
   }
@@ -200,6 +200,15 @@ describe("ConversationSession — lifecycle", () => {
     conn.close();
     expect(driver.disposes).toBe(1);
     expect(events).toContain("close");
+  });
+
+  it("disposes and notifies exactly once even if close fires twice", () => {
+    const { conn, driver, events } = setup();
+    auth(conn);
+    conn.close();
+    conn.close();
+    expect(driver.disposes).toBe(1);
+    expect(events.filter((e) => e === "close")).toHaveLength(1);
   });
 
   it("does not dispose a driver that was never created (closed before auth)", () => {

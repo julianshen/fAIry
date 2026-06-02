@@ -1,4 +1,4 @@
-import type { BridgeConnection } from "./bridgeSession";
+import { AuthenticatedSession, type BridgeConnection } from "./authenticatedSession";
 import type { PanelBeat } from "./beatMapper";
 
 /** What the session needs from a conversation controller (satisfied by `ConversationController`). */
@@ -20,62 +20,30 @@ export interface ConversationSessionOptions {
 }
 
 /**
- * One authenticated panel/client connection. The client's first message must be
- * `{ type: "auth", token }`; after that it sends commands
+ * One authenticated panel/client connection. After the token handshake (see
+ * {@link AuthenticatedSession}), the client sends commands
  * (`{ type: "start", task }` / `{ type: "stop" }`) and receives panel beats
  * (`{ type: "beat", beat }`). Drives a {@link ConversationDriver}, created on
- * auth so Pi only spawns once a client connects. On disconnect, the driver is
- * disposed.
- *
- * (Shares the token handshake shape with `BridgeSession`; a shared
- * authenticated-session helper is a candidate refactor.)
+ * auth so Pi only spawns once a client connects; on disconnect it's disposed.
  */
-export class ConversationSession {
-  private authed = false;
+export class ConversationSession extends AuthenticatedSession {
   private driver: ConversationDriver | undefined;
-  private authTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly opts: ConversationSessionOptions) {
-    opts.connection.onMessage((data) => this.onMessage(data));
-    opts.connection.onClose(() => this.onClose());
-    if (opts.authTimeoutMs && opts.authTimeoutMs > 0) {
-      this.authTimer = setTimeout(() => {
-        if (!this.authed) opts.connection.close();
-      }, opts.authTimeoutMs);
-    }
+    super({
+      token: opts.token,
+      connection: opts.connection,
+      authTimeoutMs: opts.authTimeoutMs,
+      onClose: opts.onClose,
+    });
   }
 
-  get isAuthenticated(): boolean {
-    return this.authed;
+  protected onAuthenticated(): void {
+    // May throw (Pi spawn failure); the base then closes without authenticating.
+    this.driver = this.opts.createDriver((beat) => this.sendBeat(beat));
   }
 
-  private onMessage(data: string): void {
-    let msg: unknown;
-    try {
-      msg = JSON.parse(data);
-    } catch {
-      if (!this.authed) this.opts.connection.close();
-      return;
-    }
-
-    if (!this.authed) {
-      const m = msg as { type?: string; token?: string };
-      if (m?.type === "auth" && m.token === this.opts.token) {
-        clearTimeout(this.authTimer);
-        try {
-          // Driver creation spawns Pi and can fail; only authenticate on success.
-          this.driver = this.opts.createDriver((beat) => this.sendBeat(beat));
-          this.authed = true;
-          this.opts.connection.send(JSON.stringify({ type: "auth_ok" }));
-        } catch {
-          this.opts.connection.close();
-        }
-      } else {
-        this.opts.connection.close();
-      }
-      return;
-    }
-
+  protected onAuthedMessage(msg: unknown): void {
     if (typeof msg !== "object" || msg === null) return;
     const cmd = msg as { type?: string; task?: unknown };
     if (cmd.type === "start" && typeof cmd.task === "string") {
@@ -86,17 +54,14 @@ export class ConversationSession {
     // Unknown commands are ignored.
   }
 
-  private sendBeat(beat: PanelBeat): void {
-    // The driver emits beats asynchronously; drop any that arrive after close.
-    if (!this.authed) return;
-    this.opts.connection.send(JSON.stringify({ type: "beat", beat }));
-  }
-
-  private onClose(): void {
-    clearTimeout(this.authTimer);
-    this.authed = false;
+  protected onDisposed(): void {
     this.driver?.dispose();
     this.driver = undefined;
-    this.opts.onClose?.();
+  }
+
+  private sendBeat(beat: PanelBeat): void {
+    // The driver emits beats asynchronously; drop any that arrive after close.
+    if (!this.isAuthenticated) return;
+    this.send({ type: "beat", beat });
   }
 }

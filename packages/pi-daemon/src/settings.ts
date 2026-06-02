@@ -1,4 +1,4 @@
-import type { PiConfig } from "./piConfig";
+import { normalizedApiKey, type PiConfig } from "./piConfig";
 
 /** A provider as exposed to clients — its key presence, never the key itself. */
 export interface RedactedProvider {
@@ -16,12 +16,12 @@ export interface RedactedConfig {
 
 /**
  * Project a {@link PiConfig} to its non-secret view: each provider's `apiKey`
- * collapses to a `hasKey` boolean (a key is "present" only if non-blank, matching
- * how `buildAuth` decides which keys to write), so secrets never leave the daemon.
+ * collapses to a `hasKey` boolean (via {@link normalizedApiKey}, the same rule
+ * `buildAuth` uses to decide which keys to write), so secrets never leave the daemon.
  */
 export function redactConfig(config: PiConfig): RedactedConfig {
   const redacted: RedactedConfig = {
-    providers: config.providers.map((p) => ({ id: p.id, hasKey: p.apiKey.trim() !== "" })),
+    providers: config.providers.map((p) => ({ id: p.id, hasKey: normalizedApiKey(p) !== "" })),
   };
   if (config.defaultProvider !== undefined) redacted.defaultProvider = config.defaultProvider;
   if (config.defaultModel !== undefined) redacted.defaultModel = config.defaultModel;

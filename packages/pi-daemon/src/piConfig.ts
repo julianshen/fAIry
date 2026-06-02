@@ -17,11 +17,20 @@ export interface PiConfig {
 /** Pi `auth.json` shape: one api_key entry per provider. */
 export type PiAuth = Record<string, { type: "api_key"; key: string }>;
 
+/**
+ * A provider's API key, trimmed — `""` when blank/whitespace. The single source
+ * of truth for "is a key configured": both `buildAuth` (which writes it) and
+ * `redactConfig` (which reports its presence) decide via this, so they can't drift.
+ */
+export function normalizedApiKey(provider: ProviderConfig): string {
+  return provider.apiKey.trim();
+}
+
 /** Build the `auth.json` object — providers with a non-blank key only, trimmed. */
 export function buildAuth(config: PiConfig): PiAuth {
   const auth: PiAuth = {};
   for (const provider of config.providers) {
-    const key = provider.apiKey.trim();
+    const key = normalizedApiKey(provider);
     if (key) auth[provider.id] = { type: "api_key", key };
   }
   return auth;

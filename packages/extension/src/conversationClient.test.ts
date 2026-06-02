@@ -104,6 +104,16 @@ describe("connectConversation", () => {
     expect(beats).toEqual([]); // dropped after close
   });
 
+  it("drops start/stop issued after the socket closed (no send on a dead socket)", () => {
+    const { socket, client } = setup();
+    socket.fireOpen();
+    const before = socket.sent.length;
+    socket.fireClose();
+    client.start("late");
+    client.stop();
+    expect(socket.sent.length).toBe(before); // nothing sent after close
+  });
+
   it("close() closes the socket", () => {
     const { socket, client } = setup();
     client.close();

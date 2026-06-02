@@ -41,6 +41,7 @@ export function connectConversation(opts: ConversationClientOptions): Conversati
   const queue: string[] = [];
 
   const send = (value: unknown): void => {
+    if (closed) return; // never send/queue on a closed connection
     const frame = JSON.stringify(value);
     if (open) socket.send(frame);
     else queue.push(frame);
@@ -68,6 +69,7 @@ export function connectConversation(opts: ConversationClientOptions): Conversati
 
   socket.onClose(() => {
     closed = true;
+    open = false;
     opts.onClose?.();
   });
 

@@ -72,6 +72,29 @@ describe("discover", () => {
     }
   });
 
+  it("throws when /pair returns no token", async () => {
+    await expect(
+      discover({
+        httpBase: HTTP,
+        code: "CODE",
+        fetch: fakeFetch({ "POST /pair": () => json({}) }), // no token
+      }),
+    ).rejects.toThrow(/token/i);
+  });
+
+  it("throws when /info returns non-numeric ports", async () => {
+    await expect(
+      discover({
+        httpBase: HTTP,
+        code: "CODE",
+        fetch: fakeFetch({
+          "POST /pair": () => json({ token: "T" }),
+          "GET /info": () => json({ bridgePort: "nope", conversationPort: 2 }),
+        }),
+      }),
+    ).rejects.toThrow(/port/i);
+  });
+
   it("throws when /info fails", async () => {
     await expect(
       discover({

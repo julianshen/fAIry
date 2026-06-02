@@ -34,7 +34,10 @@ export async function discover(opts: DiscoverOptions): Promise<DaemonConnection>
   if (!pairRes.ok) {
     throw new Error(`pairing failed (${pairRes.status}) — the code may be wrong or expired`);
   }
-  const { token } = (await pairRes.json()) as { token: string };
+  const { token } = (await pairRes.json()) as { token?: unknown };
+  if (typeof token !== "string" || token === "") {
+    throw new Error("pairing response had no token");
+  }
 
   const infoRes = await doFetch(`${opts.httpBase}/info`, {
     headers: { authorization: `Bearer ${token}` },
@@ -43,9 +46,13 @@ export async function discover(opts: DiscoverOptions): Promise<DaemonConnection>
     throw new Error(`info request failed (${infoRes.status})`);
   }
   const { bridgePort, conversationPort } = (await infoRes.json()) as {
-    bridgePort: number;
-    conversationPort: number;
+    bridgePort?: unknown;
+    conversationPort?: unknown;
   };
+  // Validate before returning — bad values would surface later as ws://…:undefined.
+  if (typeof bridgePort !== "number" || typeof conversationPort !== "number") {
+    throw new Error("info response had invalid bridge/conversation ports");
+  }
 
   return { token, bridgePort, conversationPort };
 }

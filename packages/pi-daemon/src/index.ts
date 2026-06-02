@@ -31,3 +31,6 @@ export type { BridgeServerOptions } from "./bridgeServer";
 
 export { BeatMapper } from "./beatMapper";
 export type { PanelBeat, PanelAgentId, PanelRun } from "./beatMapper";
+
+export { ConversationController } from "./conversation";
+export type { ConversationControllerOptions } from "./conversation";

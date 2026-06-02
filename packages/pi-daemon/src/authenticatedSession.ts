@@ -1,3 +1,5 @@
+import { timingSafeStrEqual } from "./secureCompare";
+
 /**
  * Minimal duplex connection a session needs — structurally satisfied by a `ws`
  * socket (or a Bun.serve WebSocket) via a thin adapter, so session logic is
@@ -77,7 +79,7 @@ export abstract class AuthenticatedSession {
 
     if (!this.authed) {
       const m = msg as { type?: string; token?: string };
-      if (m?.type === "auth" && m.token === this.token) {
+      if (m?.type === "auth" && typeof m.token === "string" && timingSafeStrEqual(m.token, this.token)) {
         clearTimeout(this.authTimer);
         try {
           this.onAuthenticated();

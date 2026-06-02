@@ -93,10 +93,12 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
       chrome ? chrome.requestTool(tool, args) : Promise.reject(new Error("no browser connected")),
   });
 
-  // Pi is spawned pointed back at the piBridge. Its port is known only once
-  // piBridge is listening (below); spawn runs later (when a panel connects), so
-  // the closure reads the resolved value.
+  // The WS ports are known only once those servers are listening (below); the
+  // spawn closure and the /info provider run later (a panel connects / a paired
+  // client asks), so they read these vars after they're resolved.
+  let bridgePort = 0;
   let piBridgePort = 0;
+  let conversationPort = 0;
   const conversation = new ConversationServer({
     token,
     host,
@@ -113,30 +115,41 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     allowedOrigins,
     maxBodyBytes: opts.maxBodyBytes,
     pairing: opts.pairing,
+    // Lets a paired client discover the ephemeral WS ports it must connect to.
+    info: () => ({ bridgePort, conversationPort }),
     port: opts.ports?.http,
   });
 
   const servers = [bridge, piBridge, conversation, http];
   const closeAll = (): Promise<void> => Promise.all(servers.map((s) => s.close())).then(() => undefined);
 
-  const results = await Promise.allSettled([
-    bridge.listen(),
-    piBridge.listen(),
-    conversation.listen(),
-    http.listen(),
-  ]);
-  const failure = results.find((r) => r.status === "rejected");
-  if (failure) {
-    // Swallow any teardown error so it can't shadow the actual bind failure.
-    /* v8 ignore next */
-    await closeAll().catch(() => {});
-    throw (failure as PromiseRejectedResult).reason;
-  }
-  const port = (i: number): number => (results[i] as PromiseFulfilledResult<number>).value;
-  piBridgePort = port(1); // resolve the spawn closure's port before any conversation
+  // Start the given servers concurrently; if any fails to bind, tear the rest
+  // down (so a half-started set can't leak) and rethrow the bind error.
+  const settle = async (starts: Array<Promise<number>>): Promise<PromiseSettledResult<number>[]> => {
+    const results = await Promise.allSettled(starts);
+    const failure = results.find((r) => r.status === "rejected");
+    if (failure) {
+      /* v8 ignore next */
+      await closeAll().catch(() => {});
+      throw (failure as PromiseRejectedResult).reason;
+    }
+    return results;
+  };
+  const val = (rs: PromiseSettledResult<number>[], i: number): number =>
+    (rs[i] as PromiseFulfilledResult<number>).value;
+
+  // Bring up the WS servers first; their ports feed /info and the Pi spawner.
+  const ws = await settle([bridge.listen(), piBridge.listen(), conversation.listen()]);
+  bridgePort = val(ws, 0);
+  piBridgePort = val(ws, 1);
+  conversationPort = val(ws, 2);
+
+  // Only now start the HTTP anchor — so a client reaching its fixed port can
+  // never see /info report unresolved (0) WS ports.
+  const httpPort = val(await settle([http.listen()]), 0);
 
   return {
-    ports: { bridge: port(0), piBridge: port(1), conversation: port(2), http: port(3) },
+    ports: { bridge: bridgePort, piBridge: piBridgePort, conversation: conversationPort, http: httpPort },
     close: closeAll,
   };
 }

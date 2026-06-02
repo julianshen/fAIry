@@ -103,10 +103,16 @@ Remaining daemon work is integration/wiring — see M2/M3 below (150+ pi-daemon 
 
 ### M4 — Chrome extension
 
-- [ ] MV3 scaffold; connect to the daemon at `localhost`.
+> **Discovery enabled (daemon side):** `main.ts` binds the HTTP control plane on
+> a fixed port (`FAIRY_HTTP_PORT`, default 51789) and `httpServer` serves an
+> authenticated `GET /info` → `{ bridgePort, conversationPort }`. So the extension
+> bootstraps: known HTTP port → `POST /pair` (code → token) → `GET /info` (→ WS
+> ports) → connect the bridge + conversation WS. Build: Vite + `@crxjs/vite-plugin`.
+
+- [ ] MV3 scaffold; connect to the daemon at `localhost` (pairing → token → `/info`).
 - [ ] Browser-tool backend: execute `navigate`/`click`/`type`/`screenshot`/CDP
       via `chrome.debugger` / `chrome.tabs` / `chrome.scripting`.
-- [ ] Host the `agent-panel` as the side-panel UI, wired to the daemon.
+- [ ] Host the `agent-panel` as the side-panel UI, wired to the conversation WS.
 
 ### M5 — macOS shell (Swift)
 

@@ -48,10 +48,19 @@ async function main(): Promise<void> {
     const pairing = createPairingStore({ token });
     writeJsonFile(path.join(paths.appData, "pairing.json"), { code: pairing.code }, 0o600);
 
-    // M4: once the Chrome extension exists, pass its exact origin as
-    // `allowedOrigins` so /pair + CORS accept only the real extension rather
-    // than any chrome-extension:// origin (the pairing code stays the credential).
-    const daemon = await createDaemon({ token, settings, pairing, spawnPi: piSpawner(paths) });
+    // The HTTP control plane binds a fixed, well-known port so the extension has
+    // a stable anchor: it POSTs /pair (code → token), then GET /info (→ the
+    // ephemeral bridge/conversation WS ports). Overridable via FAIRY_HTTP_PORT.
+    // M4: once the Chrome extension exists, also pass its exact origin as
+    // `allowedOrigins` so /pair + CORS accept only the real extension.
+    const httpPort = Number.parseInt(process.env.FAIRY_HTTP_PORT ?? "", 10) || DEFAULT_HTTP_PORT;
+    const daemon = await createDaemon({
+      token,
+      settings,
+      pairing,
+      spawnPi: piSpawner(paths),
+      ports: { http: httpPort },
+    });
 
     console.log("[fairy:pi-daemon] listening (loopback):");
     console.log(`  bridge:       ws://127.0.0.1:${daemon.ports.bridge}`);
@@ -67,6 +76,9 @@ async function main(): Promise<void> {
     throw err;
   }
 }
+
+/** Fixed loopback HTTP port — the extension's stable bootstrap anchor. */
+const DEFAULT_HTTP_PORT = 51789;
 
 /** The Pi `browser` extension script, shipped alongside the daemon. */
 const BROWSER_EXTENSION = path.resolve(
@@ -127,6 +139,13 @@ function installShutdown(daemon: RunningDaemon, lock: LockHandle): void {
 }
 
 main().catch((err) => {
-  console.error("[fairy:pi-daemon] FATAL: failed to start.", err);
+  if ((err as NodeJS.ErrnoException)?.code === "EADDRINUSE") {
+    console.error(
+      "[fairy:pi-daemon] FATAL: a port is already in use — set FAIRY_HTTP_PORT to use a different HTTP port.",
+      err,
+    );
+  } else {
+    console.error("[fairy:pi-daemon] FATAL: failed to start.", err);
+  }
   process.exit(1);
 });

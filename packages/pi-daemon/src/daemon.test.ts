@@ -185,6 +185,22 @@ describe("createDaemon", () => {
     }
   });
 
+  it("GET /info reports the live bridge + conversation ports", async () => {
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
+    try {
+      const res = await fetch(`http://127.0.0.1:${daemon.ports.http}/info`, {
+        headers: { authorization: `Bearer ${TOKEN}` },
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        bridgePort: daemon.ports.bridge,
+        conversationPort: daemon.ports.conversation,
+      });
+    } finally {
+      await daemon.close();
+    }
+  });
+
   it("close() stops every server", async () => {
     const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
     const httpPort = daemon.ports.http;

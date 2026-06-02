@@ -34,6 +34,13 @@ export interface HttpServerOptions {
    * pairing code for the session token. Omit to disable pairing (`/pair` → 404).
    */
   pairing?: PairingStore;
+  /**
+   * Enables the authenticated `GET /info` endpoint, returning connection details
+   * (e.g. the bridge/conversation WS ports) so a paired client can discover the
+   * ephemeral WS servers. Omit to disable (`/info` → 404). Called per request, so
+   * it can read values resolved after construction.
+   */
+  info?: () => unknown;
 }
 
 /**
@@ -118,6 +125,11 @@ export class HttpServer {
     if (path === "/status") {
       if (method !== "GET") return send(res, 405, { error: "method_not_allowed" });
       return send(res, 200, { status: "ok" });
+    }
+    if (path === "/info") {
+      if (!this.opts.info) return send(res, 404, { error: "not_found" });
+      if (method !== "GET") return send(res, 405, { error: "method_not_allowed" });
+      return send(res, 200, this.opts.info());
     }
     if (path === "/settings") {
       if (method === "GET") return send(res, 200, redactConfig(this.opts.settings.get()));

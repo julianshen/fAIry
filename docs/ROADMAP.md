@@ -12,24 +12,26 @@
 | `pi-daemon` | `paths` — isolated per-OS workspace/config dirs | ✅ merged (#2) |
 | `pi-daemon` | `ndjson` — newline-delimited JSON framing codec | ✅ merged (#4) |
 | `pi-daemon` | `jsonLineProcess` — injectable subprocess NDJSON transport | ✅ merged (#5) |
+| `pi-daemon` | `piSession` — Pi RPC over the transport (typed `AgentEvent` stream) | ✅ merged (#7) |
+| `pi-daemon` | `piConfig` — `settings.json`/`auth.json` writer (atomic, `0600`) | ✅ merged (#8) |
 
-Transport stack is complete: `paths` → `ndjson` → `jsonLineProcess`.
+**M1 (daemon core) is complete**: `paths` → `ndjson` → `jsonLineProcess` →
+`piSession` → `piConfig`.
 
 ## Milestones
 
-### M1 — Daemon core (in progress)
+### M1 — Daemon core ✅
 
 - [x] Isolated paths (`paths.ts`)
 - [x] NDJSON framing (`ndjson.ts`)
 - [x] Subprocess transport (`jsonLineProcess.ts`)
-- [ ] **`PiSession`** — Pi RPC semantics over `JsonLineProcess`: send
-      prompt/abort/compact; parse `agent_start` / `message_update` (text deltas)
-      / `tool_execution_*` / `turn_end` / `agent_end`; surface a typed event
-      stream; handle the "already processing" steer-retry and error/auto-retry
-      cases. (Port of POC `PiSession`, on the new transport.)
-- [ ] **Pi config writer** — materialize `settings.json` / `auth.json` under
-      `piAgentDir`; multi-provider, secrets `0600`, reconcile only fAIry-managed
-      keys. (Port of POC `PiConfigWriter`.)
+- [x] **`PiSession`** — Pi RPC over `JsonLineProcess`: prompt/abort/compact;
+      `message_update` (text deltas) / `tool_execution_*` / `turn_end` /
+      `agent_end` translated to a typed `AgentEvent` stream; "already processing"
+      steer-retry + error/auto-retry handling; hardened against malformed output.
+- [x] **Pi config writer** (`piConfig.ts`) — atomic `settings.json` / `auth.json`
+      under `piAgentDir`; multi-provider, keys trimmed, secrets `0600`. (v1 owns
+      the dir wholesale; the POC's sidecar-reconcile + custom base-URLs deferred.)
 
 ### M2 — Browser bridge
 

@@ -1,39 +1,8 @@
 import { once } from "node:events";
-import { createConnection } from "node:net";
 import { PiBridgeServer } from "./piBridgeServer";
+import { lineClient } from "./testFakes";
 
 const TOKEN = "secret";
-
-/** A line-framed TCP client mirroring what the Pi `-e` extension speaks. */
-function lineClient(port: number) {
-  const socket = createConnection({ host: "127.0.0.1", port });
-  socket.setEncoding("utf8");
-  const queue: unknown[] = [];
-  const waiters: ((v: unknown) => void)[] = [];
-  let buf = "";
-  socket.on("data", (chunk: string) => {
-    buf += chunk;
-    let nl: number;
-    while ((nl = buf.indexOf("\n")) !== -1) {
-      const line = buf.slice(0, nl);
-      buf = buf.slice(nl + 1);
-      if (!line) continue;
-      const v = JSON.parse(line);
-      const w = waiters.shift();
-      if (w) w(v);
-      else queue.push(v);
-    }
-  });
-  return {
-    socket,
-    send: (o: unknown) => socket.write(JSON.stringify(o) + "\n"),
-    next: (): Promise<unknown> =>
-      new Promise((resolve) => {
-        if (queue.length) resolve(queue.shift());
-        else waiters.push(resolve);
-      }),
-  };
-}
 
 async function connectAndAuth(port: number, token = TOKEN) {
   const c = lineClient(port);

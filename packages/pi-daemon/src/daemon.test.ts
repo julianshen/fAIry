@@ -1,9 +1,8 @@
 import { once } from "node:events";
-import { createConnection } from "node:net";
 import { WebSocket } from "ws";
 import { createDaemon, type PiBridgeInfo } from "./daemon";
 import { HttpServer } from "./httpServer";
-import { SilentChild, silentSpawn } from "./testFakes";
+import { lineClient, SilentChild, silentSpawn } from "./testFakes";
 import type { SettingsStore } from "./settings";
 import type { PiConfig } from "./piConfig";
 
@@ -12,34 +11,6 @@ const TOKEN = "tok";
 function fakeStore(): SettingsStore {
   let cfg: PiConfig = { providers: [] };
   return { get: () => cfg, save: (c) => void (cfg = c) };
-}
-
-/** A line-framed TCP client, as the Pi `-e` extension speaks to the piBridge. */
-function tcpClient(port: number) {
-  const socket = createConnection({ host: "127.0.0.1", port });
-  socket.setEncoding("utf8");
-  const queue: unknown[] = [];
-  const waiters: ((v: unknown) => void)[] = [];
-  let buf = "";
-  socket.on("data", (chunk: string) => {
-    buf += chunk;
-    let nl: number;
-    while ((nl = buf.indexOf("\n")) !== -1) {
-      const line = buf.slice(0, nl);
-      buf = buf.slice(nl + 1);
-      if (!line) continue;
-      const v = JSON.parse(line);
-      const w = waiters.shift();
-      if (w) w(v);
-      else queue.push(v);
-    }
-  });
-  return {
-    socket,
-    send: (o: unknown) => socket.write(JSON.stringify(o) + "\n"),
-    next: (): Promise<unknown> =>
-      new Promise((resolve) => (queue.length ? resolve(queue.shift()) : waiters.push(resolve))),
-  };
 }
 
 /** Connect, authenticate, return the first frame back. */
@@ -108,7 +79,7 @@ describe("createDaemon", () => {
       });
 
       // Pi side (requester): a TCP client through the piBridge.
-      const pi = tcpClient(daemon.ports.piBridge);
+      const pi = lineClient(daemon.ports.piBridge);
       await once(pi.socket, "connect");
       pi.send({ type: "auth", token: TOKEN });
       expect(await pi.next()).toEqual({ type: "auth_ok" });
@@ -122,10 +93,33 @@ describe("createDaemon", () => {
     }
   });
 
+  it("reports 'no browser connected' after the Chrome bridge disconnects", async () => {
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
+    try {
+      const chrome = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
+      await once(chrome, "open");
+      chrome.send(JSON.stringify({ type: "auth", token: TOKEN }));
+      await once(chrome, "message"); // auth_ok
+      chrome.close();
+      await once(chrome, "close");
+      await new Promise((r) => setTimeout(r, 25)); // let the server mark the session closed
+
+      const pi = lineClient(daemon.ports.piBridge);
+      await once(pi.socket, "connect");
+      pi.send({ type: "auth", token: TOKEN });
+      expect(await pi.next()).toEqual({ type: "auth_ok" });
+      pi.send({ id: "1", tool: "getUrl", args: {} });
+      expect(await pi.next()).toEqual({ id: "1", ok: false, error: "no browser connected" });
+      pi.socket.destroy();
+    } finally {
+      await daemon.close();
+    }
+  });
+
   it("answers a Pi tool call with 'no browser connected' when no Chrome bridge is present", async () => {
     const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
     try {
-      const pi = tcpClient(daemon.ports.piBridge);
+      const pi = lineClient(daemon.ports.piBridge);
       await once(pi.socket, "connect");
       pi.send({ type: "auth", token: TOKEN });
       expect(await pi.next()).toEqual({ type: "auth_ok" });

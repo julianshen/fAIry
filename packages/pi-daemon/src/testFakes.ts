@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { createConnection } from "node:net";
 import type { ChildLike, ReadableLine } from "./jsonLineProcess";
 
 // Shared test doubles for the "Pi never emits output" case — enough to exercise
@@ -23,3 +24,39 @@ export class SilentChild extends EventEmitter implements ChildLike {
 
 /** A {@link import("./jsonLineProcess").Spawner} yielding a fresh silent child. */
 export const silentSpawn = (): ChildLike => new SilentChild();
+
+/**
+ * A line-framed TCP client, as the Pi `-e` extension speaks to the piBridge:
+ * `send` writes one JSON object per line; `next` resolves the next frame back.
+ * Shared by the piBridgeServer and daemon relay tests.
+ */
+export function lineClient(port: number): {
+  socket: ReturnType<typeof createConnection>;
+  send: (o: unknown) => void;
+  next: () => Promise<unknown>;
+} {
+  const socket = createConnection({ host: "127.0.0.1", port });
+  socket.setEncoding("utf8");
+  const queue: unknown[] = [];
+  const waiters: ((v: unknown) => void)[] = [];
+  let buf = "";
+  socket.on("data", (chunk: string) => {
+    buf += chunk;
+    let nl: number;
+    while ((nl = buf.indexOf("\n")) !== -1) {
+      const line = buf.slice(0, nl);
+      buf = buf.slice(nl + 1);
+      if (!line) continue;
+      const v = JSON.parse(line);
+      const w = waiters.shift();
+      if (w) w(v);
+      else queue.push(v);
+    }
+  });
+  return {
+    socket,
+    send: (o) => void socket.write(JSON.stringify(o) + "\n"),
+    next: () =>
+      new Promise((resolve) => (queue.length ? resolve(queue.shift()) : waiters.push(resolve))),
+  };
+}

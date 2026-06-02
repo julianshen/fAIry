@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createDaemon, type RunningDaemon } from "./daemon";
@@ -15,6 +16,11 @@ import { mintToken, writeToken } from "./tokenStore";
  */
 async function main(): Promise<void> {
   const paths = resolvePaths({ platform: process.platform, env: process.env, home: homedirOrExit() });
+
+  // appData and piAgentDir get created as a side effect of writing the token and
+  // Pi config; the workspace (Pi's cwd per conversation) has no other creator, so
+  // a first-run conversation would otherwise spawn Pi against a missing directory.
+  mkdirSync(paths.workspace, { recursive: true });
 
   const token = mintToken();
   writeToken(paths.appData, token);

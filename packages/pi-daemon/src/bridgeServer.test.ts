@@ -57,6 +57,40 @@ describe("BridgeServer (real WebSocket)", () => {
     server = fresh; // afterEach close() is then a no-op too
   });
 
+  it("rejects a browser (http/https) Origin by default", async () => {
+    server = new BridgeServer({ token: TOKEN });
+    const port = await server.listen();
+    const client = new WebSocket(`ws://127.0.0.1:${port}`, { origin: "http://evil.example" });
+    const [, res] = (await once(client, "unexpected-response")) as [unknown, { statusCode: number }];
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("honors an explicit allowedOrigins allowlist", async () => {
+    server = new BridgeServer({ token: TOKEN, allowedOrigins: ["chrome-extension://good"] });
+    const port = await server.listen();
+
+    const ok = new WebSocket(`ws://127.0.0.1:${port}`, { origin: "chrome-extension://good" });
+    await once(ok, "open");
+    ok.close();
+
+    const bad = new WebSocket(`ws://127.0.0.1:${port}`, { origin: "chrome-extension://bad" });
+    const [, res] = (await once(bad, "unexpected-response")) as [unknown, { statusCode: number }];
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("rejects a second listen() while already listening", async () => {
+    server = new BridgeServer({ token: TOKEN });
+    await server.listen();
+    await expect(server.listen()).rejects.toThrow(/already/i);
+  });
+
+  it("rejects listen() when the port is already in use", async () => {
+    server = new BridgeServer({ token: TOKEN });
+    const port = await server.listen();
+    const second = new BridgeServer({ token: TOKEN, port });
+    await expect(second.listen()).rejects.toBeTruthy();
+  });
+
   it("closes a client that presents the wrong token", async () => {
     server = new BridgeServer({ token: TOKEN });
     const port = await server.listen();

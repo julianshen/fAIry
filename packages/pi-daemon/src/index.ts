@@ -16,3 +16,6 @@ export type {
 
 export { PiSession } from "./piSession";
 export type { AgentEvent, PiSessionHandlers } from "./piSession";
+
+export { buildAuth, buildSettings, writePiConfig } from "./piConfig";
+export type { PiConfig, ProviderConfig, PiAuth } from "./piConfig";

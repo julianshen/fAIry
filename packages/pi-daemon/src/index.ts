@@ -22,3 +22,6 @@ export type { PiConfig, ProviderConfig, PiAuth } from "./piConfig";
 
 export { RequestCorrelator } from "./bridge";
 export type { ToolRequest, ToolResponse, CorrelatorOptions } from "./bridge";
+
+export { BridgeSession } from "./bridgeSession";
+export type { BridgeConnection, BridgeSessionOptions } from "./bridgeSession";

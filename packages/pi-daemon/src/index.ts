@@ -13,3 +13,6 @@ export type {
   Spawner,
   JsonLineHandlers,
 } from "./jsonLineProcess";
+
+export { PiSession } from "./piSession";
+export type { AgentEvent, PiSessionHandlers } from "./piSession";

@@ -25,3 +25,6 @@ export type { ToolRequest, ToolResponse, CorrelatorOptions } from "./bridge";
 
 export { BridgeSession } from "./bridgeSession";
 export type { BridgeConnection, BridgeSessionOptions } from "./bridgeSession";
+
+export { BridgeServer } from "./bridgeServer";
+export type { BridgeServerOptions } from "./bridgeServer";

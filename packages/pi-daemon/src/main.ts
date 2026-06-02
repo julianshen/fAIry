@@ -2,8 +2,9 @@ import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createDaemon, type RunningDaemon } from "./daemon";
-import type { ChildLike, Spawner } from "./jsonLineProcess";
+import { fileURLToPath } from "node:url";
+import { createDaemon, type PiBridgeInfo, type RunningDaemon } from "./daemon";
+import type { ChildLike } from "./jsonLineProcess";
 import { resolvePaths, type DaemonPaths } from "./paths";
 import { createFileSettingsStore } from "./settingsStore";
 import { mintToken, writeToken } from "./tokenStore";
@@ -30,10 +31,11 @@ async function main(): Promise<void> {
     piAgentDir: paths.piAgentDir,
   });
 
-  const daemon = await createDaemon({ token, settings, spawn: piSpawner(paths) });
+  const daemon = await createDaemon({ token, settings, spawnPi: piSpawner(paths) });
 
   console.log("[fairy:pi-daemon] listening (loopback):");
   console.log(`  bridge:       ws://127.0.0.1:${daemon.ports.bridge}`);
+  console.log(`  pi-bridge:    tcp://127.0.0.1:${daemon.ports.piBridge}`);
   console.log(`  conversation: ws://127.0.0.1:${daemon.ports.conversation}`);
   console.log(`  http:         http://127.0.0.1:${daemon.ports.http}`);
   console.log(`  appData:      ${paths.appData}`);
@@ -41,11 +43,25 @@ async function main(): Promise<void> {
   installShutdown(daemon);
 }
 
-/** Spawn `pi --mode rpc` against the daemon's isolated config dir. */
-function piSpawner(paths: DaemonPaths): Spawner {
-  return () =>
-    spawn("pi", ["--mode", "rpc"], {
-      env: { ...process.env, PI_CODING_AGENT_DIR: paths.piAgentDir },
+/** The Pi `browser` extension script, shipped alongside the daemon. */
+const BROWSER_EXTENSION = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../pi-extension/browser-bridge.ts",
+);
+
+/**
+ * Spawn `pi --mode rpc` against the daemon's isolated config dir, loading the
+ * browser extension and pointing it back at the loopback piBridge via env.
+ */
+function piSpawner(paths: DaemonPaths): (bridge: PiBridgeInfo) => ChildLike {
+  return (bridge) =>
+    spawn("pi", ["--mode", "rpc", "-e", BROWSER_EXTENSION], {
+      env: {
+        ...process.env,
+        PI_CODING_AGENT_DIR: paths.piAgentDir,
+        FAIRY_PI_BRIDGE_PORT: String(bridge.port),
+        FAIRY_PI_BRIDGE_TOKEN: bridge.token,
+      },
       cwd: paths.workspace,
       stdio: ["pipe", "pipe", "pipe"],
     }) as unknown as ChildLike;

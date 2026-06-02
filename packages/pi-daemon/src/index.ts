@@ -29,10 +29,18 @@ export { createFileSettingsStore } from "./settingsStore";
 export type { FileSettingsStoreOptions } from "./settingsStore";
 
 export { createDaemon } from "./daemon";
-export type { DaemonOptions, DaemonPorts, RunningDaemon } from "./daemon";
+export type { DaemonOptions, DaemonPorts, RunningDaemon, PiBridgeInfo } from "./daemon";
 
 export { ConversationServer } from "./conversationServer";
 export type { ConversationServerOptions } from "./conversationServer";
+
+export { isLoopbackHost } from "./loopback";
+
+export { PiBridgeServer } from "./piBridgeServer";
+export type { PiBridgeServerOptions } from "./piBridgeServer";
+
+export { PiBridgeSession } from "./piBridgeSession";
+export type { PiBridgeSessionOptions, ToolRelay } from "./piBridgeSession";
 
 export { isAllowedOrigin } from "./origin";
 

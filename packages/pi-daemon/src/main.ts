@@ -48,6 +48,9 @@ async function main(): Promise<void> {
     const pairing = createPairingStore({ token });
     writeJsonFile(path.join(paths.appData, "pairing.json"), { code: pairing.code }, 0o600);
 
+    // M4: once the Chrome extension exists, pass its exact origin as
+    // `allowedOrigins` so /pair + CORS accept only the real extension rather
+    // than any chrome-extension:// origin (the pairing code stays the credential).
     const daemon = await createDaemon({ token, settings, pairing, spawnPi: piSpawner(paths) });
 
     console.log("[fairy:pi-daemon] listening (loopback):");

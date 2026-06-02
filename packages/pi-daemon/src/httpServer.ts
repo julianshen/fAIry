@@ -170,28 +170,27 @@ function setCorsHeaders(res: ServerResponse, origin: string): void {
   res.setHeader("access-control-allow-headers", "content-type, authorization");
 }
 
-/** Extract a string `code` from a `/pair` body, or null if malformed. */
-function parseCode(raw: string): string | null {
+/** Parse a request body as a JSON object, or null if it isn't valid JSON / not an object. */
+function parseJsonObject(raw: string): Record<string, unknown> | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
     return null;
   }
-  if (typeof parsed !== "object" || parsed === null) return null;
-  const code = (parsed as { code?: unknown }).code;
+  return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : null;
+}
+
+/** Extract a string `code` from a `/pair` body, or null if malformed. */
+function parseCode(raw: string): string | null {
+  const code = parseJsonObject(raw)?.code;
   return typeof code === "string" ? code : null;
 }
 
 /** Parse a request body into a PiConfig, or null if it isn't a valid one. */
 function parseConfig(raw: string): PiConfig | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  return isPiConfig(parsed) ? parsed : null;
+  const obj = parseJsonObject(raw);
+  return obj && isPiConfig(obj) ? obj : null;
 }
 
 function send(res: ServerResponse, status: number, body: unknown): void {

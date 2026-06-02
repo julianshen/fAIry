@@ -78,6 +78,27 @@ describe("ConversationController", () => {
     expect(beats.filter((b) => b.kind === "actGroup")).toHaveLength(1);
   });
 
+  it("aborts a running turn before starting a new one (flushing partial text)", () => {
+    const { controller, beats, sent, feed } = setup();
+    controller.start("first");
+    feed({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "partial" } });
+    beats.length = 0;
+    controller.start("second");
+    expect(sent()).toContainEqual({ type: "abort" });
+    expect(sent()).toContainEqual({ type: "prompt", message: "second" });
+    expect(beats).toContainEqual({ kind: "say", agent: "sage", text: "partial" });
+    expect(beats).toContainEqual({ kind: "user", text: "second" });
+  });
+
+  it("ignores trailing events after dispose()", () => {
+    const { controller, beats, child } = setup();
+    controller.start("go");
+    beats.length = 0;
+    controller.dispose();
+    child.emit("close", 1); // async exit after kill
+    expect(beats).toEqual([]);
+  });
+
   it("dispose() kills the Pi subprocess", () => {
     const { controller, child } = setup();
     controller.dispose();

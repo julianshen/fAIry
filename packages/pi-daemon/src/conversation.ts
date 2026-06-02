@@ -22,6 +22,7 @@ export interface ConversationControllerOptions {
 export class ConversationController {
   private readonly session: PiSession;
   private readonly mapper = new BeatMapper();
+  private disposed = false;
 
   constructor(private readonly opts: ConversationControllerOptions) {
     this.session = new PiSession(opts.spawn, { onEvent: (e) => this.onEvent(e) });
@@ -31,8 +32,10 @@ export class ConversationController {
     return this.session.isRunning;
   }
 
-  /** Begin a task: echo the user message, mark running, and prompt Pi. */
+  /** Begin a task as a fresh turn — aborting any in-flight one first (which
+   *  flushes its partial text), rather than steering it. */
   start(task: string): void {
+    if (this.session.isRunning) this.session.abort();
     this.mapper.reset();
     this.opts.onBeat({ kind: "user", text: task });
     this.opts.onBeat({ kind: "status", run: "running" });
@@ -44,12 +47,16 @@ export class ConversationController {
     this.session.abort();
   }
 
-  /** Terminate the Pi subprocess. */
+  /** Terminate the Pi subprocess; ignore any trailing events it emits. */
   dispose(): void {
+    this.disposed = true;
     this.session.dispose();
   }
 
   private onEvent(event: AgentEvent): void {
+    // Killing Pi is async — drop the trailing close/error so we don't emit beats
+    // to an already-torn-down client.
+    if (this.disposed) return;
     for (const beat of this.mapper.apply(event)) this.opts.onBeat(beat);
   }
 }

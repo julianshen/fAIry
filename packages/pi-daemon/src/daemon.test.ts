@@ -2,6 +2,7 @@ import { once } from "node:events";
 import { WebSocket } from "ws";
 import { createDaemon, type PiBridgeInfo } from "./daemon";
 import { HttpServer } from "./httpServer";
+import { createPairingStore } from "./pairing";
 import { lineClient, SilentChild, silentSpawn } from "./testFakes";
 import type { SettingsStore } from "./settings";
 import type { PiConfig } from "./piConfig";
@@ -159,6 +160,26 @@ describe("createDaemon", () => {
       pi.send({ id: "1", tool: "getUrl", args: {} });
       expect(await pi.next()).toEqual({ id: "1", ok: false, error: "no browser connected" });
       pi.socket.destroy();
+    } finally {
+      await daemon.close();
+    }
+  });
+
+  it("exposes the pairing endpoint when a pairing store is provided", async () => {
+    const daemon = await createDaemon({
+      token: TOKEN,
+      settings: fakeStore(),
+      spawnPi: silentSpawn,
+      pairing: createPairingStore({ token: TOKEN, code: "PAIRCODE" }),
+    });
+    try {
+      const res = await fetch(`http://127.0.0.1:${daemon.ports.http}/pair`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: "PAIRCODE" }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ token: TOKEN });
     } finally {
       await daemon.close();
     }

@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { isLoopbackHost } from "./loopback";
 import { isAllowedOrigin } from "./origin";
+import type { PairingStore } from "./pairing";
 import { isPiConfig, mergeProviderKeys, redactConfig, type SettingsStore } from "./settings";
 import type { PiConfig } from "./piConfig";
 
@@ -19,14 +20,19 @@ export interface HttpServerOptions {
   host?: string;
   /**
    * Exact `Origin` values allowed; defaults to blocking web origins (see
-   * {@link isAllowedOrigin}). Note: this gates the Origin only — it does not
-   * emit CORS headers or answer `OPTIONS` preflights, so a browser can't yet
-   * call these endpoints. The intended consumer is the native shell (no CORS);
-   * browser access waits on the pairing endpoint, which will add CORS.
+   * {@link isAllowedOrigin}). Allowed origins also receive CORS headers + an
+   * `OPTIONS` preflight answer, so a browser (the extension) can call the
+   * endpoints — `/pair` cross-origin to bootstrap, and the rest once it has the
+   * token. The native shell sends no Origin and needs no CORS.
    */
   allowedOrigins?: string[];
-  /** Maximum accepted `PUT` body size in bytes (default 1 MiB). */
+  /** Maximum accepted body size in bytes (default 1 MiB). */
   maxBodyBytes?: number;
+  /**
+   * Enables the unauthenticated `POST /pair` endpoint: the extension redeems a
+   * pairing code for the session token. Omit to disable pairing (`/pair` → 404).
+   */
+  pairing?: PairingStore;
 }
 
 /**
@@ -79,12 +85,12 @@ export class HttpServer {
   }
 
   private handle(req: IncomingMessage, res: ServerResponse): void {
-    if (!isAllowedOrigin(req.headers.origin, this.opts.allowedOrigins)) {
+    const origin = req.headers.origin;
+    if (!isAllowedOrigin(origin, this.opts.allowedOrigins)) {
       return send(res, 403, { error: "forbidden_origin" });
     }
-    if (req.headers.authorization !== `Bearer ${this.opts.token}`) {
-      return send(res, 401, { error: "unauthorized" });
-    }
+    // CORS for allowed browser origins (the extension calls these cross-origin).
+    if (origin) setCorsHeaders(res, origin);
 
     // Node always sets url/method on a server request; the defaults are type
     // guards for the optional `IncomingMessage` fields, not reachable states.
@@ -92,6 +98,21 @@ export class HttpServer {
     const path = (req.url ?? "/").split("?")[0] ?? "/";
     const method = req.method ?? "GET";
 
+    // Answer the CORS preflight before any auth.
+    if (method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    // `/pair` is the one unauthenticated route — the pairing code is the credential.
+    if (path === "/pair") {
+      if (method !== "POST") return send(res, 405, { error: "method_not_allowed" });
+      return this.pair(req, res);
+    }
+
+    if (req.headers.authorization !== `Bearer ${this.opts.token}`) {
+      return send(res, 401, { error: "unauthorized" });
+    }
     if (path === "/status") {
       if (method !== "GET") return send(res, 405, { error: "method_not_allowed" });
       return send(res, 200, { status: "ok" });
@@ -102,6 +123,23 @@ export class HttpServer {
       return send(res, 405, { error: "method_not_allowed" });
     }
     return send(res, 404, { error: "not_found" });
+  }
+
+  /** Redeem a pairing code for the session token (unauthenticated; the code authenticates). */
+  private pair(req: IncomingMessage, res: ServerResponse): void {
+    const pairing = this.opts.pairing;
+    if (!pairing) return send(res, 404, { error: "not_found" }); // pairing disabled
+    readBody(req, this.opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES)
+      .then((raw) => {
+        if (raw === null) return send(res, 413, { error: "payload_too_large" });
+        const code = parseCode(raw);
+        if (code === null) return send(res, 400, { error: "invalid_code" });
+        const token = pairing.redeem(code);
+        if (token === null) return send(res, 401, { error: "invalid_or_expired_code" });
+        send(res, 200, { token });
+      })
+      /* v8 ignore next */
+      .catch(() => send(res, 400, { error: "invalid_body" }));
   }
 
   private putSettings(req: IncomingMessage, res: ServerResponse): void {
@@ -123,6 +161,26 @@ export class HttpServer {
       /* v8 ignore next */
       .catch(() => send(res, 400, { error: "invalid_body" }));
   }
+}
+
+/** Allow the (already origin-checked) browser origin to call these endpoints. */
+function setCorsHeaders(res: ServerResponse, origin: string): void {
+  res.setHeader("access-control-allow-origin", origin);
+  res.setHeader("access-control-allow-methods", "GET, PUT, POST, OPTIONS");
+  res.setHeader("access-control-allow-headers", "content-type, authorization");
+}
+
+/** Extract a string `code` from a `/pair` body, or null if malformed. */
+function parseCode(raw: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const code = (parsed as { code?: unknown }).code;
+  return typeof code === "string" ? code : null;
 }
 
 /** Parse a request body into a PiConfig, or null if it isn't a valid one. */

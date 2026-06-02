@@ -3,6 +3,7 @@ import type { BridgeSession } from "./bridgeSession";
 import { ConversationServer } from "./conversationServer";
 import { HttpServer } from "./httpServer";
 import type { ChildLike } from "./jsonLineProcess";
+import type { PairingStore } from "./pairing";
 import { PiBridgeServer } from "./piBridgeServer";
 import type { SettingsStore } from "./settings";
 
@@ -27,6 +28,8 @@ export interface DaemonOptions {
   authTimeoutMs?: number;
   /** Max HTTP body size. */
   maxBodyBytes?: number;
+  /** Enables `POST /pair` so the extension can redeem a code for the token. */
+  pairing?: PairingStore;
   /** Fixed ports; any omitted one binds an ephemeral port. */
   ports?: { bridge?: number; piBridge?: number; conversation?: number; http?: number };
 }
@@ -109,6 +112,7 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     host,
     allowedOrigins,
     maxBodyBytes: opts.maxBodyBytes,
+    pairing: opts.pairing,
     port: opts.ports?.http,
   });
 

@@ -4,7 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDaemon, type PiBridgeInfo, type RunningDaemon } from "./daemon";
+import { writeJsonFile } from "./fsAtomic";
 import type { ChildLike } from "./jsonLineProcess";
+import { createPairingStore } from "./pairing";
 import { resolvePaths, type DaemonPaths } from "./paths";
 import { createFileSettingsStore } from "./settingsStore";
 import { acquireSingleInstanceLock, type LockHandle } from "./singleInstance";
@@ -41,7 +43,12 @@ async function main(): Promise<void> {
       piAgentDir: paths.piAgentDir,
     });
 
-    const daemon = await createDaemon({ token, settings, spawnPi: piSpawner(paths) });
+    // The extension can't read token.json; surface a single-use pairing code it
+    // redeems for the token via POST /pair. The trusted shell reads this file.
+    const pairing = createPairingStore({ token });
+    writeJsonFile(path.join(paths.appData, "pairing.json"), { code: pairing.code }, 0o600);
+
+    const daemon = await createDaemon({ token, settings, pairing, spawnPi: piSpawner(paths) });
 
     console.log("[fairy:pi-daemon] listening (loopback):");
     console.log(`  bridge:       ws://127.0.0.1:${daemon.ports.bridge}`);

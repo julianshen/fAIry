@@ -33,8 +33,8 @@ Three components, all talking over `localhost`. A Bun-workspaces monorepo
 │  Swift menu-bar app │◄──── HTTP/WS ──────►│   pi-daemon (Bun)    │
 │  • tray icon        │                     │  • spawns pi --rpc   │
 │  • login-item launch│                     │  • bridge server     │
-│  • WKWebView:       │                     │  • app-local workspace│
-│    Settings + Chat  │                     │  • multi-provider cfg │
+│  • native Settings  │                     │  • app-local workspace│
+│  • WebView chat     │                     │  • multi-provider cfg │
 │  • manages daemon   │                     └──────────┬───────────┘
 └─────────────────────┘                                │ localhost WS
                                             ┌───────────▼───────────┐
@@ -51,7 +51,7 @@ Three components, all talking over `localhost`. A Bun-workspaces monorepo
 | --- | --- | --- | --- |
 | **Chrome extension** | TypeScript (MV3) | `chrome-extension` *(planned)* | The browser surface. Executes agent actions on the live tab via `chrome.debugger` / `chrome.tabs` / `chrome.scripting`. Hosts the Fairy agent panel UI. |
 | **pi-daemon** | Bun + TypeScript | `pi-daemon` | Standalone local agent. Spawns the Pi coding agent (`pi --mode rpc`), bridges browser tools, owns an app-local workspace + isolated config, supports multiple providers/models. Launched at login. |
-| **macOS shell** | Swift | *(planned)* | Menu-bar tray app. Manages the daemon lifecycle and hosts native (WKWebView) Settings + Conversation windows. |
+| **macOS shell** | Swift | *(planned)* | Menu-bar tray app. Manages the daemon lifecycle. **Native macOS Settings UI** (providers/models) opened from the tray; a **WKWebView Conversation window** hosting the `agent-panel`. Code-signed + notarized with **Sparkle auto-update**; LaunchAgent for login launch. |
 | **agent-panel** | React + TS | `agent-panel` | The conversation/activity UI (header + feed + composer), consumed by the extension and the native Conversation window. **Built.** |
 
 ## 3. The Pi agent
@@ -104,10 +104,10 @@ state-mutating) are gated; payment and similar always hand control back.
 | --- | --- | --- |
 | **NDJSON framing** | one JSON value per line; partial-line buffering, CRLF, blank-line skipping | **Built** (`packages/pi-daemon/src/ndjson.ts`) |
 | **Subprocess transport** | write values to stdin / receive parsed values from stdout; lifecycle | **Built** (`packages/pi-daemon/src/jsonLineProcess.ts`) |
-| **Pi RPC** | prompt/abort/compact ⟷ agent/tool/turn events | **(open)** — `PiSession`, next |
-| **Browser bridge** | `ToolRequest {id, tool, args}` ⟷ `ToolResponse {id, ok, result?, error?}` | **(open)** — daemon ↔ extension |
+| **Pi RPC** | prompt/abort/compact ⟷ agent/tool/turn events | **(planned)** — `PiSession`, next |
+| **Browser bridge** | `ToolRequest {id, tool, args}` ⟷ `ToolResponse {id, ok, result?, error?}`; **all 27 POC tools** in v1 | **(planned)** — daemon ↔ extension |
 | **Panel beat model** | typed `Beat` / `FeedItem` reducer | **Built** (`packages/agent-panel/src/engine.ts`) |
-| **Daemon ↔ shell/extension API** | localhost HTTP/WS — conversation I/O, settings, status | **(open)** |
+| **Daemon ↔ clients API** | **WebSocket** for the conversation/event stream + extension tool bridge; **HTTP REST** for settings/status | **(planned)** |
 
 ## 6. Isolation & configuration
 
@@ -118,7 +118,16 @@ A hard requirement: the daemon must **not** touch the user's global `~/.pi`.
   else XDG. `FAIRY_HOME` overrides. `piAgentDir` → `PI_CODING_AGENT_DIR`.
 - **Multiple providers/models** are configured per-instance via Pi's
   `settings.json` / `auth.json` under `piAgentDir` (evolution of the POC's
-  `PiConfigWriter`). Secrets are written `0600`. **(open: provider-config UX/API.)**
+  `PiConfigWriter`). Secrets are written `0600`. Edited from the **native macOS
+  Settings UI** (opened from the tray) → daemon HTTP API → the config writer; the
+  active model is switched from the panel's model chip.
+- **Extension auth**: a `localhost` listener is reachable by any local process,
+  so the daemon mints a **per-session token** and the extension **pairs once**
+  (the user approves it in Settings). The token gates browser-tool/conversation
+  requests.
+- **Session model (v1)**: a **single conversation** operates the **active tab**;
+  the agent may open/switch tabs via tools, but there is one session, not one
+  per tab.
 - The daemon is **launched at login** (macOS LaunchAgent, managed by the shell).
 
 ## 7. Reuse from the Horizon POC
@@ -138,17 +147,21 @@ See the [README](../README.md) and project memory. In short: **Bun** toolchain;
 **feature branches via PRs** into `main`; pure/injectable design for testability
 (`resolvePaths`, `JsonLineProcess`'s injected spawner) is the house style.
 
-## 9. Open questions (to resolve before the relevant milestone)
+## 9. Resolved decisions
 
-- **Bridge protocol**: exact tool set and `ToolRequest`/`ToolResponse` schema for
-  the Chrome-extension backend (the POC had 27 tools; which ship in v1?).
-- **Daemon ↔ clients API**: HTTP vs WebSocket; endpoints for conversation,
-  settings, status, multi-session.
-- **Provider/model config**: the settings UX and the daemon API behind it.
-- **Extension ↔ daemon auth**: a `localhost` listener is reachable by *any*
-  local process in the user's session — it is **not** isolated from other local
-  apps — so a per-session token (or equivalent) is likely required to stop
-  another local app issuing browser-tool/conversation requests. Confirm the scheme.
-- **Multi-tab / multi-session**: one conversation per tab? per window? global?
-- **Swift shell specifics**: LaunchAgent install, auto-update, code-signing.
-- **Pi `extension_ui_request`** handling (dialogs/confirms) in the prod UI.
+These were the v1 design questions; all are now settled (see the ROADMAP
+decision log for dates):
+
+- **Tool set** = all 27 POC browser tools.
+- **Daemon API** = WebSocket (conversation stream + extension bridge) + HTTP REST
+  (settings/status).
+- **Extension auth** = per-session token with a one-time pairing approved in Settings.
+- **Session model** = one conversation operating the active tab.
+- **Provider/model config** = native macOS Settings UI from the tray → daemon HTTP API.
+- **Shell** = code-signed + notarized + Sparkle auto-update from v1.
+
+## 10. Still to detail (at the relevant milestone, not up front)
+
+- The exact `ToolRequest`/`ToolResponse` schema and the WS/HTTP **endpoint list**.
+- The **pairing flow** mechanics (how the extension obtains + stores the token).
+- Pi **`extension_ui_request`** (dialogs/confirms) handling in the prod UI.

@@ -39,12 +39,16 @@ Transport stack is complete: `paths` → `ndjson` → `jsonLineProcess`.
       requests to the connected Chrome extension and correlates responses.
 - [ ] **Pi browser extension** — the `-e` extension registering the `browser`
       tool that calls the bridge. (Port/adapt POC `horizon-bridge.ts`.)
-- [ ] Decide & document the **v1 tool set** (subset of the POC's 27).
+- [ ] Port **all 27 POC browser tools** to the bridge (v1).
 
 ### M3 — Daemon ↔ clients API
 
+- [ ] **Transport** — WebSocket for the conversation/event stream + extension
+      tool bridge; HTTP REST for settings/status.
+- [ ] **Auth** — daemon mints a per-session token; one-time pairing approved in
+      the Settings UI; the token gates all requests.
 - [ ] Conversation API (start task, stream beats, answer confirm, pause, take
-      over, stop) for the panel.
+      over, stop) — a **single conversation bound to the active tab**.
 - [ ] Settings/status API (providers/models, daemon health).
 - [ ] Map the Pi event stream → panel **beat model** (the `agent-panel` contract).
 
@@ -58,14 +62,16 @@ Transport stack is complete: `paths` → `ndjson` → `jsonLineProcess`.
 ### M5 — macOS shell (Swift)
 
 - [ ] Menu-bar tray app; spawn/monitor/restart the daemon.
-- [ ] Native Settings + Conversation windows (WKWebView hosting the panel).
+- [ ] **Native macOS Settings UI** (providers/models) from the tray → daemon HTTP API.
+- [ ] **WKWebView Conversation window** hosting the `agent-panel`.
 - [ ] Login-item / LaunchAgent install.
+- [ ] **Code-signing + notarization + Sparkle auto-update** (built in from v1).
 
 ### M6 — Packaging & integration
 
 - [ ] Bundle Pi (`bun build --compile`) + ship with the app.
 - [ ] End-to-end happy path (the design's flight-booking flow) on a real site.
-- [ ] Code-signing, auto-update.
+- [ ] Release pipeline (DMG + update feed) wiring the M5 signing/Sparkle setup.
 
 ## Non-goals (scope guardrails)
 
@@ -97,3 +103,4 @@ To keep us from "going elsewhere," fAIry explicitly does **not** aim to:
 | 2026-06-01 | agent-panel built as a controlled, presentational React package driven by a typed beat model. |
 | 2026-06-02 | Trunk is `main`. Workflow: feature branch → PR → simplify/review → fix comments → wait for bot reviews → merge. |
 | 2026-06-02 | Daemon spawns Pi through `node:child_process` (Bun node-compat), not `Bun.spawn`. |
+| 2026-06-02 | **v1 scope set**: all 27 browser tools; daemon API = WebSocket (stream + bridge) + HTTP (settings/status); per-session token + one-time pairing auth; one conversation on the active tab; provider config via a **native macOS Settings UI from the tray**; shell **code-signed + notarized + Sparkle auto-update from v1**. |

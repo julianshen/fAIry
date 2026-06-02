@@ -5,3 +5,11 @@ export type { DaemonPaths, ResolvePathsInput } from "./paths";
 
 export { encodeLine, LineDecoder } from "./ndjson";
 export type { LineErrorHandler } from "./ndjson";
+
+export { JsonLineProcess } from "./jsonLineProcess";
+export type {
+  ChildLike,
+  ReadableLine,
+  Spawner,
+  JsonLineHandlers,
+} from "./jsonLineProcess";

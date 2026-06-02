@@ -32,24 +32,30 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const token = mintToken();
-  writeToken(paths.appData, token);
+  try {
+    const token = mintToken();
+    writeToken(paths.appData, token);
 
-  const settings = createFileSettingsStore({
-    configFile: path.join(paths.appData, "config.json"),
-    piAgentDir: paths.piAgentDir,
-  });
+    const settings = createFileSettingsStore({
+      configFile: path.join(paths.appData, "config.json"),
+      piAgentDir: paths.piAgentDir,
+    });
 
-  const daemon = await createDaemon({ token, settings, spawnPi: piSpawner(paths) });
+    const daemon = await createDaemon({ token, settings, spawnPi: piSpawner(paths) });
 
-  console.log("[fairy:pi-daemon] listening (loopback):");
-  console.log(`  bridge:       ws://127.0.0.1:${daemon.ports.bridge}`);
-  console.log(`  pi-bridge:    tcp://127.0.0.1:${daemon.ports.piBridge}`);
-  console.log(`  conversation: ws://127.0.0.1:${daemon.ports.conversation}`);
-  console.log(`  http:         http://127.0.0.1:${daemon.ports.http}`);
-  console.log(`  appData:      ${paths.appData}`);
+    console.log("[fairy:pi-daemon] listening (loopback):");
+    console.log(`  bridge:       ws://127.0.0.1:${daemon.ports.bridge}`);
+    console.log(`  pi-bridge:    tcp://127.0.0.1:${daemon.ports.piBridge}`);
+    console.log(`  conversation: ws://127.0.0.1:${daemon.ports.conversation}`);
+    console.log(`  http:         http://127.0.0.1:${daemon.ports.http}`);
+    console.log(`  appData:      ${paths.appData}`);
 
-  installShutdown(daemon, lock);
+    installShutdown(daemon, lock);
+  } catch (err) {
+    // Don't leave the lock held if startup failed before installShutdown.
+    lock.release();
+    throw err;
+  }
 }
 
 /** The Pi `browser` extension script, shipped alongside the daemon. */

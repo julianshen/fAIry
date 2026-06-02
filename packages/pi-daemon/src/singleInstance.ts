@@ -37,7 +37,14 @@ export function acquireSingleInstanceLock(opts: SingleInstanceLockOptions): Lock
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       writeFileSync(opts.lockFile, String(pid), { flag: "wx" });
-      return { release: () => rmSync(opts.lockFile, { force: true }) };
+      return {
+        // Only remove the lockfile if it's still ours — if we were paused long
+        // enough for another instance to reclaim a "stale" lock, deleting it
+        // would clobber that instance's lock.
+        release: () => {
+          if (readHolder(opts.lockFile) === pid) rmSync(opts.lockFile, { force: true });
+        },
+      };
     } catch (err) {
       /* v8 ignore next */
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
@@ -62,7 +69,8 @@ function readHolder(file: string): number | null {
     return null;
   }
   /* v8 ignore stop */
-  const pid = Number.parseInt(raw.trim(), 10);
+  // Number() (not parseInt) so trailing garbage like "1234abc" is NaN, not 1234.
+  const pid = Number(raw.trim());
   return Number.isInteger(pid) && pid > 0 ? pid : null;
 }
 

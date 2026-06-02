@@ -52,6 +52,20 @@ describe("acquireSingleInstanceLock", () => {
     expect(() => lock!.release()).not.toThrow();
   });
 
+  it("release() leaves a lockfile that another instance has since reclaimed", () => {
+    const lock = acquireSingleInstanceLock({ lockFile, pid: 4242, isAlive: () => true });
+    writeFileSync(lockFile, "9999"); // another instance reclaimed the stale lock
+    lock!.release();
+    expect(readFileSync(lockFile, "utf8").trim()).toBe("9999"); // not ours — untouched
+  });
+
+  it("treats a pid with trailing garbage as unparseable (reclaims)", () => {
+    writeFileSync(lockFile, "1234abc");
+    const lock = acquireSingleInstanceLock({ lockFile, pid: 4242, isAlive: () => true });
+    expect(lock).not.toBeNull();
+    expect(readFileSync(lockFile, "utf8").trim()).toBe("4242");
+  });
+
   describe("default liveness (process.kill)", () => {
     it("refuses when the lockfile holds this live process", () => {
       writeFileSync(lockFile, String(process.pid));

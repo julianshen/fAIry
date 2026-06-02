@@ -28,7 +28,7 @@ specialists hand work off to each other, visibly.
 Three components, all talking over `localhost`. A Bun-workspaces monorepo
 (`packages/*`).
 
-```
+```text
 ┌─────────────────────┐     localhost      ┌──────────────────────┐
 │  Swift menu-bar app │◄──── HTTP/WS ──────►│   pi-daemon (Bun)    │
 │  • tray icon        │                     │  • spawns pi --rpc   │
@@ -72,7 +72,7 @@ the POC's `pi-extension/horizon-bridge.ts`.)
 
 ### 4.1 Conversation
 
-```
+```text
 user types in panel ─▶ daemon ─▶ pi (prompt) ─▶ event stream ─▶ daemon ─▶ panel beats
 ```
 
@@ -82,7 +82,7 @@ panel is driven identically whether by the live daemon or (in dev) a script.
 
 ### 4.2 Browser tool execution
 
-```
+```text
 pi calls browser tool ─▶ pi-extension ─▶ daemon bridge ─▶ Chrome extension
    ─▶ chrome.debugger/tabs/scripting on the live tab ─▶ result ─▶ back up the chain
 ```
@@ -102,11 +102,11 @@ state-mutating) are gated; payment and similar always hand control back.
 
 | Seam | Shape | Status |
 | --- | --- | --- |
-| **NDJSON framing** | one JSON value per line; partial-line buffering, CRLF, blank-line skipping | **Built** (`pi-daemon/ndjson.ts`) |
-| **Subprocess transport** | write values to stdin / receive parsed values from stdout; lifecycle | **Built** (`pi-daemon/jsonLineProcess.ts`) |
+| **NDJSON framing** | one JSON value per line; partial-line buffering, CRLF, blank-line skipping | **Built** (`packages/pi-daemon/src/ndjson.ts`) |
+| **Subprocess transport** | write values to stdin / receive parsed values from stdout; lifecycle | **Built** (`packages/pi-daemon/src/jsonLineProcess.ts`) |
 | **Pi RPC** | prompt/abort/compact ⟷ agent/tool/turn events | **(open)** — `PiSession`, next |
 | **Browser bridge** | `ToolRequest {id, tool, args}` ⟷ `ToolResponse {id, ok, result?, error?}` | **(open)** — daemon ↔ extension |
-| **Panel beat model** | typed `Beat` / `FeedItem` reducer | **Built** (`agent-panel/engine.ts`) |
+| **Panel beat model** | typed `Beat` / `FeedItem` reducer | **Built** (`packages/agent-panel/src/engine.ts`) |
 | **Daemon ↔ shell/extension API** | localhost HTTP/WS — conversation I/O, settings, status | **(open)** |
 
 ## 6. Isolation & configuration
@@ -114,7 +114,7 @@ state-mutating) are gated; payment and similar always hand control back.
 A hard requirement: the daemon must **not** touch the user's global `~/.pi`.
 
 - **Workspace + config** live under a per-OS app-data directory
-  (`pi-daemon/paths.ts`): macOS `Application Support/fAIry`, Windows `%APPDATA%`,
+  (`packages/pi-daemon/src/paths.ts`): macOS `Application Support/fAIry`, Windows `%APPDATA%`,
   else XDG. `FAIRY_HOME` overrides. `piAgentDir` → `PI_CODING_AGENT_DIR`.
 - **Multiple providers/models** are configured per-instance via Pi's
   `settings.json` / `auth.json` under `piAgentDir` (evolution of the POC's
@@ -133,7 +133,7 @@ A hard requirement: the daemon must **not** touch the user's global `~/.pi`.
 
 ## 8. Conventions
 
-See [`CONTRIBUTING`/README] and project memory. In short: **Bun** toolchain;
+See the [README](../README.md) and project memory. In short: **Bun** toolchain;
 **TDD** (red→green→refactor); **≥90% coverage** enforced per package; all work on
 **feature branches via PRs** into `main`; pure/injectable design for testability
 (`resolvePaths`, `JsonLineProcess`'s injected spawner) is the house style.
@@ -145,8 +145,10 @@ See [`CONTRIBUTING`/README] and project memory. In short: **Bun** toolchain;
 - **Daemon ↔ clients API**: HTTP vs WebSocket; endpoints for conversation,
   settings, status, multi-session.
 - **Provider/model config**: the settings UX and the daemon API behind it.
-- **Extension ↔ daemon auth**: loopback is OS-isolated, but do we need a
-  per-session token to stop other local apps connecting?
+- **Extension ↔ daemon auth**: a `localhost` listener is reachable by *any*
+  local process in the user's session — it is **not** isolated from other local
+  apps — so a per-session token (or equivalent) is likely required to stop
+  another local app issuing browser-tool/conversation requests. Confirm the scheme.
 - **Multi-tab / multi-session**: one conversation per tab? per window? global?
 - **Swift shell specifics**: LaunchAgent install, auto-update, code-signing.
 - **Pi `extension_ui_request`** handling (dialogs/confirms) in the prod UI.

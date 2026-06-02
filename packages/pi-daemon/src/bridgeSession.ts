@@ -83,11 +83,16 @@ export class BridgeSession {
       return;
     }
 
+    // A valid-JSON but non-object frame (null, a number, an array) would crash
+    // the correlator reading `.id`; drop anything that isn't a response object.
+    if (typeof msg !== "object" || msg === null || !("id" in msg)) return;
     this.correlator.resolve(msg as ToolResponse);
   }
 
   private onClose(): void {
     clearTimeout(this.authTimer);
+    // Drop auth so a late requestTool rejects instead of sending to a dead socket.
+    this.authed = false;
     this.correlator.rejectAll("bridge connection closed");
     this.opts.onClose?.();
   }

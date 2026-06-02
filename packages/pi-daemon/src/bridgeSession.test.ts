@@ -109,6 +109,14 @@ describe("BridgeSession — tool calls", () => {
     expect(() => conn.emit("garbage")).not.toThrow();
   });
 
+  it("ignores valid-JSON non-object frames after auth without crashing", () => {
+    const { conn } = setup();
+    authenticate(conn);
+    expect(() => conn.emit(null)).not.toThrow();
+    expect(() => conn.emit(42)).not.toThrow();
+    expect(() => conn.emit([])).not.toThrow();
+  });
+
   it("forwards a per-call timeout to the correlator", async () => {
     vi.useFakeTimers();
     try {
@@ -162,5 +170,12 @@ describe("BridgeSession — lifecycle", () => {
     conn.drop();
     await expect(p).rejects.toThrow(/closed/i);
     expect(events).toContain("close");
+  });
+
+  it("rejects tool calls made after the connection has closed", async () => {
+    const { conn, session } = setup();
+    authenticate(conn);
+    conn.drop();
+    await expect(session.requestTool("x", {})).rejects.toThrow(/not authenticated/i);
   });
 });

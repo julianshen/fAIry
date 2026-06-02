@@ -78,10 +78,15 @@ Remaining daemon work is integration/wiring — see M2/M3 below (150+ pi-daemon 
       `token.json`, so it redeems a short-lived, single-use pairing code to obtain
       the token. Needs a client-facing entry point → builds on the HTTP endpoint
       above; the WS auth handshake itself already exists (`authenticatedSession`).
-- [ ] **Daemon entry wiring** (`main.ts`) — compose token + paths + `writePiConfig`
-      + `wsServer`(×2: bridge + conversation) + `PiSession` into a running
-      `bun run start` daemon. *(integration: real Pi + sockets)*
-- [ ] **Lifecycle** — single-instance lock, graceful shutdown.
+- [x] **Daemon entry wiring** (`daemon` + `main`) — `createDaemon` composes the
+      `BridgeServer`, the new `ConversationServer` (`WsServer` + `ConversationSession`
+      + `ConversationController`), and the `HttpServer` under one token/Origin policy;
+      `createFileSettingsStore` persists a canonical `config.json` and materializes
+      Pi's `settings.json`/`auth.json`. `main.ts` mints+surfaces the token, spawns
+      real `pi --mode rpc`, and installs `SIGINT`/`SIGTERM` shutdown. *(Pi → bridge
+      tool routing still pending the Pi `browser` extension below.)*
+- [ ] **Lifecycle** — single-instance lock, fuller graceful shutdown (basic
+      signal-driven `close()` landed with the wiring above).
 
 ### M4 — Chrome extension
 

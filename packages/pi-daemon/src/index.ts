@@ -22,8 +22,17 @@ export type { PiConfig, ProviderConfig, PiAuth } from "./piConfig";
 
 export { mintToken, writeToken, TOKEN_FILENAME } from "./tokenStore";
 
-export { redactConfig } from "./settings";
+export { redactConfig, isPiConfig, mergeProviderKeys } from "./settings";
 export type { SettingsStore, RedactedConfig, RedactedProvider } from "./settings";
+
+export { createFileSettingsStore } from "./settingsStore";
+export type { FileSettingsStoreOptions } from "./settingsStore";
+
+export { createDaemon } from "./daemon";
+export type { DaemonOptions, DaemonPorts, RunningDaemon } from "./daemon";
+
+export { ConversationServer } from "./conversationServer";
+export type { ConversationServerOptions } from "./conversationServer";
 
 export { isAllowedOrigin } from "./origin";
 

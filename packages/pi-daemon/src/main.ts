@@ -1,35 +1,87 @@
+import { spawn } from "node:child_process";
+import { mkdirSync } from "node:fs";
 import os from "node:os";
-import { resolvePaths } from "./paths";
+import path from "node:path";
+import { createDaemon, type RunningDaemon } from "./daemon";
+import type { ChildLike, Spawner } from "./jsonLineProcess";
+import { resolvePaths, type DaemonPaths } from "./paths";
+import { createFileSettingsStore } from "./settingsStore";
+import { mintToken, writeToken } from "./tokenStore";
 
 /**
- * Daemon entry point. For now it just resolves and reports its isolated
- * directories — proof the package runs end-to-end via `bun run start`.
- *
- * Next PRs wire the real daemon: spawn Pi (`pi --mode rpc`), run the loopback
- * bridge server, and expose the localhost API consumed by the Chrome extension
- * and the native macOS shell.
+ * Daemon entry point: resolve the isolated dirs, mint + surface the per-session
+ * token, load persisted settings (materializing Pi's config), then bring up the
+ * bridge / conversation / HTTP servers via {@link createDaemon}. A thin
+ * composition shell over already-unit-tested parts — exercised by running it.
  */
-function main(): void {
-  let home: string;
-  try {
-    home = os.homedir();
-  } catch (err) {
-    console.error(
-      "[fairy:pi-daemon] FATAL: could not determine the user's home directory.",
-      err,
-    );
-    process.exit(1);
-  }
+async function main(): Promise<void> {
+  const paths = resolvePaths({ platform: process.platform, env: process.env, home: homedirOrExit() });
 
-  const paths = resolvePaths({
-    platform: process.platform,
-    env: process.env,
-    home,
+  // appData and piAgentDir get created as a side effect of writing the token and
+  // Pi config; the workspace (Pi's cwd per conversation) has no other creator, so
+  // a first-run conversation would otherwise spawn Pi against a missing directory.
+  mkdirSync(paths.workspace, { recursive: true });
+
+  const token = mintToken();
+  writeToken(paths.appData, token);
+
+  const settings = createFileSettingsStore({
+    configFile: path.join(paths.appData, "config.json"),
+    piAgentDir: paths.piAgentDir,
   });
-  console.log("[fairy:pi-daemon] resolved paths:");
-  console.log(`  appData:    ${paths.appData}`);
-  console.log(`  piAgentDir: ${paths.piAgentDir}`);
-  console.log(`  workspace:  ${paths.workspace}`);
+
+  const daemon = await createDaemon({ token, settings, spawn: piSpawner(paths) });
+
+  console.log("[fairy:pi-daemon] listening (loopback):");
+  console.log(`  bridge:       ws://127.0.0.1:${daemon.ports.bridge}`);
+  console.log(`  conversation: ws://127.0.0.1:${daemon.ports.conversation}`);
+  console.log(`  http:         http://127.0.0.1:${daemon.ports.http}`);
+  console.log(`  appData:      ${paths.appData}`);
+
+  installShutdown(daemon);
 }
 
-main();
+/** Spawn `pi --mode rpc` against the daemon's isolated config dir. */
+function piSpawner(paths: DaemonPaths): Spawner {
+  return () =>
+    spawn("pi", ["--mode", "rpc"], {
+      env: { ...process.env, PI_CODING_AGENT_DIR: paths.piAgentDir },
+      cwd: paths.workspace,
+      stdio: ["pipe", "pipe", "pipe"],
+    }) as unknown as ChildLike;
+}
+
+function homedirOrExit(): string {
+  try {
+    return os.homedir();
+  } catch (err) {
+    console.error("[fairy:pi-daemon] FATAL: could not determine the home directory.", err);
+    process.exit(1);
+  }
+}
+
+/** Close the daemon on SIGINT/SIGTERM so sockets/Pi don't linger. */
+function installShutdown(daemon: RunningDaemon): void {
+  let closing = false;
+  const shutdown = (signal: string): void => {
+    if (closing) {
+      // A second signal while a slow/stuck close() is in flight forces exit, so
+      // the daemon stays killable from the terminal.
+      console.error(`[fairy:pi-daemon] ${signal} again — forcing exit.`);
+      process.exit(1);
+    }
+    closing = true;
+    console.log(`[fairy:pi-daemon] ${signal} — shutting down.`);
+    daemon.close().then(
+      () => process.exit(0),
+      () => process.exit(1),
+    );
+  };
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+}
+
+main().catch((err) => {
+  console.error("[fairy:pi-daemon] FATAL: failed to start.", err);
+  process.exit(1);
+});

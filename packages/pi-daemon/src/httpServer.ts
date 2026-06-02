@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import { isLoopbackHost } from "./loopback";
 import { isAllowedOrigin } from "./origin";
 import type { PairingStore } from "./pairing";
+import { timingSafeStrEqual } from "./secureCompare";
 import { isPiConfig, mergeProviderKeys, redactConfig, type SettingsStore } from "./settings";
 import type { PiConfig } from "./piConfig";
 
@@ -110,7 +111,8 @@ export class HttpServer {
       return this.pair(req, res);
     }
 
-    if (req.headers.authorization !== `Bearer ${this.opts.token}`) {
+    const auth = req.headers.authorization;
+    if (typeof auth !== "string" || !timingSafeStrEqual(auth, `Bearer ${this.opts.token}`)) {
       return send(res, 401, { error: "unauthorized" });
     }
     if (path === "/status") {
@@ -178,7 +180,10 @@ function parseJsonObject(raw: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
-  return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : null;
+  // typeof [] === "object" too; exclude arrays so only key-value bodies pass.
+  return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : null;
 }
 
 /** Extract a string `code` from a `/pair` body, or null if malformed. */

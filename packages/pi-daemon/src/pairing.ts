@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { timingSafeStrEqual } from "./secureCompare";
 
 export interface PairingStoreOptions {
   /** The session token a valid code redeems to. */
@@ -37,7 +38,7 @@ export function createPairingStore(opts: PairingStoreOptions): PairingStore {
     redeem(input) {
       if (used) return null;
       if (expiresAt !== undefined && now() >= expiresAt) return null;
-      if (input !== code) return null;
+      if (!timingSafeStrEqual(input, code)) return null;
       used = true;
       return token;
     },

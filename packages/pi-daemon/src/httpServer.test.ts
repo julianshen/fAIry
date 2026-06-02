@@ -281,6 +281,7 @@ describe("HttpServer", () => {
       expect((await call("POST", "/pair", { token: null, body: { code: 42 } })).status).toBe(400);
       expect((await call("POST", "/pair", { token: null, body: "{not json" })).status).toBe(400);
       expect((await call("POST", "/pair", { token: null, body: "42" })).status).toBe(400); // non-object JSON
+      expect((await call("POST", "/pair", { token: null, body: "[1,2]" })).status).toBe(400); // array, not an object
     });
 
     it("POST /pair over the body size limit is 413", async () => {

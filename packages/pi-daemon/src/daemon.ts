@@ -63,11 +63,11 @@ export interface RunningDaemon {
 export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> {
   const { token, host, allowedOrigins, authTimeoutMs } = opts;
 
-  // Track the latest Chrome session so Pi's tool calls can be relayed to it
-  // (v1 = one browser, newest wins). The relay checks `isAuthenticated` rather
-  // than just non-null, so a disconnected browser reports "no browser connected"
-  // (not the session's internal auth error) and the relay doesn't depend on
-  // requestTool's own post-close behavior.
+  // The active Chrome session Pi's tool calls relay to (v1 = one browser, newest
+  // authenticated wins). Promote only on successful auth — `onSession` fires at
+  // connect, before the token is proven, so a stray/unauthenticated socket must
+  // not displace a working browser — and clear on close so a disconnected browser
+  // reports "no browser connected".
   let chrome: BridgeSession | undefined;
   const bridge = new BridgeServer({
     token,
@@ -75,7 +75,10 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     allowedOrigins,
     authTimeoutMs,
     port: opts.ports?.bridge,
-    onSession: (session) => (chrome = session),
+    onAuthenticated: (session) => (chrome = session),
+    onClose: (session) => {
+      if (chrome === session) chrome = undefined;
+    },
   });
 
   const piBridge = new PiBridgeServer({
@@ -84,9 +87,7 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     authTimeoutMs,
     port: opts.ports?.piBridge,
     requestTool: (tool, args) =>
-      chrome && chrome.isAuthenticated
-        ? chrome.requestTool(tool, args)
-        : Promise.reject(new Error("no browser connected")),
+      chrome ? chrome.requestTool(tool, args) : Promise.reject(new Error("no browser connected")),
   });
 
   // Pi is spawned pointed back at the piBridge. Its port is known only once

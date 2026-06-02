@@ -58,6 +58,7 @@ function adapt(socket: Socket): BridgeConnection {
 export class PiBridgeServer {
   private server: Server | undefined;
   private starting = false;
+  private readonly sockets = new Set<Socket>();
 
   constructor(private readonly opts: PiBridgeServerOptions) {}
 
@@ -71,6 +72,8 @@ export class PiBridgeServer {
     this.starting = true;
     return new Promise((resolve, reject) => {
       const server = createServer((socket) => {
+        this.sockets.add(socket);
+        socket.on("close", () => this.sockets.delete(socket));
         const session = new PiBridgeSession({
           token: this.opts.token,
           connection: adapt(socket),
@@ -96,11 +99,15 @@ export class PiBridgeServer {
     });
   }
 
-  /** Stop accepting connections and close the server. */
+  /** Stop accepting connections and destroy any live ones. */
   close(): Promise<void> {
     const server = this.server;
     if (!server) return Promise.resolve();
     this.server = undefined;
+    // server.close() only stops accepting and waits for open sockets to end, so
+    // destroy them — otherwise a long-lived Pi connection makes shutdown hang.
+    for (const socket of this.sockets) socket.destroy();
+    this.sockets.clear();
     return new Promise((resolve) => server.close(() => resolve()));
   }
 }

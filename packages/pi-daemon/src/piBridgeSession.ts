@@ -40,14 +40,19 @@ export class PiBridgeSession extends AuthenticatedSession {
     const call = msg as { id?: unknown; tool?: unknown; args?: unknown };
     if (typeof call.id !== "string" || typeof call.tool !== "string") return;
     const id = call.id;
+    const tool = call.tool;
     const args =
-      typeof call.args === "object" && call.args !== null
+      typeof call.args === "object" && call.args !== null && !Array.isArray(call.args)
         ? (call.args as Record<string, unknown>)
         : {};
-    this.opts.requestTool(call.tool, args).then(
-      (result) => this.reply({ id, ok: true, result }),
-      (err) => this.reply({ id, ok: false, error: err instanceof Error ? err.message : String(err) }),
-    );
+    // Promise.resolve().then so a *synchronous* throw from requestTool becomes a
+    // rejected reply rather than an uncaught exception that crashes the daemon.
+    Promise.resolve()
+      .then(() => this.opts.requestTool(tool, args))
+      .then(
+        (result) => this.reply({ id, ok: true, result }),
+        (err) => this.reply({ id, ok: false, error: err instanceof Error ? err.message : String(err) }),
+      );
   }
 
   protected onDisposed(): void {}

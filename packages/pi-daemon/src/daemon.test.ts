@@ -93,6 +93,39 @@ describe("createDaemon", () => {
     }
   });
 
+  it("keeps the authenticated Chrome bridge when a second connection arrives unauthenticated", async () => {
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
+    try {
+      // Chrome #1 authenticates and answers tool calls — the active bridge.
+      const chrome1 = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
+      await once(chrome1, "open");
+      chrome1.send(JSON.stringify({ type: "auth", token: TOKEN }));
+      await once(chrome1, "message"); // auth_ok
+      chrome1.on("message", (raw: Buffer) => {
+        const req = JSON.parse(raw.toString()) as { id?: string; tool?: string };
+        if (req.id && req.tool) chrome1.send(JSON.stringify({ id: req.id, ok: true, result: "from-1" }));
+      });
+
+      // Chrome #2 connects but never authenticates — must NOT displace #1.
+      const chrome2 = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
+      await once(chrome2, "open");
+      await new Promise((r) => setTimeout(r, 25));
+
+      const pi = lineClient(daemon.ports.piBridge);
+      await once(pi.socket, "connect");
+      pi.send({ type: "auth", token: TOKEN });
+      expect(await pi.next()).toEqual({ type: "auth_ok" });
+      pi.send({ id: "1", tool: "getUrl", args: {} });
+      expect(await pi.next()).toEqual({ id: "1", ok: true, result: "from-1" });
+
+      chrome1.close();
+      chrome2.close();
+      pi.socket.destroy();
+    } finally {
+      await daemon.close();
+    }
+  });
+
   it("reports 'no browser connected' after the Chrome bridge disconnects", async () => {
     const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
     try {

@@ -31,28 +31,36 @@ const PORT = Number(process.env.FAIRY_PI_BRIDGE_PORT ?? 0);
 const TOKEN = process.env.FAIRY_PI_BRIDGE_TOKEN ?? "";
 
 let sock: Socket | null = null;
+let connecting: Promise<Socket> | null = null;
 let buf = "";
 const pending = new Map<string, PendingCall>();
 let nextId = 0;
 
 function getConn(): Promise<Socket> {
   if (sock && !sock.destroyed) return Promise.resolve(sock);
+  // Share one in-flight connection so concurrent tool calls don't each open a
+  // socket (a connection storm) before the first finishes connecting.
+  if (connecting) return connecting;
   if (!PORT) return Promise.reject(new Error("FAIRY_PI_BRIDGE_PORT not set"));
-  return new Promise((resolve, reject) => {
+  connecting = new Promise((resolve, reject) => {
     const s = createConnection({ host: "127.0.0.1", port: PORT });
     s.setEncoding("utf8");
     s.on("connect", () => {
       // Authenticate first; the daemon closes the socket on a bad/absent token.
       s.write(JSON.stringify({ type: "auth", token: TOKEN }) + "\n");
       sock = s;
+      connecting = null;
       resolve(s);
     });
     s.on("error", (err) => {
       sock = null;
+      connecting = null;
       reject(err);
     });
     s.on("close", () => {
       sock = null;
+      connecting = null;
+      buf = ""; // drop any partial line so it can't corrupt the next connection
       for (const p of pending.values()) p.reject(new Error("bridge closed"));
       pending.clear();
     });
@@ -82,6 +90,7 @@ function getConn(): Promise<Socket> {
       }
     });
   });
+  return connecting;
 }
 
 async function callBridge(tool: string, args: Record<string, unknown>): Promise<unknown> {

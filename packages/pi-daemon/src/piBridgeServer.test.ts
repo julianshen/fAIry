@@ -96,10 +96,28 @@ describe("PiBridgeServer (real TCP)", () => {
     expect(await c.next()).toEqual({ id: "1", ok: true, result: "ok" });
     c.send({ id: "2", tool: "getTitle", args: null }); // null args
     expect(await c.next()).toEqual({ id: "2", ok: true, result: "ok" });
+    c.send({ id: "3", tool: "axtree", args: [1, 2] }); // array args (typeof "object")
+    expect(await c.next()).toEqual({ id: "3", ok: true, result: "ok" });
     expect(calls).toEqual([
       { tool: "getUrl", args: {} },
       { tool: "getTitle", args: {} },
+      { tool: "axtree", args: {} },
     ]);
+    c.socket.destroy();
+  });
+
+  it("answers ok:false when requestTool throws synchronously (no daemon crash)", async () => {
+    server = new PiBridgeServer({
+      token: TOKEN,
+      requestTool: () => {
+        throw new Error("sync boom");
+      },
+    });
+    const port = await server.listen();
+    const c = await connectAndAuth(port);
+    expect(await c.next()).toEqual({ type: "auth_ok" });
+    c.send({ id: "1", tool: "navigate", args: {} });
+    expect(await c.next()).toEqual({ id: "1", ok: false, error: "sync boom" });
     c.socket.destroy();
   });
 
@@ -154,6 +172,17 @@ describe("PiBridgeServer (real TCP)", () => {
     const port = await server.listen();
     const second = new PiBridgeServer({ token: TOKEN, requestTool: async () => null, port });
     await expect(second.listen()).rejects.toBeDefined();
+  });
+
+  it("close() destroys live sockets so shutdown can't hang on a connected client", async () => {
+    server = new PiBridgeServer({ token: TOKEN, requestTool: async () => null });
+    const port = await server.listen();
+    const c = await connectAndAuth(port);
+    expect(await c.next()).toEqual({ type: "auth_ok" });
+    // With the client still connected, close() must still resolve promptly
+    // (a plain server.close() would wait for the socket to end → hang).
+    await expect(server.close()).resolves.toBeUndefined();
+    c.socket.destroy();
   });
 
   it("close() before listen() resolves to a no-op", async () => {

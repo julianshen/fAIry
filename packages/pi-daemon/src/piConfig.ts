@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 export interface ProviderConfig {
@@ -17,11 +17,12 @@ export interface PiConfig {
 /** Pi `auth.json` shape: one api_key entry per provider. */
 export type PiAuth = Record<string, { type: "api_key"; key: string }>;
 
-/** Build the `auth.json` object — providers with a non-empty key only. */
+/** Build the `auth.json` object — providers with a non-blank key only, trimmed. */
 export function buildAuth(config: PiConfig): PiAuth {
   const auth: PiAuth = {};
   for (const provider of config.providers) {
-    if (provider.apiKey) auth[provider.id] = { type: "api_key", key: provider.apiKey };
+    const key = provider.apiKey.trim();
+    if (key) auth[provider.id] = { type: "api_key", key };
   }
   return auth;
 }
@@ -35,11 +36,17 @@ export function buildSettings(config: PiConfig): Record<string, unknown> {
   return settings;
 }
 
-/** Write a JSON file, enforcing `mode` even when overwriting (the writeFileSync
- *  `mode` option only applies on creation). */
+/**
+ * Atomically write a JSON file: serialize to a sibling temp file (created fresh
+ * at `mode`, so a secrets file is never briefly world-readable), then `rename`
+ * it over the target. The rename is atomic on the same filesystem, so the
+ * target is never partially written or left with looser permissions.
+ */
 function writeJson(file: string, data: unknown, mode?: number): void {
-  writeFileSync(file, JSON.stringify(data, null, 2), mode !== undefined ? { mode } : undefined);
-  if (mode !== undefined) chmodSync(file, mode);
+  const tmp = `${file}.tmp`;
+  writeFileSync(tmp, JSON.stringify(data, null, 2), mode !== undefined ? { mode } : undefined);
+  if (mode !== undefined) chmodSync(tmp, mode);
+  renameSync(tmp, file);
 }
 
 /**

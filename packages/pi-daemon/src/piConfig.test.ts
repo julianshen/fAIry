@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, existsSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { buildAuth, buildSettings, writePiConfig } from "./piConfig";
@@ -22,8 +22,14 @@ describe("buildAuth", () => {
     });
   });
 
-  it("skips providers with a blank key", () => {
-    const auth = buildAuth({ providers: [{ id: "anthropic", apiKey: "" }, { id: "openai", apiKey: "k" }] });
+  it("skips blank/whitespace-only keys and trims valid ones", () => {
+    const auth = buildAuth({
+      providers: [
+        { id: "anthropic", apiKey: "" },
+        { id: "blank", apiKey: "   " },
+        { id: "openai", apiKey: "  k  " },
+      ],
+    });
     expect(auth).toEqual({ openai: { type: "api_key", key: "k" } });
   });
 });
@@ -78,5 +84,10 @@ describe("writePiConfig", () => {
     writePiConfig(dir, CONFIG);
     writePiConfig(dir, CONFIG);
     expect(statSync(path.join(dir, "auth.json")).mode & 0o777).toBe(0o600);
+  });
+
+  it("leaves no temp files behind (atomic write)", () => {
+    writePiConfig(dir, CONFIG);
+    expect(readdirSync(dir).filter((f) => f.endsWith(".tmp"))).toEqual([]);
   });
 });

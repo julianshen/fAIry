@@ -23,7 +23,7 @@
 **M1 (daemon core) complete** (`paths` → `ndjson` → `jsonLineProcess` →
 `piSession` → `piConfig`). **M2 transport complete** and **M3 logic complete**
 (`bridge`/sessions/servers, `beatMapper`, `conversation`/`conversationSession`).
-Remaining daemon work is integration/wiring — see M2/M3 below. 155 pi-daemon tests.
+Remaining daemon work is integration/wiring — see M2/M3 below (150+ pi-daemon tests).
 
 ## Milestones
 

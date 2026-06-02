@@ -50,7 +50,14 @@ export function acquireSingleInstanceLock(opts: SingleInstanceLockOptions): Lock
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
       const holder = readHolder(opts.lockFile);
       if (holder !== null && isAlive(holder)) return null; // another live instance
-      rmSync(opts.lockFile, { force: true }); // stale/unreadable — reclaim
+      // Reclaim the stale/unreadable lock — but only if it still holds the dead
+      // PID we just saw, so we don't delete a fresh lock another process raced in
+      // and created (then re-acquire next iteration). This narrows, but doesn't
+      // fully close, the concurrent-stale-recovery window — a real OS advisory
+      // lock (flock) would; deferred for v1.
+      /* v8 ignore next -- the "changed under us" path needs a real concurrent racer */
+      if (readHolder(opts.lockFile) !== holder) continue;
+      rmSync(opts.lockFile, { force: true });
     }
   }
   return null;

@@ -18,6 +18,8 @@ export interface BridgeSessionOptions {
   connection: BridgeConnection;
   /** Per-tool-call timeout in ms (forwarded to the correlator). */
   timeoutMs?: number;
+  /** Close the connection if it doesn't authenticate within this many ms. */
+  authTimeoutMs?: number;
   onAuthenticated?: () => void;
   onClose?: () => void;
 }
@@ -31,6 +33,7 @@ export interface BridgeSessionOptions {
  */
 export class BridgeSession {
   private authed = false;
+  private authTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly correlator: RequestCorrelator;
 
   constructor(private readonly opts: BridgeSessionOptions) {
@@ -40,6 +43,11 @@ export class BridgeSession {
     });
     opts.connection.onMessage((data) => this.onMessage(data));
     opts.connection.onClose(() => this.onClose());
+    if (opts.authTimeoutMs && opts.authTimeoutMs > 0) {
+      this.authTimer = setTimeout(() => {
+        if (!this.authed) opts.connection.close();
+      }, opts.authTimeoutMs);
+    }
   }
 
   get isAuthenticated(): boolean {
@@ -66,6 +74,7 @@ export class BridgeSession {
       const m = msg as { type?: string; token?: string };
       if (m?.type === "auth" && m.token === this.opts.token) {
         this.authed = true;
+        clearTimeout(this.authTimer);
         this.opts.connection.send(JSON.stringify({ type: "auth_ok" }));
         this.opts.onAuthenticated?.();
       } else {
@@ -78,6 +87,7 @@ export class BridgeSession {
   }
 
   private onClose(): void {
+    clearTimeout(this.authTimer);
     this.correlator.rejectAll("bridge connection closed");
     this.opts.onClose?.();
   }

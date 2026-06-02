@@ -125,6 +125,35 @@ describe("BridgeSession — tool calls", () => {
   });
 });
 
+describe("BridgeSession — auth timeout", () => {
+  it("closes a connection that never authenticates within authTimeoutMs", () => {
+    vi.useFakeTimers();
+    try {
+      const conn = new FakeConnection();
+      const session = new BridgeSession({ token: TOKEN, connection: conn, authTimeoutMs: 1000 });
+      vi.advanceTimersByTime(1000);
+      expect(conn.closed).toBe(true);
+      expect(session.isAuthenticated).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not close once authenticated before the deadline", () => {
+    vi.useFakeTimers();
+    try {
+      const conn = new FakeConnection();
+      const session = new BridgeSession({ token: TOKEN, connection: conn, authTimeoutMs: 1000 });
+      conn.emit({ type: "auth", token: TOKEN });
+      vi.advanceTimersByTime(2000);
+      expect(conn.closed).toBe(false);
+      expect(session.isAuthenticated).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("BridgeSession — lifecycle", () => {
   it("rejects in-flight calls and notifies on connection close", async () => {
     const { conn, session, events } = setup();

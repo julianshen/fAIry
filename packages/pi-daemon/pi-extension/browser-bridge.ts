@@ -106,7 +106,9 @@ async function callBridge(tool: string, args: Record<string, unknown>): Promise<
 async function bridge(tool: string, args: Record<string, unknown>) {
   try {
     const result = await callBridge(tool, args);
-    const text = typeof result === "string" ? result : JSON.stringify(result);
+    // A successful action tool (click/type/...) may return no result;
+    // JSON.stringify(undefined) is `undefined`, not a string, so coerce to "".
+    const text = typeof result === "string" ? result : (JSON.stringify(result) ?? "");
     return { content: [{ type: "text" as const, text }], details: result };
   } catch (err) {
     return {

@@ -56,8 +56,10 @@ Remaining daemon work is integration/wiring — see M2/M3 below (150+ pi-daemon 
       Integration-tested: real `pi --mode rpc -e` load smoke test + an end-to-end relay
       (Chrome WS executor ⟷ daemon ⟷ Pi TCP requester).
 
-> The **27 tool handlers** are extension-side (M4), not daemon work — the bridge
-> is generic (`ToolRequest`/`ToolResponse`).
+> The browser-tool **handlers** are extension-side (M4), not daemon work — the
+> bridge is generic (`ToolRequest`/`ToolResponse`). The Pi extension's ~40
+> `browser_*` tools map onto these bridge operations; the Chrome extension
+> implements them.
 
 ### M3 — Daemon ↔ clients API (detailed)
 

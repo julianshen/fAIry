@@ -1,4 +1,4 @@
-import { redactConfig } from "./settings";
+import { isPiConfig, redactConfig } from "./settings";
 import type { PiConfig } from "./piConfig";
 
 describe("redactConfig", () => {
@@ -40,5 +40,40 @@ describe("redactConfig", () => {
   it("omits optional fields when the config has none", () => {
     const redacted = redactConfig({ providers: [] });
     expect(redacted).toEqual({ providers: [] });
+  });
+});
+
+describe("isPiConfig", () => {
+  it("accepts a minimal config and one with valid optional fields", () => {
+    expect(isPiConfig({ providers: [] })).toBe(true);
+    expect(isPiConfig({ providers: [{ id: "a", apiKey: "k" }] })).toBe(true);
+    expect(
+      isPiConfig({ providers: [], defaultProvider: "a", defaultModel: "m", enabledModels: ["x"] }),
+    ).toBe(true);
+  });
+
+  it("rejects non-objects", () => {
+    expect(isPiConfig(null)).toBe(false);
+    expect(isPiConfig(42)).toBe(false);
+    expect(isPiConfig("x")).toBe(false);
+  });
+
+  it("rejects a missing or non-array providers", () => {
+    expect(isPiConfig({})).toBe(false);
+    expect(isPiConfig({ providers: "nope" })).toBe(false);
+  });
+
+  it("rejects provider entries that are not {id, apiKey} strings", () => {
+    expect(isPiConfig({ providers: [null] })).toBe(false);
+    expect(isPiConfig({ providers: [{ id: "a" }] })).toBe(false);
+    expect(isPiConfig({ providers: [{ id: "a", apiKey: 1 }] })).toBe(false);
+    expect(isPiConfig({ providers: [{ id: 1, apiKey: "k" }] })).toBe(false);
+  });
+
+  it("rejects optional fields of the wrong type", () => {
+    expect(isPiConfig({ providers: [], defaultProvider: 5 })).toBe(false);
+    expect(isPiConfig({ providers: [], defaultModel: 5 })).toBe(false);
+    expect(isPiConfig({ providers: [], enabledModels: "gpt-5" })).toBe(false);
+    expect(isPiConfig({ providers: [], enabledModels: ["ok", 2] })).toBe(false);
   });
 });

@@ -166,6 +166,24 @@ describe("HttpServer", () => {
     expect(store.saved).toEqual([]);
   });
 
+  it("rejects a config with a malformed provider with 400 and does not save", async () => {
+    await start();
+    const res = await call("PUT", "/settings", { body: { providers: [{ id: "x" }] } });
+    expect(res.status).toBe(400);
+    expect(store.saved).toEqual([]);
+  });
+
+  it("rejects a body over the configured size limit with 413 and does not save", async () => {
+    store = fakeStore({ providers: [] });
+    server = new HttpServer({ token: TOKEN, settings: store, maxBodyBytes: 16 });
+    base = `http://127.0.0.1:${await server.listen()}`;
+    const res = await call("PUT", "/settings", {
+      body: { providers: [{ id: "anthropic", apiKey: "x".repeat(100) }] },
+    });
+    expect(res.status).toBe(413);
+    expect(store.saved).toEqual([]);
+  });
+
   it("close() is a no-op when the server was never started", async () => {
     server = new HttpServer({ token: TOKEN, settings: fakeStore({ providers: [] }) });
     await expect(server.close()).resolves.toBeUndefined();

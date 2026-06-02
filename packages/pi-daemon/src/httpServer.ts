@@ -1,8 +1,11 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { isAllowedOrigin } from "./origin";
-import { redactConfig, type SettingsStore } from "./settings";
+import { isPiConfig, redactConfig, type SettingsStore } from "./settings";
 import type { PiConfig } from "./piConfig";
+
+/** Default maximum `PUT` body size — the settings payload is tiny. */
+const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
 
 export interface HttpServerOptions {
   /** Expected bearer token; clients send `Authorization: Bearer <token>`. */
@@ -15,6 +18,8 @@ export interface HttpServerOptions {
   host?: string;
   /** Exact `Origin` values allowed; defaults to blocking web origins (see {@link isAllowedOrigin}). */
   allowedOrigins?: string[];
+  /** Maximum accepted `PUT` body size in bytes (default 1 MiB). */
+  maxBodyBytes?: number;
 }
 
 /**
@@ -89,8 +94,9 @@ export class HttpServer {
   }
 
   private putSettings(req: IncomingMessage, res: ServerResponse): void {
-    readBody(req)
+    readBody(req, this.opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES)
       .then((raw) => {
+        if (raw === null) return send(res, 413, { error: "payload_too_large" });
         const config = parseConfig(raw);
         if (!config) return send(res, 400, { error: "invalid_config" });
         this.opts.settings.save(config);
@@ -101,7 +107,7 @@ export class HttpServer {
   }
 }
 
-/** Parse a request body into a PiConfig, or null if it isn't one. */
+/** Parse a request body into a PiConfig, or null if it isn't a valid one. */
 function parseConfig(raw: string): PiConfig | null {
   let parsed: unknown;
   try {
@@ -109,9 +115,7 @@ function parseConfig(raw: string): PiConfig | null {
   } catch {
     return null;
   }
-  if (typeof parsed !== "object" || parsed === null) return null;
-  if (!Array.isArray((parsed as { providers?: unknown }).providers)) return null;
-  return parsed as PiConfig;
+  return isPiConfig(parsed) ? parsed : null;
 }
 
 function send(res: ServerResponse, status: number, body: unknown): void {
@@ -119,13 +123,28 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-function readBody(req: IncomingMessage): Promise<string> {
+/**
+ * Read the request body as a UTF-8 string, or `null` if it exceeds `limit`.
+ * Chunks are collected as Buffers and decoded once at the end — decoding each
+ * chunk would corrupt a multi-byte character split across a chunk boundary —
+ * and the `data` listener is detached at the limit so a large upload can't keep
+ * growing the buffer.
+ */
+function readBody(req: IncomingMessage, limit: number): Promise<string | null> {
   return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk) => {
-      data += chunk;
-    });
-    req.on("end", () => resolve(data));
+    const chunks: Buffer[] = [];
+    let bytesRead = 0;
+    const onData = (chunk: Buffer) => {
+      bytesRead += chunk.length;
+      if (bytesRead > limit) {
+        req.off("data", onData);
+        resolve(null);
+        return;
+      }
+      chunks.push(chunk);
+    };
+    req.on("data", onData);
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
     /* v8 ignore next */
     req.on("error", reject);
   });

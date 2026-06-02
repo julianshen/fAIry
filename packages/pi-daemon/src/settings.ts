@@ -30,6 +30,32 @@ export function redactConfig(config: PiConfig): RedactedConfig {
 }
 
 /**
+ * Validate that an arbitrary parsed value matches the {@link PiConfig} contract:
+ * a `providers` array of `{ id, apiKey }` strings, with optional string
+ * `defaultProvider`/`defaultModel` and a `string[]` `enabledModels`. Untrusted
+ * input (a `PUT /settings` body) must pass this before it's saved — otherwise a
+ * malformed key would later throw, or a contract-violating value (e.g. a string
+ * `enabledModels`) would be persisted into Pi's config.
+ */
+export function isPiConfig(value: unknown): value is PiConfig {
+  if (typeof value !== "object" || value === null) return false;
+  const o = value as Record<string, unknown>;
+  if (!Array.isArray(o.providers)) return false;
+  for (const p of o.providers) {
+    if (typeof p !== "object" || p === null) return false;
+    const prov = p as Record<string, unknown>;
+    if (typeof prov.id !== "string" || typeof prov.apiKey !== "string") return false;
+  }
+  if (o.defaultProvider !== undefined && typeof o.defaultProvider !== "string") return false;
+  if (o.defaultModel !== undefined && typeof o.defaultModel !== "string") return false;
+  if (o.enabledModels !== undefined) {
+    if (!Array.isArray(o.enabledModels)) return false;
+    if (!o.enabledModels.every((m) => typeof m === "string")) return false;
+  }
+  return true;
+}
+
+/**
  * The daemon's settings source of truth, injected into the HTTP endpoint so the
  * transport stays pure/testable. `get` returns the current config; `save`
  * persists an update (the production impl writes Pi's config via `writePiConfig`

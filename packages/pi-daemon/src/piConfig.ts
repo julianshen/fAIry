@@ -1,4 +1,3 @@
-import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { writeJsonFile } from "./fsAtomic";
 
@@ -44,7 +43,6 @@ export function buildSettings(config: PiConfig): Record<string, unknown> {
  * the single source of truth. `auth.json` is `0600` (it holds API keys).
  */
 export function writePiConfig(agentDir: string, config: PiConfig): void {
-  mkdirSync(agentDir, { recursive: true });
   writeJsonFile(path.join(agentDir, "auth.json"), buildAuth(config), 0o600);
   writeJsonFile(path.join(agentDir, "settings.json"), buildSettings(config));
 }

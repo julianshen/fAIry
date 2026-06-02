@@ -1,5 +1,4 @@
 import { randomBytes } from "node:crypto";
-import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { writeJsonFile } from "./fsAtomic";
 
@@ -22,7 +21,6 @@ export function mintToken(): string {
  * a reader never sees a half-written secret.
  */
 export function writeToken(appData: string, token: string): string {
-  mkdirSync(appData, { recursive: true });
   const file = path.join(appData, TOKEN_FILENAME);
   writeJsonFile(file, { token }, 0o600);
   return file;

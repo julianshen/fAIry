@@ -1,24 +1,10 @@
-import { EventEmitter, once } from "node:events";
+import { once } from "node:events";
 import { WebSocket } from "ws";
 import { ConversationServer } from "./conversationServer";
 import type { ConversationSession } from "./conversationSession";
-import type { ChildLike, ReadableLine } from "./jsonLineProcess";
+import { silentSpawn } from "./testFakes";
 
 const TOKEN = "secret";
-
-/** A Pi child that never emits output — enough to exercise the wiring without a real `pi`. */
-class FakeStream extends EventEmitter implements ReadableLine {
-  setEncoding(): void {}
-}
-class FakeChild extends EventEmitter implements ChildLike {
-  stdout = new FakeStream();
-  stderr = new FakeStream();
-  stdin = { write: (): void => {} };
-  kill(): boolean {
-    return true;
-  }
-}
-const fakeSpawn = (): ChildLike => new FakeChild();
 
 /**
  * Buffer every incoming frame and hand them out in order. A plain `once(client,
@@ -49,7 +35,7 @@ describe("ConversationServer (real WebSocket)", () => {
   });
 
   it("authenticates a client, then a start command streams the opening beats", async () => {
-    server = new ConversationServer({ token: TOKEN, spawn: fakeSpawn });
+    server = new ConversationServer({ token: TOKEN, spawn: silentSpawn });
     const port = await server.listen();
 
     const client = new WebSocket(`ws://127.0.0.1:${port}`);
@@ -66,7 +52,7 @@ describe("ConversationServer (real WebSocket)", () => {
 
   it("hands each connection's session to onSession", async () => {
     let session: ConversationSession | undefined;
-    server = new ConversationServer({ token: TOKEN, spawn: fakeSpawn, onSession: (s) => (session = s) });
+    server = new ConversationServer({ token: TOKEN, spawn: silentSpawn, onSession: (s) => (session = s) });
     const port = await server.listen();
     const client = new WebSocket(`ws://127.0.0.1:${port}`);
     const next = frames(client);
@@ -78,7 +64,7 @@ describe("ConversationServer (real WebSocket)", () => {
   });
 
   it("close() before listen() resolves to a no-op", async () => {
-    const fresh = new ConversationServer({ token: TOKEN, spawn: fakeSpawn });
+    const fresh = new ConversationServer({ token: TOKEN, spawn: silentSpawn });
     await expect(fresh.close()).resolves.toBeUndefined();
     server = fresh;
   });

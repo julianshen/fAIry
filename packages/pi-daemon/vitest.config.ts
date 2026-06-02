@@ -13,6 +13,8 @@ export default defineConfig({
         "src/main.ts",
         "src/index.ts",
         "src/**/*.test.ts",
+        // Test-only shared doubles (used by *.test.ts, not production code).
+        "src/testFakes.ts",
       ],
       thresholds: {
         lines: 90,

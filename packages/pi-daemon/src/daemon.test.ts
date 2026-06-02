@@ -1,25 +1,12 @@
-import { EventEmitter, once } from "node:events";
+import { once } from "node:events";
 import { WebSocket } from "ws";
 import { createDaemon } from "./daemon";
 import { HttpServer } from "./httpServer";
+import { silentSpawn } from "./testFakes";
 import type { SettingsStore } from "./settings";
-import type { ChildLike, ReadableLine } from "./jsonLineProcess";
 import type { PiConfig } from "./piConfig";
 
 const TOKEN = "tok";
-
-class FakeStream extends EventEmitter implements ReadableLine {
-  setEncoding(): void {}
-}
-class FakeChild extends EventEmitter implements ChildLike {
-  stdout = new FakeStream();
-  stderr = new FakeStream();
-  stdin = { write: (): void => {} };
-  kill(): boolean {
-    return true;
-  }
-}
-const fakeSpawn = (): ChildLike => new FakeChild();
 
 function fakeStore(): SettingsStore {
   let cfg: PiConfig = { providers: [] };
@@ -38,7 +25,7 @@ async function wsAuth(port: number): Promise<unknown> {
 
 describe("createDaemon", () => {
   it("starts the three loopback servers on distinct ports and authenticates each", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawn: fakeSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawn: silentSpawn });
     try {
       const { bridge, conversation, http } = daemon.ports;
       expect(new Set([bridge, conversation, http]).size).toBe(3);
@@ -56,7 +43,7 @@ describe("createDaemon", () => {
   });
 
   it("close() stops every server", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawn: fakeSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawn: silentSpawn });
     const httpPort = daemon.ports.http;
     await daemon.close();
     await expect(
@@ -69,7 +56,7 @@ describe("createDaemon", () => {
     const taken = await occupier.listen();
     try {
       await expect(
-        createDaemon({ token: TOKEN, settings: fakeStore(), spawn: fakeSpawn, ports: { http: taken } }),
+        createDaemon({ token: TOKEN, settings: fakeStore(), spawn: silentSpawn, ports: { http: taken } }),
       ).rejects.toBeDefined();
     } finally {
       await occupier.close();

@@ -48,12 +48,18 @@ Remaining daemon work is integration/wiring — see M2/M3 below (150+ pi-daemon 
 - [x] **`BridgeServer`** — loopback adapter over the generic `wsServer` + Origin check (#12, #18).
 - [x] **Shared infra** — `authenticatedSession` (token-handshake base, #17) and
       `wsServer` (generic ws accept/lifecycle/origin, #18), reused by both sessions/servers.
-- [ ] **Pi browser extension** — the `-e` script registering the `browser` tool
-      that bridges each call to the daemon. (Port/adapt POC `horizon-bridge.ts`.
-      Runs inside Pi → integration-tested, not pure-unit.)
+- [x] **Pi browser extension** — `pi-extension/browser-bridge.ts`, the self-contained
+      `-e` script registering all ~40 `browser_*` tools; each forwards over loopback
+      TCP (token-line auth) to the daemon's new **`PiBridgeServer`**, which relays the
+      call to the active Chrome `BridgeSession` (the executor) — closing the Pi → bridge
+      loop. `createDaemon` wires it in and spawns Pi pointed at the piBridge via env.
+      Integration-tested: real `pi --mode rpc -e` load smoke test + an end-to-end relay
+      (Chrome WS executor ⟷ daemon ⟷ Pi TCP requester).
 
-> The **27 tool handlers** are extension-side (M4), not daemon work — the bridge
-> is generic (`ToolRequest`/`ToolResponse`).
+> The browser-tool **handlers** are extension-side (M4), not daemon work — the
+> bridge is generic (`ToolRequest`/`ToolResponse`). The Pi extension's ~40
+> `browser_*` tools map onto these bridge operations; the Chrome extension
+> implements them.
 
 ### M3 — Daemon ↔ clients API (detailed)
 
@@ -83,8 +89,8 @@ Remaining daemon work is integration/wiring — see M2/M3 below (150+ pi-daemon 
       + `ConversationController`), and the `HttpServer` under one token/Origin policy;
       `createFileSettingsStore` persists a canonical `config.json` and materializes
       Pi's `settings.json`/`auth.json`. `main.ts` mints+surfaces the token, spawns
-      real `pi --mode rpc`, and installs `SIGINT`/`SIGTERM` shutdown. *(Pi → bridge
-      tool routing still pending the Pi `browser` extension below.)*
+      real `pi --mode rpc -e <browser-bridge>`, and installs `SIGINT`/`SIGTERM`
+      shutdown. *(Pi → bridge tool routing now closed via the Pi extension above.)*
 - [ ] **Lifecycle** — single-instance lock, fuller graceful shutdown (basic
       signal-driven `close()` landed with the wiring above).
 

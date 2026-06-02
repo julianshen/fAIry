@@ -1,30 +1,39 @@
 import { BridgeServer } from "./bridgeServer";
+import type { BridgeSession } from "./bridgeSession";
 import { ConversationServer } from "./conversationServer";
 import { HttpServer } from "./httpServer";
-import type { Spawner } from "./jsonLineProcess";
+import type { ChildLike } from "./jsonLineProcess";
+import { PiBridgeServer } from "./piBridgeServer";
 import type { SettingsStore } from "./settings";
 
+/** Loopback bridge the daemon hands Pi's `browser` extension (via env on spawn). */
+export interface PiBridgeInfo {
+  port: number;
+  token: string;
+}
+
 export interface DaemonOptions {
-  /** Per-session token every client (extension, panel, shell) must present. */
+  /** Per-session token every client (extension, panel, shell, Pi) must present. */
   token: string;
   /** Settings source of truth (provider/model config); backs the HTTP endpoint. */
   settings: SettingsStore;
-  /** Spawns Pi for each conversation (injected — testable without a real `pi`). */
-  spawn: Spawner;
-  /** Loopback host for all three servers. Defaults to 127.0.0.1. */
+  /** Spawn Pi for a conversation, given the loopback bridge it should connect back on. */
+  spawnPi: (bridge: PiBridgeInfo) => ChildLike;
+  /** Loopback host for all servers. Defaults to 127.0.0.1. */
   host?: string;
-  /** Exact Origin values allowed across all servers (see {@link import("./origin")}). */
+  /** Exact Origin values allowed for the WS servers (see {@link import("./origin")}). */
   allowedOrigins?: string[];
-  /** Close an unauthenticated WS connection after this many ms. */
+  /** Close an unauthenticated connection after this many ms. */
   authTimeoutMs?: number;
   /** Max HTTP body size. */
   maxBodyBytes?: number;
   /** Fixed ports; any omitted one binds an ephemeral port. */
-  ports?: { bridge?: number; conversation?: number; http?: number };
+  ports?: { bridge?: number; piBridge?: number; conversation?: number; http?: number };
 }
 
 export interface DaemonPorts {
   bridge: number;
+  piBridge: number;
   conversation: number;
   http: number;
 }
@@ -36,26 +45,64 @@ export interface RunningDaemon {
 }
 
 /**
- * Compose the daemon's three loopback servers — the browser {@link BridgeServer},
- * the panel {@link ConversationServer}, and the {@link HttpServer} control plane —
- * sharing one token and Origin policy. Resolves once all are listening, with the
- * bound ports and a `close()` that stops them. If any fails to bind, the ones
- * that started are torn down and the error is rethrown.
+ * Compose the daemon's loopback servers, sharing one token and Origin policy:
  *
- * The caller owns the pieces below this seam: the {@link SettingsStore} (which
- * materializes Pi's config) and the `spawn` of the real `pi` binary.
+ * - {@link BridgeServer} — the Chrome extension (the browser-tool *executor*);
+ * - {@link PiBridgeServer} — Pi's `browser` extension (the *requester*), whose
+ *   tool calls are relayed to the active Chrome session — closing the loop
+ *   between a conversation's Pi and the browser;
+ * - {@link ConversationServer} — the panel, spawning Pi pointed back at the
+ *   piBridge;
+ * - {@link HttpServer} — the settings/status control plane.
+ *
+ * Resolves once all are listening, with the bound ports and a `close()`. If any
+ * fails to bind, the ones that started are torn down and the error is rethrown.
+ * The caller owns the seam below: the {@link SettingsStore} and the real `pi`
+ * spawn (`spawnPi`).
  */
 export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> {
   const { token, host, allowedOrigins, authTimeoutMs } = opts;
-  const bridge = new BridgeServer({ token, host, allowedOrigins, authTimeoutMs, port: opts.ports?.bridge });
+
+  // The active Chrome session Pi's tool calls relay to (v1 = one browser, newest
+  // authenticated wins). Promote only on successful auth — `onSession` fires at
+  // connect, before the token is proven, so a stray/unauthenticated socket must
+  // not displace a working browser — and clear on close so a disconnected browser
+  // reports "no browser connected".
+  let chrome: BridgeSession | undefined;
+  const bridge = new BridgeServer({
+    token,
+    host,
+    allowedOrigins,
+    authTimeoutMs,
+    port: opts.ports?.bridge,
+    onAuthenticated: (session) => (chrome = session),
+    onClose: (session) => {
+      if (chrome === session) chrome = undefined;
+    },
+  });
+
+  const piBridge = new PiBridgeServer({
+    token,
+    host,
+    authTimeoutMs,
+    port: opts.ports?.piBridge,
+    requestTool: (tool, args) =>
+      chrome ? chrome.requestTool(tool, args) : Promise.reject(new Error("no browser connected")),
+  });
+
+  // Pi is spawned pointed back at the piBridge. Its port is known only once
+  // piBridge is listening (below); spawn runs later (when a panel connects), so
+  // the closure reads the resolved value.
+  let piBridgePort = 0;
   const conversation = new ConversationServer({
     token,
-    spawn: opts.spawn,
     host,
     allowedOrigins,
     authTimeoutMs,
     port: opts.ports?.conversation,
+    spawn: () => opts.spawnPi({ port: piBridgePort, token }),
   });
+
   const http = new HttpServer({
     token,
     settings: opts.settings,
@@ -64,13 +111,16 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     maxBodyBytes: opts.maxBodyBytes,
     port: opts.ports?.http,
   });
-  const servers = [bridge, conversation, http];
+
+  const servers = [bridge, piBridge, conversation, http];
   const closeAll = (): Promise<void> => Promise.all(servers.map((s) => s.close())).then(() => undefined);
 
-  // allSettled (not Promise.all) so every server has finished starting before we
-  // decide — otherwise closing on an early rejection could miss a server still
-  // mid-bind and leak it.
-  const results = await Promise.allSettled([bridge.listen(), conversation.listen(), http.listen()]);
+  const results = await Promise.allSettled([
+    bridge.listen(),
+    piBridge.listen(),
+    conversation.listen(),
+    http.listen(),
+  ]);
   const failure = results.find((r) => r.status === "rejected");
   if (failure) {
     // Swallow any teardown error so it can't shadow the actual bind failure.
@@ -79,9 +129,10 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     throw (failure as PromiseRejectedResult).reason;
   }
   const port = (i: number): number => (results[i] as PromiseFulfilledResult<number>).value;
+  piBridgePort = port(1); // resolve the spawn closure's port before any conversation
 
   return {
-    ports: { bridge: port(0), conversation: port(1), http: port(2) },
+    ports: { bridge: port(0), piBridge: port(1), conversation: port(2), http: port(3) },
     close: closeAll,
   };
 }

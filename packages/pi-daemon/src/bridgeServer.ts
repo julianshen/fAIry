@@ -12,6 +12,10 @@ export interface BridgeServerOptions {
   allowedOrigins?: string[];
   /** Called with each connection's session once it's wired up. */
   onSession?: (session: BridgeSession) => void;
+  /** Called when a session completes the token handshake (after `onSession`). */
+  onAuthenticated?: (session: BridgeSession) => void;
+  /** Called when a session's connection closes. */
+  onClose?: (session: BridgeSession) => void;
   /** Per-tool-call timeout (forwarded to each session). */
   timeoutMs?: number;
   /** Close a connection that doesn't authenticate within this many ms. */
@@ -32,11 +36,13 @@ export class BridgeServer {
       host: opts.host,
       allowedOrigins: opts.allowedOrigins,
       onConnection: (connection) => {
-        const session = new BridgeSession({
+        const session: BridgeSession = new BridgeSession({
           token: opts.token,
           connection,
           timeoutMs: opts.timeoutMs,
           authTimeoutMs: opts.authTimeoutMs,
+          onAuthenticated: () => opts.onAuthenticated?.(session),
+          onClose: () => opts.onClose?.(session),
         });
         opts.onSession?.(session);
       },

@@ -1,6 +1,7 @@
 import type { AddressInfo } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { BridgeConnection } from "./authenticatedSession";
+import { isLoopbackHost } from "./loopback";
 import { isAllowedOrigin } from "./origin";
 
 export interface WsServerOptions {
@@ -50,10 +51,14 @@ export class WsServer {
     // `wss` is only set on 'listening'; the `starting` flag also rejects a
     // second un-awaited listen() so two servers can't bind.
     if (this.wss || this.starting) return Promise.reject(new Error("WsServer is already listening"));
+    const host = this.opts.host ?? "127.0.0.1";
+    if (!isLoopbackHost(host)) {
+      return Promise.reject(new Error(`WsServer host must be loopback, got "${host}"`));
+    }
     this.starting = true;
     return new Promise((resolve, reject) => {
       const wss = new WebSocketServer({
-        host: this.opts.host ?? "127.0.0.1",
+        host,
         port: this.opts.port ?? 0,
         verifyClient: (info: { origin: string }) => isAllowedOrigin(info.origin, this.opts.allowedOrigins),
       });

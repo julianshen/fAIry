@@ -1,14 +1,12 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { isLoopbackHost } from "./loopback";
 import { isAllowedOrigin } from "./origin";
 import { isPiConfig, mergeProviderKeys, redactConfig, type SettingsStore } from "./settings";
 import type { PiConfig } from "./piConfig";
 
 /** Default maximum `PUT` body size — the settings payload is tiny. */
 const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
-
-/** Loopback hosts the control plane may bind — it must never be reachable off-machine. */
-const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
 
 export interface HttpServerOptions {
   /** Expected bearer token; clients send `Authorization: Bearer <token>`. */
@@ -47,7 +45,7 @@ export class HttpServer {
   listen(): Promise<number> {
     if (this.server || this.starting) return Promise.reject(new Error("HttpServer is already listening"));
     const host = this.opts.host ?? "127.0.0.1";
-    if (!LOOPBACK_HOSTS.has(host)) {
+    if (!isLoopbackHost(host)) {
       return Promise.reject(new Error(`HttpServer host must be loopback, got "${host}"`));
     }
     this.starting = true;

@@ -83,4 +83,9 @@ describe("WsServer (real WebSocket)", () => {
     await expect(fresh.close()).resolves.toBeUndefined();
     server = fresh;
   });
+
+  it("refuses to bind a non-loopback host", async () => {
+    server = new WsServer({ onConnection: () => {}, host: "0.0.0.0" });
+    await expect(server.listen()).rejects.toThrow(/loopback/);
+  });
 });

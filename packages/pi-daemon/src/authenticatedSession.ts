@@ -29,6 +29,7 @@ export interface AuthenticatedSessionOptions {
  */
 export abstract class AuthenticatedSession {
   private authed = false;
+  private closed = false;
   private authTimer: ReturnType<typeof setTimeout> | undefined;
   protected readonly connection: BridgeConnection;
   private readonly token: string;
@@ -95,6 +96,8 @@ export abstract class AuthenticatedSession {
   }
 
   private handleClose(): void {
+    if (this.closed) return; // run teardown exactly once
+    this.closed = true;
     clearTimeout(this.authTimer);
     this.authed = false;
     this.onDisposed();

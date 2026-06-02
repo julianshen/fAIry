@@ -29,8 +29,8 @@ export class BridgeSession extends AuthenticatedSession {
     super({
       token: opts.token,
       connection: opts.connection,
-      ...(opts.authTimeoutMs !== undefined ? { authTimeoutMs: opts.authTimeoutMs } : {}),
-      ...(opts.onClose !== undefined ? { onClose: opts.onClose } : {}),
+      authTimeoutMs: opts.authTimeoutMs,
+      onClose: opts.onClose,
     });
     this.correlator = new RequestCorrelator({
       send: (req) => this.send(req),

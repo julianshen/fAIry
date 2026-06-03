@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -44,11 +44,16 @@ describe("helperRegistry", () => {
     expect(reg.remove("missing")).toBe(false);
   });
 
-  it("tolerates a corrupt file (returns empty rather than throwing)", () => {
-    const reg = createHelperRegistry(file);
-    reg.save({ name: "f", expression: "() => 1" });
+  it("reads empty for a missing or corrupt file (not a real I/O failure)", () => {
+    expect(createHelperRegistry(path.join(dir, "missing.json")).list()).toEqual([]); // ENOENT
     writeFileSync(file, "not json");
-    expect(createHelperRegistry(file).list()).toEqual([]);
+    expect(createHelperRegistry(file).list()).toEqual([]); // SyntaxError
+  });
+
+  it("surfaces a real I/O failure rather than silently dropping state", () => {
+    // A directory in place of the file → EISDIR on read, which must not be swallowed.
+    mkdirSync(path.join(dir, "asdir.json"));
+    expect(() => createHelperRegistry(path.join(dir, "asdir.json")).list()).toThrow();
   });
 
   describe("callExpression", () => {

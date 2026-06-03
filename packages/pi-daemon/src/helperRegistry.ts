@@ -33,8 +33,11 @@ function load(file: string): JsHelper[] {
   try {
     const data = JSON.parse(readFileSync(file, "utf8"));
     return Array.isArray(data) ? (data as JsHelper[]) : [];
-  } catch {
-    return [];
+  } catch (err) {
+    // A missing file (first run) or corrupt JSON reads as empty; a real I/O
+    // failure (permissions, etc.) must surface, not silently drop helper state.
+    if ((err as NodeJS.ErrnoException).code === "ENOENT" || err instanceof SyntaxError) return [];
+    throw err;
   }
 }
 

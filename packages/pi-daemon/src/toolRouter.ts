@@ -25,10 +25,10 @@ export interface ToolRouter {
   handle(tool: string, args: Record<string, unknown>): Promise<unknown>;
 }
 
-/** Narrow a required string arg, or throw a named error (the wire args are untyped). */
+/** Narrow a required non-empty string arg, or throw a named error (the wire args are untyped). */
 function requireString(args: Record<string, unknown>, key: string): string {
   const v = args[key];
-  if (typeof v !== "string") throw new Error(`${key} must be a string`);
+  if (typeof v !== "string" || v.trim() === "") throw new Error(`${key} must be a non-empty string`);
   return v;
 }
 
@@ -84,6 +84,10 @@ export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
       async (args) => {
         const name = requireString(args, "name");
         if (!deps.helpers.get(name)) throw new Error(`helper not found: ${name}`);
+        // Missing args is fine (→ []); a present-but-non-array is a malformed call.
+        if (args.args !== undefined && !Array.isArray(args.args)) {
+          throw new Error("args must be an array");
+        }
         const callArgs = Array.isArray(args.args) ? args.args : [];
         return deps.relay("evaluate", { expression: deps.helpers.callExpression(name, callArgs) });
       },

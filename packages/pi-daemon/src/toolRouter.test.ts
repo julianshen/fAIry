@@ -111,10 +111,16 @@ describe("createToolRouter", () => {
       expect(helpers.get("double")).toMatchObject({ expression: "(x)=>x*2", description: "x2" });
     });
 
-    it("saveHelper rejects a missing name or expression", async () => {
+    it("saveHelper rejects a missing, empty, or whitespace name/expression", async () => {
       const router = createToolRouter(deps());
       await expect(router.handle("saveHelper", { expression: "x" })).rejects.toThrow(/name/i);
       await expect(router.handle("saveHelper", { name: "f" })).rejects.toThrow(/expression/i);
+      await expect(router.handle("saveHelper", { name: "  ", expression: "x" })).rejects.toThrow(
+        /name.*non-empty/i,
+      );
+      await expect(router.handle("saveHelper", { name: "f", expression: "" })).rejects.toThrow(
+        /expression.*non-empty/i,
+      );
     });
 
     it("listHelpers returns names + descriptions only", async () => {
@@ -153,6 +159,14 @@ describe("createToolRouter", () => {
       const relay = vi.fn(() => Promise.resolve({}));
       const router = createToolRouter(deps({ relay }));
       await expect(router.handle("callHelper", { name: "nope" })).rejects.toThrow(/helper not found/i);
+      expect(relay).not.toHaveBeenCalled();
+    });
+
+    it("callHelper rejects a present-but-non-array args", async () => {
+      const helpers = fakeHelpers([{ name: "f", expression: "()=>1", createdAt: 0 }]);
+      const relay = vi.fn(() => Promise.resolve({}));
+      const router = createToolRouter(deps({ helpers, relay }));
+      await expect(router.handle("callHelper", { name: "f", args: "nope" })).rejects.toThrow(/args.*array/i);
       expect(relay).not.toHaveBeenCalled();
     });
   });

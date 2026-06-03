@@ -63,6 +63,17 @@ describe("createEventBuffer", () => {
     expect(b.collect().map((e) => e.at)).toEqual([5, 10, 20]);
   });
 
+  it("breaks ties on equal timestamps by arrival order (same millisecond)", () => {
+    const b = createEventBuffer();
+    b.subscribe("Network.responseReceived"); // first bucket
+    b.subscribe("Network.requestWillBeSent"); // second bucket
+    // Two events in the same ms: the one that ARRIVED first must come out first,
+    // regardless of which bucket it's in (Date.now() can't break the tie).
+    b.push("Network.requestWillBeSent", { first: true }, 5);
+    b.push("Network.responseReceived", { second: true }, 5);
+    expect(b.collect().map((e) => e.params)).toEqual([{ first: true }, { second: true }]);
+  });
+
   it("collect-all with max returns the earliest events and leaves the rest", () => {
     const b = createEventBuffer();
     b.subscribe("Network.responseReceived");

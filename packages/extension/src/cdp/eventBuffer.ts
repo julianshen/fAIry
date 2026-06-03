@@ -26,8 +26,14 @@ export interface CdpEventBuffer {
 
 const DEFAULT_CAP = 1000;
 
+/** Stored event + a global arrival sequence, the tie-breaker for same-`at` events. */
+type Stored = BufferedEvent & { seq: number };
+
+const strip = ({ at, method, params }: Stored): BufferedEvent => ({ at, method, params });
+
 export function createEventBuffer(cap: number = DEFAULT_CAP): CdpEventBuffer {
-  const buffers = new Map<string, BufferedEvent[]>();
+  const buffers = new Map<string, Stored[]>();
+  let seq = 0; // monotonic arrival counter across all methods
 
   return {
     subscribe(method) {
@@ -39,7 +45,7 @@ export function createEventBuffer(cap: number = DEFAULT_CAP): CdpEventBuffer {
     push(method, params, at) {
       const bucket = buffers.get(method);
       if (!bucket) return; // not subscribed
-      bucket.push({ at, method, params });
+      bucket.push({ at, method, params, seq: seq++ });
       // `splice(0, …)` is O(n), so trimming on every push once at cap would be
       // O(cap) per event — costly for high-frequency domains (Network.*). Only
       // trim past a slack margin, making push amortized O(1); the buffer stays
@@ -49,21 +55,22 @@ export function createEventBuffer(cap: number = DEFAULT_CAP): CdpEventBuffer {
     collect(method, max) {
       if (method !== undefined) {
         const bucket = buffers.get(method) ?? [];
-        return max !== undefined ? bucket.splice(0, max) : bucket.splice(0);
+        return (max !== undefined ? bucket.splice(0, max) : bucket.splice(0)).map(strip);
       }
-      // Drain ALL methods in global arrival order (by `at`), not bucket-by-bucket
-      // — a multi-method trace (Network request/response) must read chronologically.
-      const all: BufferedEvent[] = [];
+      // Drain ALL methods in global arrival order — by `at`, then by arrival
+      // `seq` for same-millisecond events (Date.now() can't break that tie), so
+      // a multi-method trace (Network request/response) reads chronologically.
+      const all: Stored[] = [];
       for (const bucket of buffers.values()) all.push(...bucket);
-      all.sort((a, b) => a.at - b.at);
+      all.sort((a, b) => a.at - b.at || a.seq - b.seq);
       const selected = max !== undefined ? all.slice(0, max) : all;
       const taken = new Set(selected);
-      for (const bucket of buffers.values()) {
+      for (const [, bucket] of buffers) {
         const kept = bucket.filter((e) => !taken.has(e));
         bucket.length = 0;
         bucket.push(...kept);
       }
-      return selected;
+      return selected.map(strip);
     },
     unsubscribe(method) {
       if (method === undefined) {

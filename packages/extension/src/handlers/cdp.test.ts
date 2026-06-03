@@ -42,11 +42,22 @@ describe("cdpSubscribe", () => {
     expect(buffer.isSubscribed("Network.responseReceived")).toBe(true);
   });
 
-  it("tolerates a domain that has no .enable", async () => {
-    const send = vi.fn(() => Promise.reject(new Error("not enableable")));
+  it("tolerates a domain that has no .enable command (benign 'not found')", async () => {
+    const send = vi.fn(() => Promise.reject(new Error("'Foo.enable' wasn't found")));
     const buffer = createEventBuffer();
     const result = await cdpSubscribe({ send }, buffer, { method: "Foo.bar" });
-    expect(result).toEqual({ ok: true }); // still subscribed despite enable failing
+    expect(result).toEqual({ ok: true }); // stays subscribed; the domain just has no enable
+    expect(buffer.isSubscribed("Foo.bar")).toBe(true);
+  });
+
+  it("reports failure and rolls back when the domain can't be enabled/attached", async () => {
+    // e.g. no tab bound after a worker restart — capture won't actually work, so
+    // returning ok:true would mislead the agent into a never-collecting wait.
+    const send = vi.fn(() => Promise.reject(new Error("no tab bound to the agent (start a task first)")));
+    const buffer = createEventBuffer();
+    const result = await cdpSubscribe({ send }, buffer, { method: "Network.responseReceived" });
+    expect(result).toEqual({ ok: false });
+    expect(buffer.isSubscribed("Network.responseReceived")).toBe(false); // rolled back
   });
 
   it("returns ok:false for a malformed method and never enables", async () => {

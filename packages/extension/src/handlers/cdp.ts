@@ -39,8 +39,17 @@ export async function cdpSubscribe(
   assertBoundMethod(method); // no subscribing to Target.*/Browser.* either
   const { ok, domain } = events.subscribe(method);
   if (!ok || !domain) return { ok: false };
-  // Not every domain has `.enable`; a failure there shouldn't undo the subscribe.
-  await cdp.send(`${domain}.enable`, {}).catch(() => {});
+  try {
+    await cdp.send(`${domain}.enable`, {});
+  } catch (err) {
+    // A domain with no `.enable` command is benign (events still flow). But a
+    // real failure — no tab bound, attach rejected — means nothing will arrive,
+    // so don't claim success: roll the subscription back and report it.
+    if (!/not found|wasn't found|doesn't exist/i.test((err as Error)?.message ?? "")) {
+      events.unsubscribe(method);
+      return { ok: false };
+    }
+  }
   return { ok: true };
 }
 

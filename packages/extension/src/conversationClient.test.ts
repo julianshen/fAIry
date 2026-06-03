@@ -1,44 +1,5 @@
-import { connectConversation, type ClientSocket } from "./conversationClient";
-
-/** A controllable fake socket: drive open/message/close from the test. */
-class FakeSocket implements ClientSocket {
-  sent: string[] = [];
-  closed = false;
-  private openCb?: () => void;
-  private msgCb?: (d: string) => void;
-  private closeCb?: () => void;
-  send(data: string): void {
-    this.sent.push(data);
-  }
-  onOpen(h: () => void): void {
-    this.openCb = h;
-  }
-  onMessage(h: (d: string) => void): void {
-    this.msgCb = h;
-  }
-  onClose(h: () => void): void {
-    this.closeCb = h;
-  }
-  close(): void {
-    this.closed = true;
-  }
-  // test drivers
-  fireOpen(): void {
-    this.openCb?.();
-  }
-  fireMessage(v: unknown): void {
-    this.msgCb?.(JSON.stringify(v));
-  }
-  fireRaw(s: string): void {
-    this.msgCb?.(s);
-  }
-  fireClose(): void {
-    this.closeCb?.();
-  }
-  parsed(): unknown[] {
-    return this.sent.map((s) => JSON.parse(s));
-  }
-}
+import { connectConversation } from "./conversationClient";
+import { FakeSocket } from "./testSocket";
 
 function setup() {
   const socket = new FakeSocket();
@@ -118,6 +79,16 @@ describe("connectConversation", () => {
     const { socket, client } = setup();
     client.close();
     expect(socket.closed).toBe(true);
+  });
+
+  it("drops start/stop after close() is called, before the close event arrives", () => {
+    const { socket, client } = setup();
+    socket.fireOpen();
+    const before = socket.sent.length;
+    client.close(); // sets closed synchronously
+    client.start("late");
+    client.stop();
+    expect(socket.sent.length).toBe(before); // nothing sent after close()
   });
 
   it("defaults to a real WebSocket adapter when no factory is injected", () => {

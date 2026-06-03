@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createToolRouter, type ToolRouterDeps } from "./toolRouter";
-import { fakeSkills as baseSkills } from "./testFakes";
+import { fakeDomainSkills, fakeSkills as baseSkills } from "./testFakes";
 import type { HelperRegistry, JsHelper } from "./helperRegistry";
-import type { DomainSkills } from "./domainSkills";
 
 const fakeSkills = () =>
   baseSkills({
@@ -26,19 +25,6 @@ function fakeHelpers(initial: JsHelper[] = []): HelperRegistry {
       return helpers.length < before;
     },
     callExpression: (name, args) => `CALL(${name}, ${JSON.stringify(args)})`,
-  };
-}
-
-/** An in-memory DomainSkills double. */
-function fakeDomainSkills(over: Partial<DomainSkills> = {}): DomainSkills {
-  return {
-    list: () => Promise.resolve([]),
-    read: () => Promise.resolve(null),
-    save: (host, name, body) =>
-      Promise.resolve({ host, name, body, bytes: body.length, updatedAt: 1 }),
-    remove: () => Promise.resolve(false),
-    search: () => Promise.resolve([]),
-    ...over,
   };
 }
 

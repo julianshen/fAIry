@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { listMdFiles, safeMdName } from "./mdFiles";
 
 /** A saved per-site note + its on-disk metadata. */
 export interface DomainSkillFile {
@@ -47,12 +48,6 @@ function normalizeHost(input: string): string {
   return h;
 }
 
-function safeName(name: string): string {
-  if (!name.endsWith(".md")) throw new Error("domain skill name must end in .md");
-  if (/[\\/\0]/.test(name) || name.startsWith(".")) throw new Error(`invalid skill name: ${name}`);
-  return name;
-}
-
 export function createDomainSkills(root: string): DomainSkills {
   const hostDir = (host: string): string => {
     const dir = path.join(root, normalizeHost(host));
@@ -69,15 +64,14 @@ export function createDomainSkills(root: string): DomainSkills {
 
   const list: DomainSkills["list"] = async (host) => {
     try {
-      const entries = await fs.readdir(hostDir(host));
-      return entries.filter((e) => e.endsWith(".md")).sort();
+      return await listMdFiles(hostDir(host));
     } catch {
-      return [];
+      return []; // invalid host → no notes (hostDir throws; listMdFiles never does)
     }
   };
 
   const read: DomainSkills["read"] = async (host, name) => {
-    const safe = safeName(name);
+    const safe = safeMdName(name);
     const full = path.join(hostDir(host), safe);
     try {
       const [body, stat] = await Promise.all([fs.readFile(full, "utf8"), fs.stat(full)]);
@@ -100,7 +94,7 @@ export function createDomainSkills(root: string): DomainSkills {
     list,
     read,
     async save(host, name, body) {
-      const safe = safeName(name);
+      const safe = safeMdName(name);
       const dir = hostDir(host);
       await fs.mkdir(dir, { recursive: true });
       const full = path.join(dir, safe);
@@ -109,7 +103,7 @@ export function createDomainSkills(root: string): DomainSkills {
       return { name: safe, host: normalizeHost(host), body, bytes: stat.size, updatedAt: stat.mtimeMs };
     },
     async remove(host, name) {
-      const full = path.join(hostDir(host), safeName(name));
+      const full = path.join(hostDir(host), safeMdName(name));
       try {
         await fs.unlink(full);
         return true;

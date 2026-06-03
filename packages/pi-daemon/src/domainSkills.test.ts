@@ -34,6 +34,7 @@ describe("domainSkills", () => {
     await ds.save("x.com", "a.md", "a");
     expect(await ds.list("x.com")).toEqual(["a.md", "b.md"]);
     expect(await ds.list("nope.com")).toEqual([]);
+    expect(await ds.list("../evil")).toEqual([]); // invalid host → no notes, not a throw
   });
 
   it("read returns null for a missing note", async () => {

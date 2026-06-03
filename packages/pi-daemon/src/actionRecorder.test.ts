@@ -21,8 +21,6 @@ describe("actionRecorder", () => {
     rec.capture("screenshot", {}); // read-only → skipped
     rec.capture("getUrl", {}); // read-only → skipped
     rec.capture("type", { text: "user" });
-    rec.capture("tabSwitch", { id: "7" }); // id-dependent → skipped (stale on replay)
-    rec.capture("tabClose", { id: "7" }); // id-dependent → skipped
     rec.capture("click", { x: 1, y: 2 });
     const wf = rec.stop();
     expect(wf.steps).toEqual([
@@ -31,6 +29,16 @@ describe("actionRecorder", () => {
       { tool: "click", args: { x: 1, y: 2 } },
     ]);
     expect(wf.name).toBe("login");
+  });
+
+  it("truncates the recording at a tab switch/close (later steps would target the wrong tab)", () => {
+    const rec = createActionRecorder(file);
+    rec.start("multi");
+    rec.capture("navigate", { url: "https://x.com" });
+    rec.capture("tabSwitch", { id: "7" }); // session-scoped id → stop recording here
+    rec.capture("click", { x: 1, y: 2 }); // dropped — would run in the wrong tab on replay
+    const wf = rec.stop();
+    expect(wf.steps).toEqual([{ tool: "navigate", args: { url: "https://x.com" } }]);
   });
 
   it("capture is a no-op when not recording", () => {

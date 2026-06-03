@@ -38,12 +38,14 @@ const READ_ONLY = new Set<string>([
   "cdpCollect",
 ]);
 
-// Tab ops that take a tab id: the recorded id is from the original session and
-// won't exist on replay (Chrome reallocates ids), so the step would fail or hit
-// the wrong tab. Skip them until replay remaps tabOpen results to fresh ids
-// (deferred). tabOpen itself is safe to record — it takes no id, and its new tab
-// becomes current.
-const ID_DEPENDENT = new Set<string>(["tabSwitch", "tabClose"]);
+// Tab ops that take a tab id AND move the active tab: the recorded id is from
+// the original session and won't exist on replay (Chrome reallocates ids).
+// Skipping just these would silently mis-target every later step (they assume
+// the tab changed), so instead we TRUNCATE the recording here — the captured
+// steps all share the one tab context, faithfully replayable. (tabOpen is fine:
+// it has no id and its new tab becomes current, so it AND the steps after it
+// reproduce correctly.) Full multi-tab replay needs tabOpen→id remapping (deferred).
+const TRUNCATING = new Set<string>(["tabSwitch", "tabClose"]);
 
 /**
  * Records the agent's side-effecting tool-call stream into a named, replayable
@@ -67,17 +69,24 @@ export interface ActionRecorder {
 
 export function createActionRecorder(file: string): ActionRecorder {
   let workflows = loadJsonArray<ActionWorkflow>(file);
-  let active: { name: string; description?: string; steps: WorkflowStep[] } | null = null;
+  let active: { name: string; description?: string; steps: WorkflowStep[]; truncated: boolean } | null =
+    null;
   const persist = (): void => writeJsonFile(file, workflows, 0o600);
 
   return {
     start(name, description) {
       if (active) throw new Error(`already recording '${active.name}'; stop first`);
       if (!name || /[\\/\0]/.test(name)) throw new Error(`invalid workflow name: ${name}`);
-      active = { name, description, steps: [] };
+      active = { name, description, steps: [], truncated: false };
     },
     capture(tool, args) {
-      if (!active || READ_ONLY.has(tool) || ID_DEPENDENT.has(tool)) return;
+      if (!active || active.truncated || READ_ONLY.has(tool)) return;
+      // A tab switch/close moves the active tab via a session-scoped id we can't
+      // replay — stop here so no later step runs against the wrong tab.
+      if (TRUNCATING.has(tool)) {
+        active.truncated = true;
+        return;
+      }
       // Snapshot the args — a later mutation by the caller mustn't alter the step.
       active.steps.push({ tool, args: structuredClone(args) });
     },

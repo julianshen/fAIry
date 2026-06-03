@@ -17,6 +17,9 @@ export default defineConfig({
         "src/testSocket.ts",
         // The real WebSocket adapter — browser glue, exercised by the E2E.
         "src/socket.ts",
+        // chrome.* / SW glue — exercised by the E2E + manual load, not units.
+        "src/background.ts",
+        "src/connection.ts",
       ],
       thresholds: {
         lines: 90,

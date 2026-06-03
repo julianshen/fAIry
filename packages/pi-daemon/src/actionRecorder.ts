@@ -71,7 +71,8 @@ export function createActionRecorder(file: string): ActionRecorder {
     },
     capture(tool, args) {
       if (!active || READ_ONLY.has(tool)) return;
-      active.steps.push({ tool, args });
+      // Snapshot the args — a later mutation by the caller mustn't alter the step.
+      active.steps.push({ tool, args: structuredClone(args) });
     },
     stop() {
       if (!active) throw new Error("not recording");
@@ -90,7 +91,11 @@ export function createActionRecorder(file: string): ActionRecorder {
       return wf;
     },
     list: () => workflows.map((w) => ({ name: w.name, description: w.description, steps: w.steps.length })),
-    get: (name) => workflows.find((w) => w.name === name),
+    // Clone so a replay can't mutate the in-memory workflow (and affect later runs).
+    get: (name) => {
+      const wf = workflows.find((w) => w.name === name);
+      return wf ? structuredClone(wf) : undefined;
+    },
     remove(name) {
       const before = workflows.length;
       workflows = workflows.filter((w) => w.name !== name);

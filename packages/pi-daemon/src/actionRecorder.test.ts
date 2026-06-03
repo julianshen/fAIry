@@ -81,6 +81,7 @@ describe("actionRecorder", () => {
     rec.stop();
     expect(rec.remove("f")).toBe(true);
     expect(rec.remove("f")).toBe(false);
+    expect(rec.get("f")).toBeUndefined(); // gone after remove
   });
 
   it("reads empty for a corrupt file", () => {

@@ -224,13 +224,15 @@ describe("createDaemon", () => {
     }
   });
 
-  it("records a relayed tool call and replays it through workflowRun", async () => {
+  it("records browser steps + callHelper (not other daemon tools) and replays them", async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "fairy-daemon-wf-"));
     const recorder = createActionRecorder(path.join(dir, "workflows.json"));
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder, spawnPi: silentSpawn });
+    const helpers = createHelperRegistry(path.join(dir, "helpers.json"));
+    helpers.save({ name: "h", expression: "() => 1" });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers, domainSkills: fakeDomainSkills(), recorder, spawnPi: silentSpawn });
     try {
-      // Chrome answers every browser tool, recording how many navigates it saw.
-      let navigates = 0;
+      // Chrome answers every browser tool, counting navigate + evaluate (callHelper relays evaluate).
+      const seen: Record<string, number> = {};
       const chrome = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
       await once(chrome, "open");
       chrome.send(JSON.stringify({ type: "auth", token: TOKEN }));
@@ -238,7 +240,7 @@ describe("createDaemon", () => {
       chrome.on("message", (raw: Buffer) => {
         const req = JSON.parse(raw.toString()) as { id?: string; tool?: string };
         if (!req.id || !req.tool) return;
-        if (req.tool === "navigate") navigates += 1;
+        seen[req.tool] = (seen[req.tool] ?? 0) + 1;
         chrome.send(JSON.stringify({ id: req.id, ok: true, result: { ok: true } }));
       });
 
@@ -247,27 +249,38 @@ describe("createDaemon", () => {
       pi.send({ type: "auth", token: TOKEN });
       expect(await pi.next()).toEqual({ type: "auth_ok" });
 
-      // Record: start → navigate (relayed + captured) → domainSkillSave (a
-      // daemon-owned WRITE — must NOT be recorded) → stop.
+      // Record: navigate (browser → recorded) + callHelper (daemon tool that runs
+      // in the page → recorded) + domainSkillSave (daemon write → NOT recorded).
       pi.send({ id: "1", tool: "workflowRecordStart", args: { name: "go" } });
       expect(await pi.next()).toEqual({ id: "1", ok: true, result: { recording: "go" } });
       pi.send({ id: "2", tool: "navigate", args: { url: "https://x.com" } });
       await pi.next();
-      pi.send({ id: "2b", tool: "domainSkillSave", args: { host: "x.com", name: "n.md", body: "b" } });
+      pi.send({ id: "2b", tool: "callHelper", args: { name: "h", args: [] } });
+      await pi.next();
+      pi.send({ id: "2c", tool: "domainSkillSave", args: { host: "x.com", name: "n.md", body: "b" } });
       await pi.next();
       pi.send({ id: "3", tool: "workflowRecordStop", args: {} });
-      // steps:1 — only the browser navigate, not the daemon-owned domainSkillSave.
-      expect(await pi.next()).toEqual({ id: "3", ok: true, result: { name: "go", steps: 1 } });
-      expect(navigates).toBe(1); // the live navigate
+      // steps:2 — navigate + callHelper; domainSkillSave excluded.
+      expect(await pi.next()).toEqual({ id: "3", ok: true, result: { name: "go", steps: 2 } });
+      expect(seen.navigate).toBe(1);
+      expect(seen.evaluate).toBe(1); // callHelper relayed one evaluate
 
-      // Replay: workflowRun re-issues the recorded navigate through the relay.
-      pi.send({ id: "4", tool: "workflowRun", args: { name: "go" } });
+      // Replay: both steps re-dispatch (callHelper relays evaluate again), no re-recording.
+      pi.send({ id: "4", tool: "workflowRun", args: { name: "go", stepDelayMs: 0 } });
       expect(await pi.next()).toEqual({
         id: "4",
         ok: true,
-        result: { name: "go", steps: 1, results: [{ tool: "navigate", ok: true }] },
+        result: {
+          name: "go",
+          steps: 2,
+          results: [
+            { tool: "navigate", ok: true },
+            { tool: "callHelper", ok: true },
+          ],
+        },
       });
-      expect(navigates).toBe(2); // replayed navigate hit Chrome again (not re-recorded)
+      expect(seen.navigate).toBe(2);
+      expect(seen.evaluate).toBe(2); // replayed callHelper relayed evaluate again
 
       chrome.close();
       pi.socket.destroy();

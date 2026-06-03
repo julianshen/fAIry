@@ -163,18 +163,20 @@ export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
         const name = requireString(args, "name");
         const wf = deps.recorder.get(name);
         if (!wf) throw new Error(`workflow not found: ${name}`);
-        const stepDelayMs = optionalNumber(args, "stepDelayMs");
+        // Pause BETWEEN steps so replayed click/type don't race page updates;
+        // 200ms is the contract's default (browser-bridge.ts), 0 disables it.
+        const stepDelayMs = optionalNumber(args, "stepDelayMs") ?? 200;
         const results: Array<{ tool: string; ok: boolean; error?: string }> = [];
-        for (const step of wf.steps) {
+        for (const [i, step] of wf.steps.entries()) {
+          if (i > 0 && stepDelayMs > 0) await new Promise((r) => setTimeout(r, stepDelayMs));
           try {
             await deps.dispatch(step.tool, step.args);
             results.push({ tool: step.tool, ok: true });
           } catch (err) {
             // A step failed — replaying the rest on a broken page is pointless.
-            results.push({ tool: step.tool, ok: false, error: (err as Error).message });
+            results.push({ tool: step.tool, ok: false, error: err instanceof Error ? err.message : String(err) });
             break;
           }
-          if (stepDelayMs) await new Promise((r) => setTimeout(r, stepDelayMs));
         }
         return { name, steps: wf.steps.length, results };
       },

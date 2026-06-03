@@ -275,7 +275,7 @@ describe("createToolRouter", () => {
       recorder.stop();
       const dispatch = vi.fn(() => Promise.resolve({ ok: true }));
       const router = createToolRouter(deps({ recorder, dispatch }));
-      const result = await router.handle("workflowRun", { name: "f" });
+      const result = await router.handle("workflowRun", { name: "f", stepDelayMs: 0 });
       expect(dispatch.mock.calls).toEqual([
         ["navigate", { url: "https://x.com" }],
         ["click", { x: 3, y: 4 }],
@@ -300,7 +300,9 @@ describe("createToolRouter", () => {
         tool === "navigate" ? Promise.reject(new Error("boom")) : Promise.resolve({}),
       );
       const router = createToolRouter(deps({ recorder, dispatch }));
-      const result = (await router.handle("workflowRun", { name: "f" })) as { results: unknown[] };
+      const result = (await router.handle("workflowRun", { name: "f", stepDelayMs: 0 })) as {
+        results: unknown[];
+      };
       expect(result.results).toEqual([{ tool: "navigate", ok: false, error: "boom" }]);
       expect(dispatch).toHaveBeenCalledTimes(1); // didn't replay click after navigate failed
     });
@@ -316,6 +318,16 @@ describe("createToolRouter", () => {
         results: unknown[];
       };
       expect(result.results).toHaveLength(2);
+    });
+
+    it("workflowRun applies the 200ms default when stepDelayMs is omitted", async () => {
+      const recorder = fakeRecorder();
+      recorder.start("f");
+      recorder.capture("click", { x: 1, y: 1 }); // single step → no actual between-step wait
+      recorder.stop();
+      const router = createToolRouter(deps({ recorder }));
+      const result = (await router.handle("workflowRun", { name: "f" })) as { results: unknown[] };
+      expect(result.results).toEqual([{ tool: "click", ok: true }]);
     });
 
     it("workflowRun throws for an unknown workflow", async () => {

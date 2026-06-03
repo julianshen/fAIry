@@ -13,6 +13,9 @@ export default tseslint.config(
     },
     rules: {
       "@typescript-eslint/no-non-null-assertion": "off",
+      // Handlers share a uniform (cdp, args) signature so the registry can bind
+      // them generically; a `_`-prefixed arg marks one intentionally unused.
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },
 );

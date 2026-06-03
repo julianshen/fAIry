@@ -523,11 +523,14 @@ export default function (pi: ExtensionAPI): void {
   });
 
   // ─── Multi-tab orchestration ─────────────────────────────────────────
+  // The agent only controls tabs in its session: the tab the task started on
+  // plus any it opens here. It cannot see or drive the user's other tabs — so
+  // tab_switch/close/list operate over agent-controlled tabs only.
   pi.registerTool({
     name: "browser_tab_open",
     label: "Open new tab",
     description:
-      "Open a new tab and switch to it (subsequent tool calls target it). Optional `url`. Returns {id, url, title, isActive}.",
+      "Open a new agent-controlled tab and switch to it (subsequent tool calls target it). Optional `url`. Returns {id, url, title, isActive}.",
     parameters: Type.Object({ url: Type.Optional(Type.String()) }),
     execute: async (_id, params) => bridge("tabOpen", params as Record<string, unknown>),
   });
@@ -535,7 +538,8 @@ export default function (pi: ExtensionAPI): void {
   pi.registerTool({
     name: "browser_tab_switch",
     label: "Switch tab",
-    description: "Switch to the tab with the given id. Subsequent tool calls target it. Returns the tab descriptor.",
+    description:
+      "Switch to one of the agent's tabs by id (from browser_tab_list). Subsequent tool calls target it. Returns the tab descriptor.",
     parameters: Type.Object({ id: Type.String() }),
     execute: async (_id, params) => bridge("tabSwitch", params as Record<string, unknown>),
   });
@@ -543,7 +547,7 @@ export default function (pi: ExtensionAPI): void {
   pi.registerTool({
     name: "browser_tab_close",
     label: "Close tab",
-    description: "Close the tab with the given id. After closing the active tab, call browser_tab_list.",
+    description: "Close one of the agent's tabs by id. After closing the active tab, call browser_tab_list.",
     parameters: Type.Object({ id: Type.String() }),
     execute: async (_id, params) => bridge("tabClose", params as Record<string, unknown>),
   });
@@ -551,7 +555,8 @@ export default function (pi: ExtensionAPI): void {
   pi.registerTool({
     name: "browser_tab_list",
     label: "List tabs",
-    description: "List all tabs in the current window: [{id, url, title, isActive}].",
+    description:
+      "List the agent-controlled tabs (the task's tab + any it opened) as [{id, url, title, isActive}]. The user's other tabs are not exposed.",
     parameters: Type.Object({}),
     execute: async () => bridge("tabList", {}),
   });

@@ -14,14 +14,13 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("actionRecorder", () => {
-  it("records side-effecting steps between start and stop, skipping reads + meta", () => {
+  it("records side-effecting browser steps between start and stop, skipping reads", () => {
     const rec = createActionRecorder(file);
     rec.start("login", "log into the site");
     rec.capture("navigate", { url: "https://x.com" });
     rec.capture("screenshot", {}); // read-only → skipped
     rec.capture("getUrl", {}); // read-only → skipped
     rec.capture("type", { text: "user" });
-    rec.capture("workflowList", {}); // meta → skipped
     rec.capture("click", { x: 1, y: 2 });
     const wf = rec.stop();
     expect(wf.steps).toEqual([

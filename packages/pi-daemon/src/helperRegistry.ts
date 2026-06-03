@@ -1,5 +1,4 @@
-import { readFileSync } from "node:fs";
-import { writeJsonFile } from "./fsAtomic";
+import { loadJsonArray, writeJsonFile } from "./fsAtomic";
 
 /** A named JS helper the agent saved for reuse across turns. */
 export interface JsHelper {
@@ -29,20 +28,8 @@ export interface HelperRegistry {
   callExpression(name: string, args: unknown[]): string;
 }
 
-function load(file: string): JsHelper[] {
-  try {
-    const data = JSON.parse(readFileSync(file, "utf8"));
-    return Array.isArray(data) ? (data as JsHelper[]) : [];
-  } catch (err) {
-    // A missing file (first run) or corrupt JSON reads as empty; a real I/O
-    // failure (permissions, etc.) must surface, not silently drop helper state.
-    if ((err as NodeJS.ErrnoException).code === "ENOENT" || err instanceof SyntaxError) return [];
-    throw err;
-  }
-}
-
 export function createHelperRegistry(file: string): HelperRegistry {
-  let helpers = load(file);
+  let helpers = loadJsonArray<JsHelper>(file);
   const persist = (): void => writeJsonFile(file, helpers, 0o600);
 
   return {

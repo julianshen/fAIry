@@ -247,12 +247,16 @@ describe("createDaemon", () => {
       pi.send({ type: "auth", token: TOKEN });
       expect(await pi.next()).toEqual({ type: "auth_ok" });
 
-      // Record: start → a navigate (relayed to Chrome + captured) → stop.
+      // Record: start → navigate (relayed + captured) → domainSkillSave (a
+      // daemon-owned WRITE — must NOT be recorded) → stop.
       pi.send({ id: "1", tool: "workflowRecordStart", args: { name: "go" } });
       expect(await pi.next()).toEqual({ id: "1", ok: true, result: { recording: "go" } });
       pi.send({ id: "2", tool: "navigate", args: { url: "https://x.com" } });
       await pi.next();
+      pi.send({ id: "2b", tool: "domainSkillSave", args: { host: "x.com", name: "n.md", body: "b" } });
+      await pi.next();
       pi.send({ id: "3", tool: "workflowRecordStop", args: {} });
+      // steps:1 — only the browser navigate, not the daemon-owned domainSkillSave.
       expect(await pi.next()).toEqual({ id: "3", ok: true, result: { name: "go", steps: 1 } });
       expect(navigates).toBe(1); // the live navigate
 

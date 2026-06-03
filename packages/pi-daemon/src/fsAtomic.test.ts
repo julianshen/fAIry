@@ -1,7 +1,37 @@
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { writeJsonFile } from "./fsAtomic";
+import { loadJsonArray, writeJsonFile } from "./fsAtomic";
+
+describe("loadJsonArray", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(path.join(tmpdir(), "fairy-loadarr-"));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("returns the array for valid array JSON", () => {
+    const file = path.join(dir, "a.json");
+    writeFileSync(file, JSON.stringify([1, 2, 3]));
+    expect(loadJsonArray<number>(file)).toEqual([1, 2, 3]);
+  });
+
+  it("returns [] for a missing file, corrupt JSON, or valid non-array JSON", () => {
+    expect(loadJsonArray(path.join(dir, "missing.json"))).toEqual([]); // ENOENT
+    const corrupt = path.join(dir, "corrupt.json");
+    writeFileSync(corrupt, "not json");
+    expect(loadJsonArray(corrupt)).toEqual([]); // SyntaxError
+    const obj = path.join(dir, "obj.json");
+    writeFileSync(obj, JSON.stringify({ not: "an array" }));
+    expect(loadJsonArray(obj)).toEqual([]); // valid JSON, not an array
+  });
+
+  it("rethrows a real I/O failure rather than masking it", () => {
+    const asDir = path.join(dir, "adir.json");
+    mkdirSync(asDir); // reading a directory → EISDIR, must not be swallowed
+    expect(() => loadJsonArray(asDir)).toThrow();
+  });
+});
 
 describe("writeJsonFile", () => {
   let dir: string;

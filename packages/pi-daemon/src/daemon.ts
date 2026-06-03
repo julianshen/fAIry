@@ -130,7 +130,7 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     domainSkills: opts.domainSkills,
     recorder: opts.recorder,
     relay: relayToBrowser,
-    dispatch: (tool, args) => route(tool, args),
+    dispatch: route,
     compact: (customInstructions) => {
       if (!activeConversation?.compact(customInstructions)) {
         // Undefined (no conversation) or false (not yet authenticated / disposed):
@@ -145,11 +145,13 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     host,
     authTimeoutMs,
     port: opts.ports?.piBridge,
-    // Route the call, then (on success) offer it to the recorder — capture
-    // filters reads/meta itself, so this is a no-op unless a workflow is recording.
+    // Route the call, then (on success) offer browser tools to the recorder.
+    // Daemon-owned tools aren't browser steps, so they're never recorded — that
+    // (not a hand-kept denylist) is what keeps compact / saveHelper / workflow*
+    // etc. out of workflows. capture itself drops the browser *reads*.
     requestTool: async (tool, args) => {
       const result = await route(tool, args);
-      opts.recorder.capture(tool, args);
+      if (!router.owns(tool)) opts.recorder.capture(tool, args);
       return result;
     },
   });

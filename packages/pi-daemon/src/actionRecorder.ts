@@ -1,5 +1,4 @@
-import { readFileSync } from "node:fs";
-import { writeJsonFile } from "./fsAtomic";
+import { loadJsonArray, writeJsonFile } from "./fsAtomic";
 
 export interface WorkflowStep {
   tool: string;
@@ -21,8 +20,11 @@ export interface WorkflowSummary {
   steps: number;
 }
 
-// Side-effect-free reads — replaying them wastes time and adds noise; the agent
-// re-issues them live at run time. (Wire tool names, as the relay sees them.)
+// Side-effect-free BROWSER reads — replaying them wastes time and adds noise; the
+// agent re-issues them live at run time. (Daemon-owned tools never reach the
+// recorder — the relay only offers it the tools it relayed to the browser — so
+// only browser reads need listing here. Shadows the extension's tool semantics;
+// a write tool mistakenly listed here would be dropped from recordings.)
 const READ_ONLY = new Set<string>([
   "screenshot",
   "screenshotMarked",
@@ -31,25 +33,9 @@ const READ_ONLY = new Set<string>([
   "getUrl",
   "getTitle",
   "describeAt",
-  "listHelpers",
-  "cdpCollect",
-  "domainSkillList",
-  "domainSkillRead",
-  "domainSkillSearch",
-  "skillPreamble",
-  "skillListInteractions",
-  "skillReadInteraction",
   "tabList",
   "reader_extract",
-]);
-
-// The recorder's own tools — calling them mid-recording must not pollute the steps.
-const META = new Set<string>([
-  "workflowRecordStart",
-  "workflowRecordStop",
-  "workflowRun",
-  "workflowList",
-  "workflowDelete",
+  "cdpCollect",
 ]);
 
 /**
@@ -72,18 +58,8 @@ export interface ActionRecorder {
   remove(name: string): boolean;
 }
 
-function load(file: string): ActionWorkflow[] {
-  try {
-    const data = JSON.parse(readFileSync(file, "utf8"));
-    return Array.isArray(data) ? (data as ActionWorkflow[]) : [];
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT" || err instanceof SyntaxError) return [];
-    throw err;
-  }
-}
-
 export function createActionRecorder(file: string): ActionRecorder {
-  let workflows = load(file);
+  let workflows = loadJsonArray<ActionWorkflow>(file);
   let active: { name: string; description?: string; steps: WorkflowStep[] } | null = null;
   const persist = (): void => writeJsonFile(file, workflows, 0o600);
 
@@ -94,7 +70,7 @@ export function createActionRecorder(file: string): ActionRecorder {
       active = { name, description, steps: [] };
     },
     capture(tool, args) {
-      if (!active || READ_ONLY.has(tool) || META.has(tool)) return;
+      if (!active || READ_ONLY.has(tool)) return;
       active.steps.push({ tool, args });
     },
     stop() {

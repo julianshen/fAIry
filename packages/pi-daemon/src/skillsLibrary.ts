@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { listMdFiles, safeMdName } from "./mdFiles";
 
 /**
  * Read-only access to the bundled `SKILL.md` + `interaction-skills/*.md` shipped
@@ -23,19 +24,11 @@ export function createSkillsLibrary(root: string): SkillsLibrary {
     preamble() {
       return fs.readFile(path.join(root, "SKILL.md"), "utf8");
     },
-    async listInteractions() {
-      try {
-        const entries = await fs.readdir(path.join(root, "interaction-skills"));
-        return entries.filter((e) => e.endsWith(".md")).sort();
-      } catch {
-        return [];
-      }
+    listInteractions() {
+      return listMdFiles(path.join(root, "interaction-skills"));
     },
     async readInteraction(name) {
-      // No path traversal, no escaping the interaction-skills dir, .md only.
-      if (!name.endsWith(".md") || /[\\/]/.test(name) || name.startsWith(".")) {
-        throw new Error(`invalid skill name: ${name}`);
-      }
+      safeMdName(name); // no traversal / escaping the dir; .md only
       try {
         return await fs.readFile(path.join(root, "interaction-skills", name), "utf8");
       } catch {

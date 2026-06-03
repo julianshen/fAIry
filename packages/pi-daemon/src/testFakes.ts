@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { createConnection } from "node:net";
 import type { ChildLike, ReadableLine } from "./jsonLineProcess";
+import type { DomainSkills } from "./domainSkills";
 import type { HelperRegistry } from "./helperRegistry";
 import type { SkillsLibrary } from "./skillsLibrary";
 
@@ -57,6 +58,16 @@ export const fakeHelpers = (over: Partial<HelperRegistry> = {}): HelperRegistry 
   save: () => {},
   remove: () => false,
   callExpression: (name, args) => `CALL(${name}, ${JSON.stringify(args)})`,
+  ...over,
+});
+
+/** An empty domain-skills double for wiring tests (createDaemon requires one). */
+export const fakeDomainSkills = (over: Partial<DomainSkills> = {}): DomainSkills => ({
+  list: () => Promise.resolve([]),
+  read: () => Promise.resolve(null),
+  save: (host, name, body) => Promise.resolve({ host, name, body, bytes: body.length, updatedAt: 0 }),
+  remove: () => Promise.resolve(false),
+  search: () => Promise.resolve([]),
   ...over,
 });
 

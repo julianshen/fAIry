@@ -15,6 +15,7 @@ const EXTENSION_ID = "bdbpchbohpaaiccocjkeinnccacojdjp";
 
 let daemon: ChildProcess | undefined;
 let home: string | undefined;
+let userDataDir: string | undefined;
 let context: BrowserContext;
 let pairingCode = "";
 let extensionLoaded = false;
@@ -23,7 +24,8 @@ async function startDaemon(): Promise<void> {
   home = mkdtempSync(path.join(tmpdir(), "fairy-e2e-"));
   daemon = spawn("bun", ["run", DAEMON_MAIN], {
     env: { ...process.env, FAIRY_HOME: home, FAIRY_HTTP_PORT: HTTP_PORT },
-    stdio: ["ignore", "pipe", "pipe"],
+    // stderr ignored (not piped-but-unread, which could fill its buffer and stall the daemon).
+    stdio: ["ignore", "pipe", "ignore"],
   });
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("daemon did not start in time")), 20_000);
@@ -41,9 +43,9 @@ async function startDaemon(): Promise<void> {
 }
 
 test.beforeAll(async () => {
-  context = await chromium.launchPersistentContext(mkdtempSync(path.join(tmpdir(), "fairy-udd-")), {
-    channel: "chrome",
-    headless: false,
+  userDataDir = mkdtempSync(path.join(tmpdir(), "fairy-udd-"));
+  context = await chromium.launchPersistentContext(userDataDir, {
+    headless: false, // bundled Chromium side-loads extensions (branded Chrome 137+ doesn't)
     args: [`--disable-extensions-except=${DIST}`, `--load-extension=${DIST}`, "--no-first-run"],
   });
   // Chrome 137+ disabled --load-extension; detect whether the extension is
@@ -61,6 +63,7 @@ test.afterAll(async () => {
   await context?.close();
   daemon?.kill("SIGTERM");
   if (home) rmSync(home, { recursive: true, force: true });
+  if (userDataDir) rmSync(userDataDir, { recursive: true, force: true });
 });
 
 test("the options page pairs with the daemon", async () => {

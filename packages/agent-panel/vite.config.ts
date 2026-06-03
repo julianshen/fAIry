@@ -21,8 +21,9 @@ export default defineConfig({
         "src/**/*.test.{ts,tsx}",
         "src/**/index.ts",
         "src/vite-env.d.ts",
-        // Type-only module — no runtime statements to cover.
+        // Type-only modules — no runtime statements to cover.
         "src/types.ts",
+        "src/a2ui/types.ts",
       ],
       thresholds: {
         lines: 90,

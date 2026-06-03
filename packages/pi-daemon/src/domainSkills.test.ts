@@ -90,7 +90,15 @@ describe("domainSkills", () => {
 
     it("rejects a name that isn't a plain .md basename", async () => {
       const ds = createDomainSkills(root);
-      for (const name of ["../escape.md", "a/b.md", "note", ".hidden.md", "a\\b.md"]) {
+      for (const name of [
+        "../escape.md",
+        "a/b.md",
+        "note",
+        ".hidden.md",
+        "a\\b.md",
+        "note.md:hidden.md", // Windows alternate-data-stream separator
+        "a:b.md",
+      ]) {
         await expect(ds.save("x.com", name, "x"), name).rejects.toThrow(/skill name|\.md/);
       }
     });

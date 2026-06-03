@@ -6,9 +6,14 @@ import { promises as fs } from "node:fs";
  * rule can't drift between the two stores.
  */
 
-/** Require a plain `.md` basename — no path separators, NUL, or dot-segments. */
+/**
+ * Require a plain `.md` basename. Rejects path separators, NUL, dot-segments,
+ * and the chars that are illegal/awkward in file names across platforms
+ * (`:*?"<>|`) — notably `:` is a Windows alternate-data-stream separator, so
+ * `note.md:hidden.md` would otherwise create a non-listable stream.
+ */
 export function safeMdName(name: string): string {
-  if (!name.endsWith(".md") || /[\\/\0]/.test(name) || name.startsWith(".")) {
+  if (!name.endsWith(".md") || /[\\/\0<>:"|?*]/.test(name) || name.startsWith(".")) {
     throw new Error(`invalid skill name: ${name}`);
   }
   return name;

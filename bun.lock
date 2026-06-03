@@ -31,6 +31,19 @@
         "vitest": "^2.1.8",
       },
     },
+    "packages/extension": {
+      "name": "@fairy/extension",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@eslint/js": "^9.17.0",
+        "@vitest/coverage-v8": "^2.1.8",
+        "eslint": "^9.17.0",
+        "globals": "^15.14.0",
+        "typescript": "^5.7.2",
+        "typescript-eslint": "^8.18.2",
+        "vitest": "^2.1.8",
+      },
+    },
     "packages/pi-daemon": {
       "name": "@fairy/pi-daemon",
       "version": "0.0.0",
@@ -174,6 +187,8 @@
     "@eslint/plugin-kit": ["@eslint/plugin-kit@0.4.1", "https://registry.npmmirror.com/@eslint/plugin-kit/-/plugin-kit-0.4.1.tgz", { "dependencies": { "@eslint/core": "^0.17.0", "levn": "^0.4.1" } }, "sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA=="],
 
     "@fairy/agent-panel": ["@fairy/agent-panel@workspace:packages/agent-panel"],
+
+    "@fairy/extension": ["@fairy/extension@workspace:packages/extension"],
 
     "@fairy/pi-daemon": ["@fairy/pi-daemon@workspace:packages/pi-daemon"],
 

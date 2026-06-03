@@ -14,7 +14,9 @@ export function createChromeTabsApi(): TabsApi {
   });
   return {
     async create(url) {
-      return toTab(await chrome.tabs.create(url ? { url } : {}));
+      // Default to about:blank, not {} — bare create() opens chrome://newtab, a
+      // privileged page chrome.debugger can't attach to, wedging open→navigate.
+      return toTab(await chrome.tabs.create({ url: url ?? "about:blank" }));
     },
     async get(id) {
       return toTab(await chrome.tabs.get(id));

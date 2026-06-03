@@ -76,11 +76,14 @@ function renderChart(node: ChartNode): ReactElement {
           <Tooltip />
           <Legend />
           {node.series.map((s, i) => (
-            <Area key={s} type="monotone" dataKey={s} stroke={colorFor(i)} fill={colorFor(i)} />
+            <Area key={s} type="monotone" dataKey={s} stroke={colorFor(i)} fill={colorFor(i)} fillOpacity={0.25} />
           ))}
         </AreaChart>
       );
     case "pie":
+      // A2UI `chart` allows multiple series, but a pie shows a single dimension:
+      // we slice by the first series, labelled by the `x` field. Extra series are
+      // intentionally ignored (a multi-ring pie is out of scope for v1).
       return (
         <PieChart>
           <Tooltip />

@@ -60,10 +60,13 @@ export class ConversationSession extends AuthenticatedSession {
   }
 
   /** Compact this conversation's history — invoked by the daemon's tool-router
-   *  when the active conversation's Pi calls `browser_compact`. No-op if the
-   *  driver isn't up yet (pre-auth) or already disposed. */
-  compact(customInstructions?: string): void {
-    this.driver?.compact(customInstructions);
+   *  when the active conversation's Pi calls `browser_compact`. Returns false if
+   *  there's no live driver (pre-auth or already disposed) so the caller can
+   *  report a real failure rather than a silent success. */
+  compact(customInstructions?: string): boolean {
+    if (!this.driver) return false;
+    this.driver.compact(customInstructions);
+    return true;
   }
 
   protected onDisposed(): void {

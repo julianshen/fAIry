@@ -7,8 +7,8 @@
 After a navigate, check the URL and page text:
 
 ```
-const url = await browser_get_url()
-const title = await browser_get_title()
+const url = await browser_getUrl()
+const title = await browser_getTitle()
 // /login, /signin, /auth/, "Sign in", "Log in" — surface to the user
 ```
 

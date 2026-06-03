@@ -67,4 +67,10 @@ describe("createToolRouter", () => {
     const router = createToolRouter({ compact: () => {}, skills: fakeSkills() });
     await expect(router.handle("navigate", {})).rejects.toThrow(/not a daemon tool/i);
   });
+
+  it("tolerates an RPC that omits the args object", async () => {
+    const router = createToolRouter({ compact: () => {}, skills: fakeSkills() });
+    const noArgs = undefined as unknown as Record<string, unknown>;
+    expect(await router.handle("skillListInteractions", noArgs)).toEqual(["iframes.md", "dialogs.md"]);
+  });
 });

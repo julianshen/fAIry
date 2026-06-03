@@ -103,8 +103,11 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
   const router = createToolRouter({
     skills: opts.skills,
     compact: (customInstructions) => {
-      if (!activeConversation) throw new Error("no active conversation to compact");
-      activeConversation.compact(customInstructions);
+      if (!activeConversation?.compact(customInstructions)) {
+        // Undefined (no conversation) or false (not yet authenticated / disposed):
+        // surface it as a tool error rather than a false "ok".
+        throw new Error("no active conversation to compact");
+      }
     },
   });
 

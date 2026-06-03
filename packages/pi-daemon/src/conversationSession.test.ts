@@ -167,16 +167,16 @@ describe("ConversationSession — commands", () => {
     expect(driver.stops).toBe(1);
   });
 
-  it("compact() delegates to the driver (the tool-router calls this)", () => {
+  it("compact() delegates to the driver and returns true (the tool-router calls this)", () => {
     const { conn, session, driver } = setup();
     auth(conn);
-    session.compact("keep the plan");
+    expect(session.compact("keep the plan")).toBe(true);
     expect(driver.compactions).toEqual(["keep the plan"]);
   });
 
-  it("compact() is a safe no-op before auth (no driver yet)", () => {
+  it("compact() returns false before auth (no driver yet) — a real failure, not silent", () => {
     const { session, driver } = setup();
-    expect(() => session.compact()).not.toThrow();
+    expect(session.compact()).toBe(false);
     expect(driver.compactions).toEqual([]);
   });
 

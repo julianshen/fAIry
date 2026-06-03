@@ -50,7 +50,9 @@ export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
     owns: (tool) => handlers.has(tool),
     handle: (tool, args) => {
       const handler = handlers.get(tool);
-      return handler ? handler(args) : Promise.reject(new Error(`${tool} is not a daemon tool`));
+      // An RPC may omit args; default to {} so handlers can read fields safely.
+      const safeArgs = args && typeof args === "object" ? args : {};
+      return handler ? handler(safeArgs) : Promise.reject(new Error(`${tool} is not a daemon tool`));
     },
   };
 }

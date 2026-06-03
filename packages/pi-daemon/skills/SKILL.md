@@ -25,8 +25,8 @@ Six more sit on top of those:
 browser_wait_for({ selector | networkIdleMs | urlContains, timeoutMs? })
 browser_dismiss_overlays()           // removes common cookie/modal/banner clutter
 browser_describe_at({ x, y })        // tag, id, classes, rect, text — for what's under a pixel
-browser_get_dom({ depth? })          // structured DOM snapshot
-browser_get_url() / browser_get_title()
+browser_getDom({ depth? })          // structured DOM snapshot
+browser_getUrl() / browser_getTitle()
 browser_cdp({ method, params })      // escape hatch — raw Chrome DevTools Protocol
 ```
 
@@ -40,7 +40,7 @@ browser_screenshot_marked() → pick a mark id → click its (x, y) → screensh
 
 `screenshot_marked` overlays numbered boxes on every visible interactive element and returns both the PNG and a `marks: [{id, x, y, w, h, tag, role, label, href}]` array. You read "the 'Submit' button is mark 7" off the image, then click mark 7's center. Far more reliable than picking pixels by eye.
 
-**Marks are numbered in reading order by default** — top-to-bottom rows, left-to-right within each row, like a human scans the page. Mark 1 is the top-left interactive element; numbers grow toward the bottom-right. So "click the third result" really does mean the third visually-appearing result, not whatever the DOM happens to put third. Pass `order: 'dom'` if you specifically want document order (rare; only useful when aligning with `browser_get_dom`).
+**Marks are numbered in reading order by default** — top-to-bottom rows, left-to-right within each row, like a human scans the page. Mark 1 is the top-left interactive element; numbers grow toward the bottom-right. So "click the third result" really does mean the third visually-appearing result, not whatever the DOM happens to put third. Pass `order: 'dom'` if you specifically want document order (rare; only useful when aligning with `browser_getDom`).
 
 Use plain `browser_screenshot` when you just need to _look_ at the page (reading content, verifying state). Use `screenshot_marked` when the next step is to click.
 

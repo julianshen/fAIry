@@ -1,11 +1,6 @@
-/** Minimal client-side socket surface — satisfied by a browser `WebSocket` via a thin adapter. */
-export interface ClientSocket {
-  send(data: string): void;
-  onOpen(handler: () => void): void;
-  onMessage(handler: (data: string) => void): void;
-  onClose(handler: () => void): void;
-  close(): void;
-}
+import { defaultSocketFactory, type ClientSocket, type SocketFactory } from "./socket";
+
+export type { ClientSocket };
 
 export interface ConversationClientOptions {
   /** `ws://127.0.0.1:<conversationPort>` (from discovery). */
@@ -15,7 +10,7 @@ export interface ConversationClientOptions {
   /** Called for each panel beat streamed by the daemon. Opaque here (the panel applies it). */
   onBeat: (beat: unknown) => void;
   /** Injected for tests; defaults to a real `WebSocket` adapter. */
-  socketFactory?: (url: string) => ClientSocket;
+  socketFactory?: SocketFactory;
   onClose?: () => void;
 }
 
@@ -49,7 +44,9 @@ export function connectConversation(opts: ConversationClientOptions): Conversati
 
   socket.onOpen(() => {
     open = true;
-    socket.send(JSON.stringify({ type: "auth", token: opts.token })); // auth must be first
+    // Auth is fire-and-forget (no `auth_ok` wait — the daemon closes on bad auth);
+    // it must be the first frame, before any queued start/stop.
+    socket.send(JSON.stringify({ type: "auth", token: opts.token }));
     for (const frame of queue) socket.send(frame);
     queue.length = 0;
   });
@@ -79,16 +76,3 @@ export function connectConversation(opts: ConversationClientOptions): Conversati
     close: () => socket.close(),
   };
 }
-
-/* v8 ignore start -- thin browser WebSocket adapter; exercised by the E2E, not units */
-function defaultSocketFactory(url: string): ClientSocket {
-  const ws = new WebSocket(url);
-  return {
-    send: (data) => ws.send(data),
-    onOpen: (h) => ws.addEventListener("open", () => h()),
-    onMessage: (h) => ws.addEventListener("message", (e) => h(String(e.data))),
-    onClose: (h) => ws.addEventListener("close", () => h()),
-    close: () => ws.close(),
-  };
-}
-/* v8 ignore stop */

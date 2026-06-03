@@ -52,15 +52,26 @@ describe("helperRegistry", () => {
   });
 
   describe("callExpression", () => {
-    it("builds a self-contained expression that injects the helpers and invokes one", () => {
+    it("builds a self-contained expression that inlines the called helper and invokes it", () => {
       const reg = createHelperRegistry(file);
       reg.save({ name: "double", expression: "(x) => x * 2" });
       const expr = reg.callExpression("double", [21]);
-      expect(expr).toContain('(x) => x * 2'); // the helper source is injected
-      expect(expr).toContain('"double"'); // the named lookup
+      expect(expr).toContain("(x) => x * 2"); // the helper source is inlined
+      expect(expr).toContain('"double"'); // referenced in the not-callable guard
       expect(expr).toContain("[21]"); // the args
-      // it's a single evaluatable expression
-      expect(expr.trim().startsWith("(")).toBe(true);
+      expect(expr.trim().startsWith("(")).toBe(true); // a single evaluatable expression
+    });
+
+    it("inlines ONLY the called helper, not other saved helpers", () => {
+      const reg = createHelperRegistry(file);
+      reg.save({ name: "wanted", expression: "() => 1" });
+      reg.save({ name: "sibling", expression: "() => { throw 'boom' }" });
+      const expr = reg.callExpression("wanted", []);
+      expect(expr).not.toContain("boom"); // a side-effecting sibling isn't injected
+    });
+
+    it("throws for an unknown helper", () => {
+      expect(() => createHelperRegistry(file).callExpression("nope", [])).toThrow(/helper not found/);
     });
   });
 });

@@ -29,9 +29,6 @@ export interface HelperRegistry {
   callExpression(name: string, args: unknown[]): string;
 }
 
-/** The page-global the injected helpers live under (internal to the call expression). */
-const NS = "__fairy";
-
 function load(file: string): JsHelper[] {
   try {
     const data = JSON.parse(readFileSync(file, "utf8"));
@@ -44,16 +41,6 @@ function load(file: string): JsHelper[] {
 export function createHelperRegistry(file: string): HelperRegistry {
   let helpers = load(file);
   const persist = (): void => writeJsonFile(file, helpers, 0o600);
-
-  const inlineInjection = (): string => {
-    const body = helpers.map((h) => `__h[${JSON.stringify(h.name)}] = (${h.expression});`).join("\n");
-    return `(function(){
-      if (!window.${NS}) window.${NS} = {};
-      if (!window.${NS}.helpers) window.${NS}.helpers = {};
-      var __h = window.${NS}.helpers;
-      ${body}
-    })()`;
-  };
 
   return {
     list: () => helpers.slice(),
@@ -69,12 +56,16 @@ export function createHelperRegistry(file: string): HelperRegistry {
       if (removed) persist();
       return removed;
     },
-    callExpression: (name, args) =>
-      `(function(){
-        ${inlineInjection()};
-        var fn = window.${NS} && window.${NS}.helpers && window.${NS}.helpers[${JSON.stringify(name)}];
+    callExpression: (name, args) => {
+      const helper = helpers.find((h) => h.name === name);
+      if (!helper) throw new Error(`helper not found: ${name}`);
+      // Inject ONLY the called helper's source (not every saved helper) so a
+      // sibling with a side-effecting definition can't break an unrelated call.
+      return `(function(){
+        var fn = (${helper.expression});
         if (typeof fn !== 'function') throw new Error('helper not callable: ' + ${JSON.stringify(name)});
         return fn.apply(null, ${JSON.stringify(args)});
-      })()`,
+      })()`;
+    },
   };
 }

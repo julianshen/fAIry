@@ -25,6 +25,18 @@ export interface ToolRouter {
   handle(tool: string, args: Record<string, unknown>): Promise<unknown>;
 }
 
+/** Narrow a required string arg, or throw a named error (the wire args are untyped). */
+function requireString(args: Record<string, unknown>, key: string): string {
+  const v = args[key];
+  if (typeof v !== "string") throw new Error(`${key} must be a string`);
+  return v;
+}
+
+function optionalString(args: Record<string, unknown>, key: string): string | undefined {
+  const v = args[key];
+  return typeof v === "string" ? v : undefined;
+}
+
 export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
   // A Map (not a plain object) so a tool name colliding with an Object prototype
   // member ("constructor", …) can't resolve to an inherited function. (Same
@@ -43,8 +55,7 @@ export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
     [
       "skillReadInteraction",
       async (args) => {
-        if (typeof args.name !== "string") throw new Error("name must be a string");
-        const body = await deps.skills.readInteraction(args.name);
+        const body = await deps.skills.readInteraction(requireString(args, "name"));
         if (body === null) throw new Error(`skill not found: ${args.name}`);
         return body;
       },
@@ -52,10 +63,11 @@ export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
     [
       "saveHelper",
       async (args) => {
-        if (typeof args.name !== "string") throw new Error("name must be a string");
-        if (typeof args.expression !== "string") throw new Error("expression must be a string");
-        const description = typeof args.description === "string" ? args.description : undefined;
-        deps.helpers.save({ name: args.name, expression: args.expression, description });
+        deps.helpers.save({
+          name: requireString(args, "name"),
+          expression: requireString(args, "expression"),
+          description: optionalString(args, "description"),
+        });
         return { ok: true };
       },
     ],
@@ -64,22 +76,16 @@ export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
       () =>
         Promise.resolve(deps.helpers.list().map((h) => ({ name: h.name, description: h.description }))),
     ],
-    [
-      "removeHelper",
-      async (args) => {
-        if (typeof args.name !== "string") throw new Error("name must be a string");
-        return { removed: deps.helpers.remove(args.name) };
-      },
-    ],
+    ["removeHelper", async (args) => ({ removed: deps.helpers.remove(requireString(args, "name")) })],
     [
       "callHelper",
       // Hybrid: the helper SOURCE lives on the daemon, but it must RUN in the
       // page — so resolve it here and relay an `evaluate` to the browser.
       async (args) => {
-        if (typeof args.name !== "string") throw new Error("name must be a string");
-        if (!deps.helpers.get(args.name)) throw new Error(`helper not found: ${args.name}`);
+        const name = requireString(args, "name");
+        if (!deps.helpers.get(name)) throw new Error(`helper not found: ${name}`);
         const callArgs = Array.isArray(args.args) ? args.args : [];
-        return deps.relay("evaluate", { expression: deps.helpers.callExpression(args.name, callArgs) });
+        return deps.relay("evaluate", { expression: deps.helpers.callExpression(name, callArgs) });
       },
     ],
   ]);

@@ -3,6 +3,7 @@ import { AGENTS } from "../agents";
 import type { ActionStyle, FeedItem } from "../types";
 import { Icon } from "./Icon";
 import { RichText } from "./RichText";
+import { A2UIView } from "../a2ui/renderA2UI";
 
 type Item<T extends FeedItem["type"]> = Extract<FeedItem, { type: T }>;
 
@@ -260,6 +261,14 @@ export function TakeoverItem({
           Take over
         </button>
       )}
+    </div>
+  );
+}
+
+export function UiItem({ item }: { item: Item<"ui"> }): ReactElement {
+  return (
+    <div className="ui-item">
+      <A2UIView message={item.a2ui} />
     </div>
   );
 }

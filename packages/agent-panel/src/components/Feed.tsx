@@ -9,6 +9,7 @@ import {
   ResultItem,
   ConfirmItem,
   TakeoverItem,
+  UiItem,
 } from "./FeedItems";
 
 export interface FeedProps {
@@ -53,6 +54,8 @@ export function Feed({
             );
           case "result":
             return <ResultItem key={it.key} item={it} />;
+          case "ui":
+            return <UiItem key={it.key} item={it} />;
           case "confirm":
             return <ConfirmItem key={it.key} item={it} onAnswer={(c) => onAnswer(it.key, c)} />;
           case "takeover":

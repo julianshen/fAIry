@@ -12,6 +12,7 @@ describe("Feed", () => {
       { type: "handoff", key: 4, from: "sage", to: "atlas" },
       { type: "plan", key: 5, steps: [{ txt: "step", who: "atlas", state: "pending" }] },
       { type: "actions", key: 6, agent: "atlas", title: "Nav", open: true, running: false, rows: [] },
+      { type: "ui", key: 8, a2ui: { type: "text", text: "uitext" } },
     ];
     const { container } = render(
       <Feed
@@ -30,6 +31,8 @@ describe("Feed", () => {
     expect(container.querySelector(".handoff")).not.toBeNull();
     expect(container.querySelector(".plan")).not.toBeNull();
     expect(container.querySelector(".actions")).not.toBeNull();
+    expect(container.querySelector(".ui-item")).not.toBeNull();
+    expect(screen.getByText("uitext")).toBeInTheDocument();
   });
 
   it("routes confirm answers with the item key", async () => {

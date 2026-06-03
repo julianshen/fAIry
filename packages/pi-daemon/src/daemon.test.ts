@@ -3,7 +3,7 @@ import { WebSocket } from "ws";
 import { createDaemon, type PiBridgeInfo } from "./daemon";
 import { HttpServer } from "./httpServer";
 import { createPairingStore } from "./pairing";
-import { lineClient, SilentChild, silentSpawn } from "./testFakes";
+import { fakeSkills, lineClient, RecordingChild, SilentChild, silentSpawn } from "./testFakes";
 import type { SettingsStore } from "./settings";
 import type { PiConfig } from "./piConfig";
 
@@ -26,7 +26,7 @@ async function wsAuth(port: number): Promise<unknown> {
 
 describe("createDaemon", () => {
   it("starts the four loopback servers on distinct ports and authenticates each", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), spawnPi: silentSpawn });
     try {
       const { bridge, piBridge, conversation, http } = daemon.ports;
       expect(new Set([bridge, piBridge, conversation, http]).size).toBe(4);
@@ -49,6 +49,7 @@ describe("createDaemon", () => {
     const daemon = await createDaemon({
       token: TOKEN,
       settings: fakeStore(),
+      skills: fakeSkills(),
       spawnPi: (bridge) => {
         spawns.push(bridge);
         return new SilentChild();
@@ -67,7 +68,7 @@ describe("createDaemon", () => {
   });
 
   it("relays a Pi tool call through to the connected Chrome bridge", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), spawnPi: silentSpawn });
     try {
       // Chrome side (executor): a WS client that answers every tool request.
       const chrome = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
@@ -95,7 +96,7 @@ describe("createDaemon", () => {
   });
 
   it("keeps the authenticated Chrome bridge when a second connection arrives unauthenticated", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), spawnPi: silentSpawn });
     try {
       // Chrome #1 authenticates and answers tool calls — the active bridge.
       const chrome1 = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
@@ -128,7 +129,7 @@ describe("createDaemon", () => {
   });
 
   it("reports 'no browser connected' after the Chrome bridge disconnects", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), spawnPi: silentSpawn });
     try {
       const chrome = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
       await once(chrome, "open");
@@ -150,8 +151,52 @@ describe("createDaemon", () => {
     }
   });
 
+  it("routes compact to the active authenticated conversation's Pi", async () => {
+    const child = new RecordingChild();
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), spawnPi: () => child });
+    try {
+      // Authenticate a conversation: Pi (the recording child) is spawned and the
+      // session becomes the active conversation (promoted on auth).
+      const panel = new WebSocket(`ws://127.0.0.1:${daemon.ports.conversation}`);
+      await once(panel, "open");
+      panel.send(JSON.stringify({ type: "auth", token: TOKEN }));
+      await once(panel, "message"); // auth_ok — onAuthenticated has run, so it's active
+
+      // Pi's browser_compact arrives over the piBridge → router → active conversation → Pi.
+      const pi = lineClient(daemon.ports.piBridge);
+      await once(pi.socket, "connect");
+      pi.send({ type: "auth", token: TOKEN });
+      expect(await pi.next()).toEqual({ type: "auth_ok" });
+      pi.send({ id: "1", tool: "compact", args: { customInstructions: "keep the plan" } });
+      expect(await pi.next()).toEqual({ id: "1", ok: true, result: { ok: true } });
+      expect(child.sent()).toContainEqual({ type: "compact", customInstructions: "keep the plan" });
+
+      panel.close();
+      pi.socket.destroy();
+    } finally {
+      await daemon.close();
+    }
+  });
+
+  it("handles a daemon-owned tool (skill) locally — not relayed, no browser needed", async () => {
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), spawnPi: silentSpawn });
+    try {
+      // No Chrome bridge connected: a browser tool would answer "no browser
+      // connected", but a daemon-owned tool is served by the router.
+      const pi = lineClient(daemon.ports.piBridge);
+      await once(pi.socket, "connect");
+      pi.send({ type: "auth", token: TOKEN });
+      expect(await pi.next()).toEqual({ type: "auth_ok" });
+      pi.send({ id: "1", tool: "skillPreamble", args: {} });
+      expect(await pi.next()).toEqual({ id: "1", ok: true, result: "# skills" });
+      pi.socket.destroy();
+    } finally {
+      await daemon.close();
+    }
+  });
+
   it("answers a Pi tool call with 'no browser connected' when no Chrome bridge is present", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), spawnPi: silentSpawn });
     try {
       const pi = lineClient(daemon.ports.piBridge);
       await once(pi.socket, "connect");
@@ -169,6 +214,7 @@ describe("createDaemon", () => {
     const daemon = await createDaemon({
       token: TOKEN,
       settings: fakeStore(),
+      skills: fakeSkills(),
       spawnPi: silentSpawn,
       pairing: createPairingStore({ token: TOKEN, code: "PAIRCODE" }),
     });
@@ -186,7 +232,7 @@ describe("createDaemon", () => {
   });
 
   it("GET /info reports the live bridge + conversation ports", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), spawnPi: silentSpawn });
     try {
       const res = await fetch(`http://127.0.0.1:${daemon.ports.http}/info`, {
         headers: { authorization: `Bearer ${TOKEN}` },
@@ -202,7 +248,7 @@ describe("createDaemon", () => {
   });
 
   it("close() stops every server", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), spawnPi: silentSpawn });
     const httpPort = daemon.ports.http;
     await daemon.close();
     await expect(
@@ -215,7 +261,7 @@ describe("createDaemon", () => {
     const taken = await occupier.listen();
     try {
       await expect(
-        createDaemon({ token: TOKEN, settings: fakeStore(), spawnPi: silentSpawn, ports: { http: taken } }),
+        createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), spawnPi: silentSpawn, ports: { http: taken } }),
       ).rejects.toBeDefined();
     } finally {
       await occupier.close();

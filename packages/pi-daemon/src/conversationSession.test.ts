@@ -37,12 +37,16 @@ class FakeDriver implements ConversationDriver {
   started: string[] = [];
   stops = 0;
   disposes = 0;
+  compactions: Array<string | undefined> = [];
   emitBeat!: (beat: PanelBeat) => void;
   start(task: string): void {
     this.started.push(task);
   }
   stop(): void {
     this.stops += 1;
+  }
+  compact(customInstructions?: string): void {
+    this.compactions.push(customInstructions);
   }
   dispose(): void {
     this.disposes += 1;
@@ -161,6 +165,19 @@ describe("ConversationSession — commands", () => {
     auth(conn);
     conn.emit({ type: "stop" });
     expect(driver.stops).toBe(1);
+  });
+
+  it("compact() delegates to the driver and returns true (the tool-router calls this)", () => {
+    const { conn, session, driver } = setup();
+    auth(conn);
+    expect(session.compact("keep the plan")).toBe(true);
+    expect(driver.compactions).toEqual(["keep the plan"]);
+  });
+
+  it("compact() returns false before auth (no driver yet) — a real failure, not silent", () => {
+    const { session, driver } = setup();
+    expect(session.compact()).toBe(false);
+    expect(driver.compactions).toEqual([]);
   });
 
   it("ignores unknown or malformed commands after auth without crashing", () => {

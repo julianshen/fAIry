@@ -1,11 +1,14 @@
 import { BridgeServer } from "./bridgeServer";
 import type { BridgeSession } from "./bridgeSession";
 import { ConversationServer } from "./conversationServer";
+import type { ConversationSession } from "./conversationSession";
 import { HttpServer } from "./httpServer";
 import type { ChildLike } from "./jsonLineProcess";
 import type { PairingStore } from "./pairing";
 import { PiBridgeServer } from "./piBridgeServer";
 import type { SettingsStore } from "./settings";
+import type { SkillsLibrary } from "./skillsLibrary";
+import { createToolRouter } from "./toolRouter";
 
 /** Loopback bridge the daemon hands Pi's `browser` extension (via env on spawn). */
 export interface PiBridgeInfo {
@@ -18,6 +21,8 @@ export interface DaemonOptions {
   token: string;
   /** Settings source of truth (provider/model config); backs the HTTP endpoint. */
   settings: SettingsStore;
+  /** Bundled skills library — served by the daemon's tool-router (not the browser). */
+  skills: SkillsLibrary;
   /** Spawn Pi for a conversation, given the loopback bridge it should connect back on. */
   spawnPi: (bridge: PiBridgeInfo) => ChildLike;
   /** Loopback host for all servers. Defaults to 127.0.0.1. */
@@ -84,13 +89,38 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     },
   });
 
+  // The active conversation the tool-router's `compact` targets. Promoted only
+  // on successful auth (not at connect — a stray socket must not displace a live
+  // conversation) and cleared on close — symmetric with `chrome` above.
+  // v1 assumes ONE conversation: a daemon-owned tool call carries no conversation
+  // identity, so `compact` (and any future stateful daemon tool) targets the
+  // single active one. Multi-conversation needs the piBridge connection
+  // correlated to its spawning ConversationSession.
+  let activeConversation: ConversationSession | undefined;
+
+  // Daemon-owned tools (helpers/skills/workflows/compact) are handled here, not
+  // forwarded to the browser. compact reaches the active conversation's Pi.
+  const router = createToolRouter({
+    skills: opts.skills,
+    compact: (customInstructions) => {
+      if (!activeConversation?.compact(customInstructions)) {
+        // Undefined (no conversation) or false (not yet authenticated / disposed):
+        // surface it as a tool error rather than a false "ok".
+        throw new Error("no active conversation to compact");
+      }
+    },
+  });
+
   const piBridge = new PiBridgeServer({
     token,
     host,
     authTimeoutMs,
     port: opts.ports?.piBridge,
-    requestTool: (tool, args) =>
-      chrome ? chrome.requestTool(tool, args) : Promise.reject(new Error("no browser connected")),
+    // Route daemon-owned tools locally; relay everything else to the browser.
+    requestTool: (tool, args) => {
+      if (router.owns(tool)) return router.handle(tool, args);
+      return chrome ? chrome.requestTool(tool, args) : Promise.reject(new Error("no browser connected"));
+    },
   });
 
   // The WS ports are known only once those servers are listening (below); the
@@ -106,6 +136,10 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     authTimeoutMs,
     port: opts.ports?.conversation,
     spawn: () => opts.spawnPi({ port: piBridgePort, token }),
+    onAuthenticated: (session) => (activeConversation = session),
+    onClose: (session) => {
+      if (activeConversation === session) activeConversation = undefined;
+    },
   });
 
   const http = new HttpServer({

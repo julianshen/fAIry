@@ -5,6 +5,7 @@ import type { PanelBeat } from "./beatMapper";
 export interface ConversationDriver {
   start(task: string): void;
   stop(): void;
+  compact(customInstructions?: string): void;
   dispose(): void;
 }
 
@@ -16,6 +17,8 @@ export interface ConversationSessionOptions {
   createDriver: (onBeat: (beat: PanelBeat) => void) => ConversationDriver;
   /** Close the connection if it doesn't authenticate within this many ms. */
   authTimeoutMs?: number;
+  /** Fired once the token handshake succeeds and the driver is up. */
+  onAuthenticated?: () => void;
   onClose?: () => void;
 }
 
@@ -39,8 +42,10 @@ export class ConversationSession extends AuthenticatedSession {
   }
 
   protected onAuthenticated(): void {
-    // May throw (Pi spawn failure); the base then closes without authenticating.
+    // May throw (Pi spawn failure); the base then closes without authenticating
+    // and the callback below doesn't fire.
     this.driver = this.opts.createDriver((beat) => this.sendBeat(beat));
+    this.opts.onAuthenticated?.();
   }
 
   protected onAuthedMessage(msg: unknown): void {
@@ -52,6 +57,16 @@ export class ConversationSession extends AuthenticatedSession {
       this.driver?.stop();
     }
     // Unknown commands are ignored.
+  }
+
+  /** Compact this conversation's history — invoked by the daemon's tool-router
+   *  when the active conversation's Pi calls `browser_compact`. Returns false if
+   *  there's no live driver (pre-auth or already disposed) so the caller can
+   *  report a real failure rather than a silent success. */
+  compact(customInstructions?: string): boolean {
+    if (!this.driver) return false;
+    this.driver.compact(customInstructions);
+    return true;
   }
 
   protected onDisposed(): void {

@@ -16,8 +16,12 @@ export interface ConversationServerOptions {
   allowedOrigins?: string[];
   /** Close a connection that doesn't authenticate within this many ms. */
   authTimeoutMs?: number;
-  /** Called with each connection's session once it's wired up. */
+  /** Called with each connection's session once it's wired up (at connect). */
   onSession?: (session: ConversationSession) => void;
+  /** Called when a session completes the token handshake (after `onSession`). */
+  onAuthenticated?: (session: ConversationSession) => void;
+  /** Called when a session closes. */
+  onClose?: (session: ConversationSession) => void;
 }
 
 /**
@@ -41,6 +45,8 @@ export class ConversationServer {
           connection,
           authTimeoutMs: opts.authTimeoutMs,
           createDriver: (onBeat) => new ConversationController({ spawn: opts.spawn, onBeat }),
+          onAuthenticated: () => opts.onAuthenticated?.(session),
+          onClose: () => opts.onClose?.(session),
         });
         opts.onSession?.(session);
       },

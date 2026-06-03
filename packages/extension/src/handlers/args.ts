@@ -17,6 +17,11 @@ export function requireNumber(args: Record<string, unknown>, key: string): numbe
   return v;
 }
 
+// Overloaded so that supplying a fallback narrows the return to a guaranteed
+// value — callers then write `optionalNumber(args, "x", 0)`, not
+// `optionalNumber(args, "x", 0) ?? 0`.
+export function optionalString(args: Record<string, unknown>, key: string): string | undefined;
+export function optionalString(args: Record<string, unknown>, key: string, fallback: string): string;
 export function optionalString(
   args: Record<string, unknown>,
   key: string,
@@ -26,6 +31,8 @@ export function optionalString(
   return typeof v === "string" ? v : fallback;
 }
 
+export function optionalNumber(args: Record<string, unknown>, key: string): number | undefined;
+export function optionalNumber(args: Record<string, unknown>, key: string, fallback: number): number;
 export function optionalNumber(
   args: Record<string, unknown>,
   key: string,

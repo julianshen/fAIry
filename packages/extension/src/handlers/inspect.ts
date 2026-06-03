@@ -8,7 +8,7 @@ import { evaluateExpression } from "./evaluate";
  * roots out — cheaper, and rarely what the agent needs.
  */
 export async function getDom(cdp: CdpClient, args: Record<string, unknown>): Promise<unknown> {
-  const depth = optionalNumber(args, "depth", 4) ?? 4;
+  const depth = optionalNumber(args, "depth", 4);
   const res = (await cdp.send("DOM.getDocument", { depth, pierce: false })) as { root: unknown };
   return res.root;
 }

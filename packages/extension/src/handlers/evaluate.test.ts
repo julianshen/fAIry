@@ -1,19 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CdpClient } from "../cdp/cdpClient";
+import { fakeCdp } from "../cdp/testCdp";
 import { evaluate, evaluateExpression } from "./evaluate";
-
-function fakeCdp(responses: Record<string, unknown> = {}): CdpClient & {
-  calls: Array<{ method: string; params?: Record<string, unknown> }>;
-} {
-  const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
-  return {
-    calls,
-    send(method, params) {
-      calls.push({ method, params });
-      return Promise.resolve(responses[method]);
-    },
-  };
-}
 
 describe("evaluateExpression", () => {
   it("returns the value of a successful Runtime.evaluate", async () => {

@@ -1,19 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CdpClient } from "../cdp/cdpClient";
+import { fakeCdp } from "../cdp/testCdp";
 import { click, scroll, type } from "./input";
-
-function fakeCdp(): CdpClient & {
-  calls: Array<{ method: string; params?: Record<string, unknown> }>;
-} {
-  const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
-  return {
-    calls,
-    send(method, params) {
-      calls.push({ method, params });
-      return Promise.resolve(undefined);
-    },
-  };
-}
 
 describe("click", () => {
   it("dispatches a press then a release at (x,y) with the default left button", async () => {

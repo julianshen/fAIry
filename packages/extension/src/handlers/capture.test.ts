@@ -1,26 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { CdpClient } from "../cdp/cdpClient";
+import { fakeCdp as recordingCdp } from "../cdp/testCdp";
 import { screenshot, screenshotMarked } from "./capture";
 
 const METRICS = { visualViewport: { clientWidth: 800.4, clientHeight: 600.6 } };
 
-function fakeCdp(overrides: Record<string, unknown> = {}): CdpClient & {
-  calls: Array<{ method: string; params?: Record<string, unknown> }>;
-} {
-  const responses: Record<string, unknown> = {
+/** The shared recorder seeded with the capture defaults; overrides win. */
+function fakeCdp(overrides: Record<string, unknown> = {}) {
+  return recordingCdp({
     "Page.getLayoutMetrics": METRICS,
     "Page.captureScreenshot": { data: "BASE64DATA" },
     "Runtime.evaluate": { result: { value: [] } },
     ...overrides,
-  };
-  const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
-  return {
-    calls,
-    send(method, params) {
-      calls.push({ method, params });
-      return Promise.resolve(responses[method]);
-    },
-  };
+  });
 }
 
 describe("screenshot", () => {

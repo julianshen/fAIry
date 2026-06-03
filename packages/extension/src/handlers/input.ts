@@ -26,7 +26,7 @@ export async function click(
  */
 export async function type(cdp: CdpClient, args: Record<string, unknown>): Promise<{ ok: true }> {
   const text = requireString(args, "text");
-  const delayMs = optionalNumber(args, "delayMs", 0) ?? 0;
+  const delayMs = optionalNumber(args, "delayMs", 0);
   for (const ch of text) {
     await cdp.send("Input.dispatchKeyEvent", { type: "char", text: ch });
     if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
@@ -38,10 +38,10 @@ export async function type(cdp: CdpClient, args: Record<string, unknown>): Promi
 export async function scroll(cdp: CdpClient, args: Record<string, unknown>): Promise<{ ok: true }> {
   await cdp.send("Input.dispatchMouseEvent", {
     type: "mouseWheel",
-    x: optionalNumber(args, "x", 0) ?? 0,
-    y: optionalNumber(args, "y", 0) ?? 0,
-    deltaX: optionalNumber(args, "deltaX", 0) ?? 0,
-    deltaY: optionalNumber(args, "deltaY", 0) ?? 0,
+    x: optionalNumber(args, "x", 0),
+    y: optionalNumber(args, "y", 0),
+    deltaX: optionalNumber(args, "deltaX", 0),
+    deltaY: optionalNumber(args, "deltaY", 0),
   });
   return { ok: true };
 }

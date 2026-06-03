@@ -17,8 +17,9 @@ export default defineConfig({
         // manual loading, not unit tests (they need the extension runtime).
         "src/**/*.test.ts",
         "src/**/index.ts",
-        // Test-only shared double (used by *.test.ts, not production code).
+        // Test-only shared doubles (used by *.test.ts, not production code).
         "src/testSocket.ts",
+        "src/cdp/testCdp.ts",
         // The real WebSocket adapter — browser glue, exercised by the E2E.
         "src/socket.ts",
         // chrome.* / SW glue — exercised by the E2E + manual load, not units.

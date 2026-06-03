@@ -13,8 +13,11 @@ import { dismissOverlays, waitFor } from "./page";
  * to a handler that runs CDP commands through `cdp`. Pass the result to
  * {@link import("../toolExecutor").createToolExecutor}.
  *
- * This is the single place the wire names live, so a name typo surfaces as a
- * missing tool here (and in index.test.ts) rather than a silent no-op at runtime.
+ * This is the single place the extension's wire names live; `registry.test.ts`
+ * pins the set so a typo is a failing test, not a silent runtime no-op. The
+ * names are produced on the daemon side by the Pi `-e` script's `bridge("...")`
+ * calls — deduping the two across the process boundary awaits a shared protocol
+ * module (the `-e` script can't import daemon/extension code, so it's deferred).
  */
 export function createBrowserHandlers(cdp: CdpClient): Record<string, ToolHandler> {
   const bind =

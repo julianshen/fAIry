@@ -17,20 +17,26 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) 
 });
 
 let bridge: BridgeClient | null = null;
+// Serialize (re)connects: two storage-change events in quick succession would
+// otherwise each close-then-reassign across the `await`, leaking the first socket.
+let connecting: Promise<void> | null = null;
 
-async function connectBridgeForConnection(): Promise<void> {
-  const conn = await loadConnection();
-  if (!conn) return; // not paired yet
-  bridge?.close();
-  const executor = createToolExecutor(createBrowserHandlers(createDebuggerCdpClient()));
-  bridge = connectBridge({
-    url: `ws://127.0.0.1:${conn.bridgePort}`,
-    token: conn.token,
-    execute: executor.execute,
-    onClose: () => {
-      bridge = null;
-    },
+function connectBridgeForConnection(): Promise<void> {
+  connecting = (connecting ?? Promise.resolve()).then(async () => {
+    const conn = await loadConnection();
+    if (!conn) return; // not paired yet
+    bridge?.close();
+    const executor = createToolExecutor(createBrowserHandlers(createDebuggerCdpClient()));
+    bridge = connectBridge({
+      url: `ws://127.0.0.1:${conn.bridgePort}`,
+      token: conn.token,
+      execute: executor.execute,
+      onClose: () => {
+        bridge = null;
+      },
+    });
   });
+  return connecting;
 }
 
 connectBridgeForConnection().catch((err) => {

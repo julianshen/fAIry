@@ -85,4 +85,28 @@ describe("waitFor", () => {
     const result = await waitFor(cdp, { predicate: "false", timeoutMs: 250 }, fakeClock());
     expect(result).toEqual({ ok: false, reason: "timeout" });
   });
+
+  it("rejects an unparseable urlMatch regex up front instead of compiling it each tick", async () => {
+    const cdp = fakeCdp(["https://x.com"]);
+    const result = await waitFor(cdp, { urlMatch: "(" }, fakeClock());
+    expect(result).toEqual({ ok: false, reason: "badRegex" });
+    // bailed before any page evaluation
+    expect(cdp.calls).toEqual([]);
+  });
+
+  it("rejects an over-long urlMatch (ReDoS guard) without evaluating", async () => {
+    const cdp = fakeCdp(["https://x.com"]);
+    const result = await waitFor(cdp, { urlMatch: "a".repeat(257) }, fakeClock());
+    expect(result).toEqual({ ok: false, reason: "badRegex" });
+    expect(cdp.calls).toEqual([]);
+  });
+
+  it("caps an absurd timeoutMs so the loop is bounded", async () => {
+    const cdp = fakeCdp([false]);
+    const clock = fakeClock();
+    const result = await waitFor(cdp, { predicate: "false", timeoutMs: 10 ** 12 }, clock);
+    expect(result).toEqual({ ok: false, reason: "timeout" });
+    // capped at 60s of 100ms polls → ~600, not ~10^10
+    expect(clock.now()).toBeLessThanOrEqual(60_000);
+  });
 });

@@ -30,13 +30,16 @@ export interface Mark {
  */
 async function capture(cdp: CdpClient, args: Record<string, unknown>): Promise<Shot> {
   const format: Format = optionalString(args, "format", "jpeg") === "png" ? "png" : "jpeg";
-  const quality = optionalNumber(args, "quality", 70) ?? 70;
-  const metrics = (await cdp.send("Page.getLayoutMetrics")) as {
-    visualViewport: { clientWidth: number; clientHeight: number };
-  };
+  const quality = optionalNumber(args, "quality", 70);
   const params: Record<string, unknown> =
     format === "jpeg" ? { format: "jpeg", quality } : { format: "png" };
-  const { data } = (await cdp.send("Page.captureScreenshot", params)) as { data: string };
+  // The two reads are independent (capture params don't use the metrics), so
+  // overlap them — one fewer round-trip per frame on the agent's perception loop.
+  const [metrics, shot] = (await Promise.all([
+    cdp.send("Page.getLayoutMetrics"),
+    cdp.send("Page.captureScreenshot", params),
+  ])) as [{ visualViewport: { clientWidth: number; clientHeight: number } }, { data: string }];
+  const { data } = shot;
   return {
     base64: data,
     width: Math.round(metrics.visualViewport.clientWidth),

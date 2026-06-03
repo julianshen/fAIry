@@ -14,6 +14,9 @@ const realClock: Clock = {
 };
 
 const POLL_MS = 100;
+/** Hard ceilings on tool-supplied input: bound the loop and guard against a ReDoS regex. */
+const MAX_TIMEOUT_MS = 60_000;
+const MAX_URL_MATCH_LEN = 256;
 
 /**
  * Detect and remove modal/overlay elements that intercept clicks — the common
@@ -76,11 +79,24 @@ export async function waitFor(
   args: Record<string, unknown>,
   clock: Clock = realClock,
 ): Promise<{ ok: boolean; reason: string }> {
-  const timeoutMs = optionalNumber(args, "timeoutMs", 10_000) ?? 10_000;
+  const timeoutMs = Math.min(optionalNumber(args, "timeoutMs", 10_000), MAX_TIMEOUT_MS);
   const selector = optionalString(args, "selector");
   const selectorGone = optionalString(args, "selectorGone");
   const urlMatch = optionalString(args, "urlMatch");
   const predicate = optionalString(args, "predicate");
+
+  // Compile the url regex once, up front — never per tick (a constant recompile,
+  // and an untrusted pattern shouldn't be fed to `new RegExp` in a hot loop).
+  let urlRe: RegExp | undefined;
+  if (urlMatch !== undefined) {
+    if (urlMatch.length > MAX_URL_MATCH_LEN) return { ok: false, reason: "badRegex" };
+    try {
+      urlRe = new RegExp(urlMatch);
+    } catch {
+      return { ok: false, reason: "badRegex" };
+    }
+  }
+
   const deadline = clock.now() + timeoutMs;
 
   const truthy = async (expr: string): Promise<boolean> => {
@@ -101,9 +117,9 @@ export async function waitFor(
     if (selectorGone && (await truthy(`!document.querySelector(${JSON.stringify(selectorGone)})`))) {
       return { ok: true, reason: "selectorGone" };
     }
-    if (urlMatch) {
+    if (urlRe) {
       const href = String(await evaluateExpression(cdp, "location.href"));
-      if (new RegExp(urlMatch).test(href)) return { ok: true, reason: "urlMatch" };
+      if (urlRe.test(href)) return { ok: true, reason: "urlMatch" };
     }
     if (predicate && (await truthy(`!!(${predicate})`))) {
       return { ok: true, reason: "predicate" };

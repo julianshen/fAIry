@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CdpClient } from "../cdp/cdpClient";
+import { fakeCdp } from "../cdp/testCdp";
 import { createBrowserHandlers } from "./registry";
-
-function fakeCdp(responses: Record<string, unknown> = {}): CdpClient {
-  return { send: (method) => Promise.resolve(responses[method]) };
-}
 
 /** The exact wire names the daemon relays (the `bridge("...")` args in the -e script). */
 const EXPECTED_TOOLS = [

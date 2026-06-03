@@ -40,9 +40,11 @@ export interface DomainSkills {
 function normalizeHost(input: string): string {
   let h = input.toLowerCase().trim();
   if (h.startsWith("www.")) h = h.slice(4);
-  // No path separators, NUL, or bare dot segments (`.`/`..` have no slash yet
-  // would escape the root via path.join).
-  if (h.length === 0 || /[\\/\0]/.test(h) || h === "." || h === "..") {
+  // Reject anything that isn't a clean directory name: path separators, NUL,
+  // bare dot segments (would escape root via path.join), and the chars that are
+  // illegal/awkward in file names across platforms (`:`*?"<>| — Windows + macOS).
+  // A real URL hostname uses none of these.
+  if (h.length === 0 || /[\\/\0<>:"|?*]/.test(h) || h === "." || h === "..") {
     throw new Error(`invalid host: ${input}`);
   }
   return h;
@@ -103,9 +105,13 @@ export function createDomainSkills(root: string): DomainSkills {
       return { name: safe, host: normalizeHost(host), body, bytes: stat.size, updatedAt: stat.mtimeMs };
     },
     async remove(host, name) {
-      const full = path.join(hostDir(host), safeMdName(name));
+      const dir = hostDir(host);
+      const full = path.join(dir, safeMdName(name));
       try {
         await fs.unlink(full);
+        // Drop the host dir if that was its last note (rmdir fails on a
+        // non-empty dir, which we ignore) — no empty hosts left to scan.
+        await fs.rmdir(dir).catch(() => {});
         return true;
       } catch {
         return false;

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -48,6 +48,17 @@ describe("domainSkills", () => {
     expect(await ds.remove("x.com", "a.md")).toBe(false);
   });
 
+  it("removing the last note drops the now-empty host dir, but keeps a host with other notes", async () => {
+    const ds = createDomainSkills(root);
+    await ds.save("solo.com", "a.md", "a");
+    await ds.save("multi.com", "a.md", "a");
+    await ds.save("multi.com", "b.md", "b");
+    await ds.remove("solo.com", "a.md");
+    expect(existsSync(path.join(root, "solo.com"))).toBe(false); // emptied → gone
+    await ds.remove("multi.com", "a.md");
+    expect(existsSync(path.join(root, "multi.com"))).toBe(true); // still has b.md
+  });
+
   describe("search", () => {
     it("finds a substring across hosts, ranked by hit count, with line numbers", async () => {
       const ds = createDomainSkills(root);
@@ -69,9 +80,10 @@ describe("domainSkills", () => {
   });
 
   describe("path-traversal guards", () => {
-    it("rejects a host that would escape the root", async () => {
+    it("rejects a host that would escape the root or use a file-unsafe char", async () => {
       const ds = createDomainSkills(root);
-      for (const host of ["../evil", "..", ".", "a/b", "a\\b", ""]) {
+      // traversal + separators, plus chars illegal/awkward in file names (Win/macOS)
+      for (const host of ["../evil", "..", ".", "a/b", "a\\b", "", "a:b", "a*b", "a?b", 'a"b', "a|b"]) {
         await expect(ds.save(host, "n.md", "x"), host).rejects.toThrow(/invalid host/);
       }
     });

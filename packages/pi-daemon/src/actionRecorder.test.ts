@@ -21,6 +21,8 @@ describe("actionRecorder", () => {
     rec.capture("screenshot", {}); // read-only → skipped
     rec.capture("getUrl", {}); // read-only → skipped
     rec.capture("type", { text: "user" });
+    rec.capture("tabSwitch", { id: "7" }); // id-dependent → skipped (stale on replay)
+    rec.capture("tabClose", { id: "7" }); // id-dependent → skipped
     rec.capture("click", { x: 1, y: 2 });
     const wf = rec.stop();
     expect(wf.steps).toEqual([

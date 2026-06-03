@@ -38,6 +38,13 @@ const READ_ONLY = new Set<string>([
   "cdpCollect",
 ]);
 
+// Tab ops that take a tab id: the recorded id is from the original session and
+// won't exist on replay (Chrome reallocates ids), so the step would fail or hit
+// the wrong tab. Skip them until replay remaps tabOpen results to fresh ids
+// (deferred). tabOpen itself is safe to record — it takes no id, and its new tab
+// becomes current.
+const ID_DEPENDENT = new Set<string>(["tabSwitch", "tabClose"]);
+
 /**
  * Records the agent's side-effecting tool-call stream into a named, replayable
  * sequence — bridging the LLM-driven world (slow, fuzzy) and scripted automation
@@ -70,7 +77,7 @@ export function createActionRecorder(file: string): ActionRecorder {
       active = { name, description, steps: [] };
     },
     capture(tool, args) {
-      if (!active || READ_ONLY.has(tool)) return;
+      if (!active || READ_ONLY.has(tool) || ID_DEPENDENT.has(tool)) return;
       // Snapshot the args — a later mutation by the caller mustn't alter the step.
       active.steps.push({ tool, args: structuredClone(args) });
     },

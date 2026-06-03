@@ -14,15 +14,17 @@ function App(): ReactElement {
   useEffect(() => {
     let cancelled = false;
     let client: ConversationClient | undefined;
-    void loadConnection().then((conn) => {
-      if (cancelled || !conn) return; // unmounted before the read resolved
-      client = connectConversation({
-        url: `ws://127.0.0.1:${conn.conversationPort}`,
-        token: conn.token,
-        onBeat: (beat) => controller.apply(beat as Beat),
-      });
-      clientRef.current = client;
-    });
+    loadConnection()
+      .then((conn) => {
+        if (cancelled || !conn) return; // unmounted before the read resolved
+        client = connectConversation({
+          url: `ws://127.0.0.1:${conn.conversationPort}`,
+          token: conn.token,
+          onBeat: (beat) => controller.apply(beat as Beat),
+        });
+        clientRef.current = client;
+      })
+      .catch((err) => console.error("[fairy] could not load the paired connection", err));
     return () => {
       cancelled = true;
       client?.close();

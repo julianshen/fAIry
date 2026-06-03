@@ -12,8 +12,12 @@ export default defineManifest({
   // debugger/tabs/scripting are for the (later) browser tool handlers; storage
   // holds the paired connection; sidePanel opens the conversation UI.
   permissions: ["storage", "sidePanel", "debugger", "tabs", "scripting"],
-  // `:*` for any port (the WS ports are ephemeral, discovered via /info; HTTP is
-  // :51789) and the `ws://` scheme — without both, the discovery HTTP calls and
-  // the conversation/bridge WS connections are blocked at connect time.
-  host_permissions: ["http://127.0.0.1:*/*", "ws://127.0.0.1:*/*"],
+  // Any loopback port (HTTP is :51789; the WS ports are ephemeral, via /info).
+  // `ws://` isn't a valid host_permissions scheme — the WS connections are
+  // allowed via the connect-src CSP below instead.
+  host_permissions: ["http://127.0.0.1:*/*"],
+  content_security_policy: {
+    extension_pages:
+      "script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*;",
+  },
 });

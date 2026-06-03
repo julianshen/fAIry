@@ -20,7 +20,7 @@ function Options(): ReactElement {
       await saveConnection(conn);
       setStatus("Paired! Open Fairy from the toolbar.");
     } catch (err) {
-      setStatus(`Pairing failed: ${(err as Error).message}`);
+      setStatus(`Pairing failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setBusy(false);
     }

@@ -30,17 +30,15 @@ describe("evaluateExpression", () => {
     await expect(evaluateExpression(cdp, "(")).rejects.toThrow("Syntax error");
   });
 
-  it("decodes non-JSON primitives returned via unserializableValue", async () => {
-    const cases: Array<[string, (v: unknown) => void]> = [
-      ["NaN", (v) => expect(v).toBeNaN()],
-      ["Infinity", (v) => expect(v).toBe(Infinity)],
-      ["-Infinity", (v) => expect(v).toBe(-Infinity)],
-      ["-0", (v) => expect(Object.is(v, -0)).toBe(true)],
-      ["42n", (v) => expect(v).toBe(42n)],
-    ];
-    for (const [unserializableValue, check] of cases) {
+  it("surfaces non-JSON primitives as their wire-safe string (they can't survive JSON.stringify)", async () => {
+    // Returning raw NaN/Infinity/-0/bigint would be lost or throw when the bridge
+    // JSON-encodes the reply; the unserializableValue string is the safe form.
+    for (const unserializableValue of ["NaN", "Infinity", "-Infinity", "-0", "42n"]) {
       const cdp = fakeCdp({ "Runtime.evaluate": { result: { unserializableValue } } });
-      check(await evaluateExpression(cdp, "x"));
+      const v = await evaluateExpression(cdp, "x");
+      expect(v).toBe(unserializableValue);
+      // proof it crosses the bridge intact
+      expect(JSON.parse(JSON.stringify(v))).toBe(unserializableValue);
     }
   });
 

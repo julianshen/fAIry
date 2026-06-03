@@ -7,27 +7,15 @@ interface RuntimeEvaluateResult {
 }
 
 /**
- * With `returnByValue`, CDP can't JSON-encode some primitives, so it sends them
- * as a string in `unserializableValue` (with `value` absent). Decode those back
- * so a successful `NaN`/`Infinity`/`-0`/bigint result isn't collapsed to
- * `undefined`.
+ * With `returnByValue`, CDP can't JSON-encode some primitives (`NaN`,
+ * `Infinity`, `-0`, bigint), so it sends them as a string in
+ * `unserializableValue` with `value` absent. Surface that string verbatim: the
+ * tool reply is itself JSON-encoded over the bridge, where reconstructed raw
+ * primitives would be lost (`NaN`→`null`, `-0`→`0`) or throw (bigint). The
+ * string is the only representation that reaches Pi intact.
  */
 function decodeRemote(result: { value?: unknown; unserializableValue?: string }): unknown {
-  if (result.value !== undefined) return result.value;
-  const u = result.unserializableValue;
-  if (u === undefined) return undefined;
-  switch (u) {
-    case "NaN":
-      return Number.NaN;
-    case "Infinity":
-      return Number.POSITIVE_INFINITY;
-    case "-Infinity":
-      return Number.NEGATIVE_INFINITY;
-    case "-0":
-      return -0;
-  }
-  if (/^-?\d+n$/.test(u)) return BigInt(u.slice(0, -1));
-  return u;
+  return result.value !== undefined ? result.value : result.unserializableValue;
 }
 
 /**

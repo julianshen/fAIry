@@ -2,6 +2,7 @@ import type { CdpClient } from "../cdp/cdpClient";
 import type { CdpEventBuffer } from "../cdp/eventBuffer";
 import { optionalNumber, optionalObject, optionalString, requireString } from "./args";
 import { assertHttpUrl } from "./urlPolicy";
+import { NO_TAB_BOUND } from "../tabs/agentTabs";
 
 // CDP isn't tab-scoped once attached: Target.* (attach to / create other
 // targets) and Browser.* (browser-level control) would let raw passthrough
@@ -47,10 +48,11 @@ export async function cdpSubscribe(
   try {
     await cdp.send(`${domain}.enable`, {});
   } catch (err) {
-    // A domain with no `.enable` command is benign (events still flow). But a
-    // real failure — no tab bound, attach rejected — means nothing will arrive,
-    // so don't claim success: roll the subscription back and report it.
-    if (!/not found|wasn't found|doesn't exist/i.test((err as Error)?.message ?? "")) {
+    // The one failure we can detect reliably is our own "no tab bound" signal —
+    // there's no session, so capture truly can't work: roll back and report it.
+    // Everything else is either benign (the domain has no `.enable`) or a rare
+    // transient; we don't couple to Chrome's version-varying error wording.
+    if ((err as Error)?.message?.includes(NO_TAB_BOUND)) {
       events.unsubscribe(method);
       return { ok: false };
     }

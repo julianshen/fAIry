@@ -1,4 +1,11 @@
 /**
+ * Thrown (and recognized) when an agent action runs with no bound session — the
+ * fail-closed signal. A shared constant so the few sites that produce/detect it
+ * agree on stable wording rather than coupling to Chrome's varying error text.
+ */
+export const NO_TAB_BOUND = "no tab bound to the agent (start a task first)";
+
+/**
  * The agent-tab binding — the heart of the cross-tab security model.
  *
  * The agent may only drive tabs it *owns*: the tab a task was bound to, plus any

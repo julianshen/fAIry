@@ -1,4 +1,4 @@
-import type { AgentTabs } from "../tabs/agentTabs";
+import { NO_TAB_BOUND, type AgentTabs } from "../tabs/agentTabs";
 import type { Tab, TabsApi } from "../tabs/tabsApi";
 import { optionalString, requireString } from "./args";
 import { assertHttpUrl } from "./urlPolicy";
@@ -32,7 +32,7 @@ export async function tabOpen(
   // Fail closed like the CDP path: opening a tab is an agent action, so it needs
   // a bound session (taskStart). Otherwise an unbound worker — e.g. after an MV3
   // restart — could open + drive a fresh tab without the user's task consent.
-  if (agentTabs.current() === null) throw new Error("no tab bound to the agent (start a task first)");
+  if (agentTabs.current() === null) throw new Error(NO_TAB_BOUND);
   const url = optionalString(args, "url");
   if (url !== undefined) assertHttpUrl(url); // same gate as navigate — no file:/data:/… tabs
   const tab = await tabs.create(url);

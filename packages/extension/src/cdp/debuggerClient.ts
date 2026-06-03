@@ -1,6 +1,6 @@
 import type { CdpClient } from "./cdpClient";
 import type { CdpEventBuffer } from "./eventBuffer";
-import type { AgentTabs } from "../tabs/agentTabs";
+import { NO_TAB_BOUND, type AgentTabs } from "../tabs/agentTabs";
 
 /**
  * The real {@link CdpClient}, backed by `chrome.debugger`. Glue — it can't run
@@ -39,7 +39,7 @@ export function createDebuggerCdpClient(agentTabs: AgentTabs, events: CdpEventBu
     attaching = (async () => {
       try {
         const tabId = agentTabs.current();
-        if (tabId === null) throw new Error("no tab bound to the agent (start a task first)");
+        if (tabId === null) throw new Error(NO_TAB_BOUND);
         if (attached !== tabId) {
           if (attached !== null) {
             await chrome.debugger.detach({ tabId: attached }).catch(() => {});

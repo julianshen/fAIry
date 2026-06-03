@@ -18,9 +18,13 @@ export interface ToolExecutor {
  * this dispatch stays pure and unit-testable.
  */
 export function createToolExecutor(handlers: Record<string, ToolHandler>): ToolExecutor {
+  // A Map (not direct `handlers[tool]`) so a tool name matching an Object
+  // prototype member ("constructor", "toString", …) can't resolve to an
+  // inherited method and get invoked — it's simply not a registered tool.
+  const registry = new Map(Object.entries(handlers));
   const execute: ToolExecute = (tool, args) => {
-    const handler = handlers[tool];
+    const handler = registry.get(tool);
     return handler ? handler(args) : Promise.reject(new Error(`unknown tool: ${tool}`));
   };
-  return { execute, tools: Object.freeze(Object.keys(handlers)) };
+  return { execute, tools: Object.freeze([...registry.keys()]) };
 }

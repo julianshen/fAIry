@@ -28,6 +28,13 @@ describe("createToolExecutor", () => {
     await expect(execute("click", { x: 1, y: 2 })).rejects.toThrow("no active tab");
   });
 
+  it("rejects a tool name that collides with an Object prototype property", async () => {
+    const { execute } = createToolExecutor({ navigate: async () => null });
+    // "constructor"/"toString" exist on Object.prototype but aren't registered tools.
+    await expect(execute("constructor", {})).rejects.toThrow(/unknown tool: constructor/i);
+    await expect(execute("toString", {})).rejects.toThrow(/unknown tool/i);
+  });
+
   it("lists the registered tool names", () => {
     const { tools } = createToolExecutor({ navigate: async () => null, click: async () => null });
     expect(tools).toEqual(["navigate", "click"]);

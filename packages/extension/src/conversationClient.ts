@@ -73,6 +73,11 @@ export function connectConversation(opts: ConversationClientOptions): Conversati
   return {
     start: (task) => send({ type: "start", task }),
     stop: () => send({ type: "stop" }),
-    close: () => socket.close(),
+    close: () => {
+      // Set the flag synchronously so a send issued between now and the async
+      // `close` event is dropped rather than written to a closing socket.
+      closed = true;
+      socket.close();
+    },
   };
 }

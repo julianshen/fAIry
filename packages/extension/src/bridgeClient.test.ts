@@ -125,6 +125,29 @@ describe("connectBridge", () => {
     ]);
   });
 
+  it("replies with an error when the tool result is not serializable", async () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const { socket } = setup(async () => circular);
+    socket.fireOpen();
+    socket.fireMessage({ id: "1", tool: "getDom", args: {} });
+    await flush();
+    expect(socket.parsed().at(-1)).toMatchObject({ id: "1", ok: false });
+  });
+
+  it("stops replying once close() is called, before the close event arrives", async () => {
+    let resolveExec!: (v: unknown) => void;
+    const { socket, client } = setup(() => new Promise((r) => (resolveExec = r)));
+    socket.fireOpen();
+    socket.fireMessage({ id: "1", tool: "getUrl", args: {} });
+    await flush(); // execute runs, promise pending
+    const before = socket.sent.length;
+    client.close(); // sets closed synchronously — no onClose event fired here
+    resolveExec("late");
+    await flush();
+    expect(socket.sent.length).toBe(before); // no reply after close() was called
+  });
+
   it("close() closes the socket", () => {
     const { socket, client } = setup(async () => null);
     client.close();

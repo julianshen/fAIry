@@ -81,6 +81,16 @@ describe("connectConversation", () => {
     expect(socket.closed).toBe(true);
   });
 
+  it("drops start/stop after close() is called, before the close event arrives", () => {
+    const { socket, client } = setup();
+    socket.fireOpen();
+    const before = socket.sent.length;
+    client.close(); // sets closed synchronously
+    client.start("late");
+    client.stop();
+    expect(socket.sent.length).toBe(before); // nothing sent after close()
+  });
+
   it("defaults to a real WebSocket adapter when no factory is injected", () => {
     const created: string[] = [];
     class FakeWS {

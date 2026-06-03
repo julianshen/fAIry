@@ -32,7 +32,16 @@ export function connectBridge(opts: BridgeClientOptions): BridgeClient {
   let closed = false;
 
   const reply = (response: { id: string; ok: boolean; result?: unknown; error?: string }): void => {
-    if (!closed) socket.send(JSON.stringify(response));
+    if (closed) return;
+    let frame: string;
+    try {
+      frame = JSON.stringify(response);
+    } catch {
+      // A tool result with a circular structure / BigInt isn't serializable —
+      // reply with an error (the id is a plain string) so the call doesn't hang.
+      frame = JSON.stringify({ id: response.id, ok: false, error: "tool result was not serializable" });
+    }
+    socket.send(frame);
   };
 
   // Auth is fire-and-forget: the daemon closes the socket on a bad/missing
@@ -71,5 +80,12 @@ export function connectBridge(opts: BridgeClientOptions): BridgeClient {
     opts.onClose?.();
   });
 
-  return { close: () => socket.close() };
+  return {
+    close: () => {
+      // Set the flag synchronously so a tool execution that resolves between now
+      // and the async `close` event doesn't reply on a closing socket.
+      closed = true;
+      socket.close();
+    },
+  };
 }

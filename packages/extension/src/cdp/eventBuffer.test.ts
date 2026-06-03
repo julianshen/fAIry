@@ -103,6 +103,21 @@ describe("createEventBuffer", () => {
     expect(b.isSubscribed("Network.responseReceived")).toBe(false);
   });
 
+  it("reports the distinct domains of subscribed methods (to re-enable after a tab switch)", () => {
+    const b = createEventBuffer();
+    b.subscribe("Network.responseReceived");
+    b.subscribe("Network.requestWillBeSent");
+    b.subscribe("Page.loadEventFired");
+    expect(new Set(b.domains())).toEqual(new Set(["Network", "Page"]));
+  });
+
+  it("drops a domain from domains() once its last method unsubscribes", () => {
+    const b = createEventBuffer();
+    b.subscribe("Page.loadEventFired");
+    b.unsubscribe("Page.loadEventFired");
+    expect(b.domains()).toEqual([]);
+  });
+
   it("caps a method's buffer, dropping the oldest events", () => {
     const b = createEventBuffer(3); // tiny cap for the test
     b.subscribe("Network.responseReceived");

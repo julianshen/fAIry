@@ -46,6 +46,13 @@ export function createDebuggerCdpClient(agentTabs: AgentTabs, events: CdpEventBu
           }
           await chrome.debugger.attach({ tabId }, "1.3");
           attached = tabId;
+          // CDP `<domain>.enable` is per-session, so a fresh attach (first use or
+          // after tabSwitch) starts with every domain disabled. Replay the active
+          // subscriptions' domains, or event capture would silently stop on the
+          // new tab until the agent re-subscribes.
+          for (const domain of events.domains()) {
+            await chrome.debugger.sendCommand({ tabId }, `${domain}.enable`, {}).catch(() => {});
+          }
         }
         return tabId;
       } finally {

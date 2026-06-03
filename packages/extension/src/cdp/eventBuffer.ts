@@ -22,6 +22,8 @@ export interface CdpEventBuffer {
   /** Stop buffering `method` (or all) and clear its events. */
   unsubscribe(method?: string): { ok: boolean; cleared: number };
   isSubscribed(method: string): boolean;
+  /** Distinct CDP domains of the subscribed methods — replayed as `<domain>.enable` on a new tab. */
+  domains(): string[];
 }
 
 const DEFAULT_CAP = 1000;
@@ -83,6 +85,14 @@ export function createEventBuffer(cap: number = DEFAULT_CAP): CdpEventBuffer {
     },
     isSubscribed(method) {
       return buffers.has(method);
+    },
+    domains() {
+      const set = new Set<string>();
+      for (const method of buffers.keys()) {
+        const dot = method.indexOf(".");
+        if (dot > 0) set.add(method.slice(0, dot));
+      }
+      return [...set];
     },
   };
 }

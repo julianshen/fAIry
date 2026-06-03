@@ -89,8 +89,13 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     },
   });
 
-  // The active conversation Pi's tool calls belong to (v1 = one conversation,
-  // newest connection). The tool-router's `compact` targets it.
+  // The active conversation the tool-router's `compact` targets. Promoted only
+  // on successful auth (not at connect — a stray socket must not displace a live
+  // conversation) and cleared on close — symmetric with `chrome` above.
+  // v1 assumes ONE conversation: a daemon-owned tool call carries no conversation
+  // identity, so `compact` (and any future stateful daemon tool) targets the
+  // single active one. Multi-conversation needs the piBridge connection
+  // correlated to its spawning ConversationSession.
   let activeConversation: ConversationSession | undefined;
 
   // Daemon-owned tools (helpers/skills/workflows/compact) are handled here, not
@@ -128,7 +133,10 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     authTimeoutMs,
     port: opts.ports?.conversation,
     spawn: () => opts.spawnPi({ port: piBridgePort, token }),
-    onSession: (session) => (activeConversation = session),
+    onAuthenticated: (session) => (activeConversation = session),
+    onClose: (session) => {
+      if (activeConversation === session) activeConversation = undefined;
+    },
   });
 
   const http = new HttpServer({

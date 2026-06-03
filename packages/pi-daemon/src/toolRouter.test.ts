@@ -1,15 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { createToolRouter } from "./toolRouter";
-import type { SkillsLibrary } from "./skillsLibrary";
+import { fakeSkills as baseSkills } from "./testFakes";
 
-function fakeSkills(over: Partial<SkillsLibrary> = {}): SkillsLibrary {
-  return {
+const fakeSkills = () =>
+  baseSkills({
     preamble: () => Promise.resolve("PREAMBLE"),
     listInteractions: () => Promise.resolve(["iframes.md", "dialogs.md"]),
     readInteraction: (name) => Promise.resolve(name === "iframes.md" ? "IFRAME BODY" : null),
-    ...over,
-  };
-}
+  });
 
 describe("createToolRouter", () => {
   it("owns exactly the daemon-handled tool names (and not extension tools)", () => {

@@ -3,7 +3,7 @@ import { WebSocket } from "ws";
 import { createDaemon, type PiBridgeInfo } from "./daemon";
 import { HttpServer } from "./httpServer";
 import { createPairingStore } from "./pairing";
-import { fakeSkills, lineClient, SilentChild, silentSpawn } from "./testFakes";
+import { fakeSkills, lineClient, RecordingChild, SilentChild, silentSpawn } from "./testFakes";
 import type { SettingsStore } from "./settings";
 import type { PiConfig } from "./piConfig";
 
@@ -145,6 +145,33 @@ describe("createDaemon", () => {
       expect(await pi.next()).toEqual({ type: "auth_ok" });
       pi.send({ id: "1", tool: "getUrl", args: {} });
       expect(await pi.next()).toEqual({ id: "1", ok: false, error: "no browser connected" });
+      pi.socket.destroy();
+    } finally {
+      await daemon.close();
+    }
+  });
+
+  it("routes compact to the active authenticated conversation's Pi", async () => {
+    const child = new RecordingChild();
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), spawnPi: () => child });
+    try {
+      // Authenticate a conversation: Pi (the recording child) is spawned and the
+      // session becomes the active conversation (promoted on auth).
+      const panel = new WebSocket(`ws://127.0.0.1:${daemon.ports.conversation}`);
+      await once(panel, "open");
+      panel.send(JSON.stringify({ type: "auth", token: TOKEN }));
+      await once(panel, "message"); // auth_ok — onAuthenticated has run, so it's active
+
+      // Pi's browser_compact arrives over the piBridge → router → active conversation → Pi.
+      const pi = lineClient(daemon.ports.piBridge);
+      await once(pi.socket, "connect");
+      pi.send({ type: "auth", token: TOKEN });
+      expect(await pi.next()).toEqual({ type: "auth_ok" });
+      pi.send({ id: "1", tool: "compact", args: { customInstructions: "keep the plan" } });
+      expect(await pi.next()).toEqual({ id: "1", ok: true, result: { ok: true } });
+      expect(child.sent()).toContainEqual({ type: "compact", customInstructions: "keep the plan" });
+
+      panel.close();
       pi.socket.destroy();
     } finally {
       await daemon.close();

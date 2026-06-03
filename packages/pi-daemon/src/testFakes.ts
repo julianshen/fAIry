@@ -26,11 +26,27 @@ export class SilentChild extends EventEmitter implements ChildLike {
 /** A {@link import("./jsonLineProcess").Spawner} yielding a fresh silent child. */
 export const silentSpawn = (): ChildLike => new SilentChild();
 
-/** A minimal skills library for wiring tests (createDaemon requires one). */
-export const fakeSkills = (): SkillsLibrary => ({
+/** A Pi child that records what's written to its stdin (for asserting messages sent to Pi). */
+export class RecordingChild extends EventEmitter implements ChildLike {
+  stdout = new SilentStream();
+  stderr = new SilentStream();
+  writes: string[] = [];
+  stdin = { write: (chunk: string): void => void this.writes.push(chunk) };
+  kill(): boolean {
+    return true;
+  }
+  /** The messages sent to Pi, parsed from the NDJSON writes. */
+  sent(): unknown[] {
+    return this.writes.map((w) => JSON.parse(w));
+  }
+}
+
+/** A skills library double for tests; override any method via `over`. */
+export const fakeSkills = (over: Partial<SkillsLibrary> = {}): SkillsLibrary => ({
   preamble: () => Promise.resolve("# skills"),
   listInteractions: () => Promise.resolve([]),
   readInteraction: () => Promise.resolve(null),
+  ...over,
 });
 
 /**

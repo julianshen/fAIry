@@ -17,6 +17,8 @@ export interface ConversationSessionOptions {
   createDriver: (onBeat: (beat: PanelBeat) => void) => ConversationDriver;
   /** Close the connection if it doesn't authenticate within this many ms. */
   authTimeoutMs?: number;
+  /** Fired once the token handshake succeeds and the driver is up. */
+  onAuthenticated?: () => void;
   onClose?: () => void;
 }
 
@@ -40,8 +42,10 @@ export class ConversationSession extends AuthenticatedSession {
   }
 
   protected onAuthenticated(): void {
-    // May throw (Pi spawn failure); the base then closes without authenticating.
+    // May throw (Pi spawn failure); the base then closes without authenticating
+    // and the callback below doesn't fire.
     this.driver = this.opts.createDriver((beat) => this.sendBeat(beat));
+    this.opts.onAuthenticated?.();
   }
 
   protected onAuthedMessage(msg: unknown): void {

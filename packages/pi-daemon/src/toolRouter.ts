@@ -22,7 +22,8 @@ export interface ToolRouter {
 
 export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
   // A Map (not a plain object) so a tool name colliding with an Object prototype
-  // member ("constructor", …) can't resolve to an inherited function.
+  // member ("constructor", …) can't resolve to an inherited function. (Same
+  // guard as the extension's createToolExecutor — separate runtime, not shared.)
   const handlers = new Map<string, (args: Record<string, unknown>) => Promise<unknown>>([
     [
       "compact",

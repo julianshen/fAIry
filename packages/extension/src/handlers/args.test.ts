@@ -23,21 +23,25 @@ describe("requireNumber", () => {
 });
 
 describe("optionalString", () => {
-  it("returns the string or the fallback", () => {
+  it("returns the string, or the fallback only when the key is absent", () => {
     expect(optionalString({ s: "a" }, "s")).toBe("a");
     expect(optionalString({}, "s")).toBeUndefined();
     expect(optionalString({}, "s", "def")).toBe("def");
+    expect(optionalString({ s: undefined }, "s", "def")).toBe("def");
   });
-  it("falls back when the value is the wrong type", () => {
-    expect(optionalString({ s: 5 }, "s", "def")).toBe("def");
+  it("throws when the value is present but not a string (don't silently default)", () => {
+    expect(() => optionalString({ s: 5 }, "s", "def")).toThrow(/s.*string/);
   });
 });
 
 describe("optionalNumber", () => {
-  it("returns the number or the fallback", () => {
+  it("returns the number, or the fallback only when the key is absent", () => {
     expect(optionalNumber({ n: 3 }, "n")).toBe(3);
     expect(optionalNumber({}, "n", 7)).toBe(7);
-    expect(optionalNumber({ n: "3" }, "n", 7)).toBe(7);
-    expect(optionalNumber({ n: Number.NaN }, "n", 7)).toBe(7);
+    expect(optionalNumber({ n: undefined }, "n", 7)).toBe(7);
+  });
+  it("throws when the value is present but not a usable number", () => {
+    expect(() => optionalNumber({ n: "3" }, "n", 7)).toThrow(/n.*number/);
+    expect(() => optionalNumber({ n: Number.NaN }, "n", 7)).toThrow(/n.*number/);
   });
 });

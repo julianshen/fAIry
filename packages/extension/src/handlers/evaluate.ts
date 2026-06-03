@@ -3,7 +3,31 @@ import { requireString } from "./args";
 
 interface RuntimeEvaluateResult {
   exceptionDetails?: { text: string; exception?: { description?: string } };
-  result?: { value?: unknown };
+  result?: { value?: unknown; unserializableValue?: string };
+}
+
+/**
+ * With `returnByValue`, CDP can't JSON-encode some primitives, so it sends them
+ * as a string in `unserializableValue` (with `value` absent). Decode those back
+ * so a successful `NaN`/`Infinity`/`-0`/bigint result isn't collapsed to
+ * `undefined`.
+ */
+function decodeRemote(result: { value?: unknown; unserializableValue?: string }): unknown {
+  if (result.value !== undefined) return result.value;
+  const u = result.unserializableValue;
+  if (u === undefined) return undefined;
+  switch (u) {
+    case "NaN":
+      return Number.NaN;
+    case "Infinity":
+      return Number.POSITIVE_INFINITY;
+    case "-Infinity":
+      return Number.NEGATIVE_INFINITY;
+    case "-0":
+      return -0;
+  }
+  if (/^-?\d+n$/.test(u)) return BigInt(u.slice(0, -1));
+  return u;
 }
 
 /**
@@ -21,7 +45,7 @@ export async function evaluateExpression(cdp: CdpClient, expression: string): Pr
   if (res.exceptionDetails) {
     throw new Error(res.exceptionDetails.exception?.description ?? res.exceptionDetails.text);
   }
-  return res.result?.value;
+  return res.result ? decodeRemote(res.result) : undefined;
 }
 
 /**

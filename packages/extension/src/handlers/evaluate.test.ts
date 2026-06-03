@@ -29,6 +29,27 @@ describe("evaluateExpression", () => {
     });
     await expect(evaluateExpression(cdp, "(")).rejects.toThrow("Syntax error");
   });
+
+  it("decodes non-JSON primitives returned via unserializableValue", async () => {
+    const cases: Array<[string, (v: unknown) => void]> = [
+      ["NaN", (v) => expect(v).toBeNaN()],
+      ["Infinity", (v) => expect(v).toBe(Infinity)],
+      ["-Infinity", (v) => expect(v).toBe(-Infinity)],
+      ["-0", (v) => expect(Object.is(v, -0)).toBe(true)],
+      ["42n", (v) => expect(v).toBe(42n)],
+    ];
+    for (const [unserializableValue, check] of cases) {
+      const cdp = fakeCdp({ "Runtime.evaluate": { result: { unserializableValue } } });
+      check(await evaluateExpression(cdp, "x"));
+    }
+  });
+
+  it("still returns falsy JSON values (0, false, null) as themselves", async () => {
+    for (const value of [0, false, null, ""]) {
+      const cdp = fakeCdp({ "Runtime.evaluate": { result: { value } } });
+      expect(await evaluateExpression(cdp, "x")).toBe(value);
+    }
+  });
 });
 
 describe("evaluate (tool)", () => {

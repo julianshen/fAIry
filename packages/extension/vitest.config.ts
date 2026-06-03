@@ -25,11 +25,13 @@ export default defineConfig({
         // chrome.* / SW glue — exercised by the E2E + manual load, not units.
         "src/background.ts",
         "src/connection.ts",
-        // The real chrome.debugger adapter — browser glue (the CdpClient seam is
-        // unit-tested with a fake; this needs a live browser).
+        // Real browser adapters — glue (the seams are unit-tested with fakes;
+        // these need a live browser).
         "src/cdp/debuggerClient.ts",
-        // Type-only (the CdpClient interface) — no runtime code to cover.
+        "src/tabs/chromeTabs.ts",
+        // Type-only interfaces — no runtime code to cover.
         "src/cdp/cdpClient.ts",
+        "src/tabs/tabsApi.ts",
       ],
       thresholds: {
         lines: 90,

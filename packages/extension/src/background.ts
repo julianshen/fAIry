@@ -1,7 +1,10 @@
 import { connectBridge, type BridgeClient } from "./bridgeClient";
 import { createDebuggerCdpClient } from "./cdp/debuggerClient";
+import { createEventBuffer } from "./cdp/eventBuffer";
 import { loadConnection } from "./connection";
 import { createBrowserHandlers } from "./handlers/registry";
+import { createAgentTabs } from "./tabs/agentTabs";
+import { createChromeTabsApi } from "./tabs/chromeTabs";
 import { createToolExecutor } from "./toolExecutor";
 
 // Background service worker.
@@ -16,10 +19,32 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) 
   console.error("[fairy] failed to set side-panel behavior", err);
 });
 
-// The executor only drives the active tab, so it's stable across reconnects —
-// build it once. (Rebuilding per reconnect would also re-register a
-// chrome.debugger.onDetach listener each time, leaking dead closures.)
-const executor = createToolExecutor(createBrowserHandlers(createDebuggerCdpClient()));
+// The agent-tab binding (the cross-tab security model), the chrome.tabs seam,
+// and the CDP event buffer are all stable for the worker's life — build them
+// once. (Rebuilding the CDP client per reconnect would also re-register
+// chrome.debugger listeners each time, leaking dead closures.)
+const agentTabs = createAgentTabs();
+const tabsApi = createChromeTabsApi();
+const events = createEventBuffer();
+const cdp = createDebuggerCdpClient(agentTabs, events);
+const executor = createToolExecutor(createBrowserHandlers({ cdp, tabs: tabsApi, agentTabs, events }));
+
+// Bind the agent to the tab the user started the task on (the panel signals us).
+// Until a task starts, nothing is bound and CDP commands refuse to run.
+chrome.runtime.onMessage.addListener((msg: unknown) => {
+  if ((msg as { type?: unknown })?.type === "agent:taskStart") {
+    tabsApi
+      .queryActive()
+      .then((id) => {
+        if (id !== null) agentTabs.bindSession(id);
+      })
+      .catch((err) => console.error("[fairy] could not bind the active tab", err));
+  }
+});
+
+// If a tab the agent owns is closed (by the user or the page), drop ownership so
+// we never try to drive a dead tab.
+chrome.tabs.onRemoved.addListener((tabId) => agentTabs.remove(tabId));
 
 let bridge: BridgeClient | null = null;
 // Serialize (re)connects so two storage-change events can't close-then-reassign

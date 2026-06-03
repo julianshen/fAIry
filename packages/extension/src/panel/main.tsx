@@ -34,6 +34,9 @@ function App(): ReactElement {
 
   const send = (task: string): void => {
     controller.reset(); // clear the previous run; the daemon re-echoes the task as a beat
+    // Bind the agent to the tab the user is on right now: starting a task here is
+    // the consent to drive that tab (the background SW resolves the active tab).
+    chrome.runtime.sendMessage({ type: "agent:taskStart" }).catch(() => {});
     clientRef.current?.start(task);
   };
   const stop = (): void => clientRef.current?.stop();

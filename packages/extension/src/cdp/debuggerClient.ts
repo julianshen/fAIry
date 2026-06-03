@@ -1,16 +1,19 @@
 import type { CdpClient } from "./cdpClient";
+import type { CdpEventBuffer } from "./eventBuffer";
+import type { AgentTabs } from "../tabs/agentTabs";
 
 /**
  * The real {@link CdpClient}, backed by `chrome.debugger`. Glue — it can't run
  * without a live browser, so it's coverage-excluded; all tool logic is tested
  * against a fake CdpClient instead.
  *
- * Attaches lazily to the focused tab and re-attaches when the agent's focus
- * moves (full multi-tab orchestration — `tabOpen`/`tabSwitch` — is a later PR).
- * `chrome.debugger.sendCommand` is the exact analogue of the POC's
- * `webContents.debugger.sendCommand`.
+ * Security: it attaches to `agentTabs.current()` — the tab the agent is *bound*
+ * to — never to whatever tab the user happens to be focused on. That's the
+ * cross-tab guard: a user switching to their bank tab mid-task can't hand the
+ * agent control of it. `chrome.debugger.sendCommand` is the exact analogue of
+ * the POC's `webContents.debugger.sendCommand`.
  */
-export function createDebuggerCdpClient(): CdpClient {
+export function createDebuggerCdpClient(agentTabs: AgentTabs, events: CdpEventBuffer): CdpClient {
   let attached: number | null = null;
 
   // The debugger detaches on its own when DevTools opens, the tab navigates
@@ -18,6 +21,12 @@ export function createDebuggerCdpClient(): CdpClient {
   // re-attaches instead of sending to a dead session.
   chrome.debugger.onDetach.addListener((source) => {
     if (source.tabId === attached) attached = null;
+  });
+
+  // Feed subscribed CDP events into the buffer; the agent drains them with
+  // cdpCollect. Only events from the attached (agent) tab count.
+  chrome.debugger.onEvent.addListener((source, method, params) => {
+    if (source.tabId === attached) events.push(method, params ?? null, Date.now());
   });
 
   // Concurrent sends (e.g. screenshot's parallel reads) must not each fire
@@ -29,9 +38,8 @@ export function createDebuggerCdpClient(): CdpClient {
     if (attaching) return attaching;
     attaching = (async () => {
       try {
-        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-        if (typeof tab?.id !== "number") throw new Error("no active tab to drive");
-        const tabId = tab.id;
+        const tabId = agentTabs.current();
+        if (tabId === null) throw new Error("no tab bound to the agent (start a task first)");
         if (attached !== tabId) {
           if (attached !== null) {
             await chrome.debugger.detach({ tabId: attached }).catch(() => {});

@@ -11,3 +11,67 @@
   text-rendering: optimizeLegibility;
 }
 ::selection { background: var(--accent-soft); }
+
+/* ── A2UI generative UI ─────────────────────────────────────────── */
+.ui-item {
+  margin: 8px 0;
+}
+.a2ui {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.a2ui-text[data-variant="heading"] {
+  font-weight: 600;
+  font-size: 1.05em;
+}
+.a2ui-text[data-variant="caption"] {
+  opacity: 0.7;
+  font-size: 0.85em;
+}
+.a2ui-card {
+  border: 1px solid var(--border-3, rgba(255, 255, 255, 0.12));
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.a2ui-card-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.a2ui-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.a2ui-list {
+  margin: 0;
+  padding-left: 1.25em;
+}
+.a2ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+.a2ui-table caption {
+  text-align: left;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+.a2ui-table th,
+.a2ui-table td {
+  border: 1px solid var(--border-3, rgba(255, 255, 255, 0.12));
+  padding: 4px 8px;
+  text-align: left;
+}
+.a2ui-table th {
+  font-weight: 600;
+}
+.a2ui-chart-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.a2ui-unknown {
+  opacity: 0.6;
+  font-size: 0.85em;
+  font-style: italic;
+}

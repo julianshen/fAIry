@@ -16,6 +16,9 @@ export { DEFAULT_SUGGESTIONS } from "./suggestions";
 export { Icon } from "./components/Icon";
 export type { IconName } from "./components/Icon";
 
+export { A2UIView } from "./a2ui/renderA2UI";
+export type { A2UIMessage, A2UINode, A2UIChartKind, A2UITextVariant } from "./a2ui/types";
+
 export type {
   AgentId,
   Agent,

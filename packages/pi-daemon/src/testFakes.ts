@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { createConnection } from "node:net";
 import type { ChildLike, ReadableLine } from "./jsonLineProcess";
+import type { SkillsLibrary } from "./skillsLibrary";
 
 // Shared test doubles for the "Pi never emits output" case — enough to exercise
 // wiring (server bring-up, auth, the synchronous opening beats) without a real
@@ -24,6 +25,13 @@ export class SilentChild extends EventEmitter implements ChildLike {
 
 /** A {@link import("./jsonLineProcess").Spawner} yielding a fresh silent child. */
 export const silentSpawn = (): ChildLike => new SilentChild();
+
+/** A minimal skills library for wiring tests (createDaemon requires one). */
+export const fakeSkills = (): SkillsLibrary => ({
+  preamble: () => Promise.resolve("# skills"),
+  listInteractions: () => Promise.resolve([]),
+  readInteraction: () => Promise.resolve(null),
+});
 
 /**
  * A line-framed TCP client, as the Pi `-e` extension speaks to the piBridge:

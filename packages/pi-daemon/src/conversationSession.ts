@@ -5,6 +5,7 @@ import type { PanelBeat } from "./beatMapper";
 export interface ConversationDriver {
   start(task: string): void;
   stop(): void;
+  compact(customInstructions?: string): void;
   dispose(): void;
 }
 
@@ -52,6 +53,13 @@ export class ConversationSession extends AuthenticatedSession {
       this.driver?.stop();
     }
     // Unknown commands are ignored.
+  }
+
+  /** Compact this conversation's history — invoked by the daemon's tool-router
+   *  when the active conversation's Pi calls `browser_compact`. No-op if the
+   *  driver isn't up yet (pre-auth) or already disposed. */
+  compact(customInstructions?: string): void {
+    this.driver?.compact(customInstructions);
   }
 
   protected onDisposed(): void {

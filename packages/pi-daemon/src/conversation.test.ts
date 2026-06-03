@@ -67,6 +67,14 @@ describe("ConversationController", () => {
     expect(controller.isRunning).toBe(false);
   });
 
+  it("compact() asks Pi to compact, with optional custom instructions", () => {
+    const { controller, sent } = setup();
+    controller.compact("keep the plan");
+    expect(sent()).toContainEqual({ type: "compact", customInstructions: "keep the plan" });
+    controller.compact();
+    expect(sent()).toContainEqual({ type: "compact" });
+  });
+
   it("resets mapper state between tasks", () => {
     const { controller, beats, feed } = setup();
     controller.start("first");

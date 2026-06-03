@@ -9,6 +9,7 @@ import type { ChildLike } from "./jsonLineProcess";
 import { createPairingStore } from "./pairing";
 import { resolvePaths, type DaemonPaths } from "./paths";
 import { createFileSettingsStore } from "./settingsStore";
+import { createSkillsLibrary } from "./skillsLibrary";
 import { acquireSingleInstanceLock, type LockHandle } from "./singleInstance";
 import { mintToken, writeToken } from "./tokenStore";
 
@@ -57,6 +58,7 @@ async function main(): Promise<void> {
     const daemon = await createDaemon({
       token,
       settings,
+      skills: createSkillsLibrary(SKILLS_ROOT),
       pairing,
       spawnPi: piSpawner(paths),
       ports: { http: httpPort },
@@ -85,6 +87,9 @@ const BROWSER_EXTENSION = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../pi-extension/browser-bridge.ts",
 );
+
+/** Bundled skills the daemon's tool-router serves (SKILL.md + interaction-skills/). */
+const SKILLS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../skills");
 
 /**
  * Spawn `pi --mode rpc` against the daemon's isolated config dir, loading the

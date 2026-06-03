@@ -47,6 +47,11 @@ export class ConversationController {
     this.session.abort();
   }
 
+  /** Compact this conversation's Pi history (the agent's `browser_compact` tool). */
+  compact(customInstructions?: string): void {
+    this.session.compact(customInstructions);
+  }
+
   /** Terminate the Pi subprocess; ignore any trailing events it emits. */
   dispose(): void {
     this.disposed = true;

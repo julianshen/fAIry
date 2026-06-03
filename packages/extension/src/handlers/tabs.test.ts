@@ -51,6 +51,16 @@ describe("tabSwitch", () => {
     await expect(tabSwitch(tabs, agent, { id: "7" })).rejects.toThrow(/not.*agent/i);
     expect(agent.current()).toBe(1);
   });
+
+  it("leaves current unchanged when activation fails (owned tab went stale)", async () => {
+    const tabs = fakeTabs([{ id: 1, url: "a", title: "A", active: true }]);
+    const agent = createAgentTabs();
+    agent.bindSession(1);
+    agent.add(2); // owned but missing from the store → activate(2) rejects
+    agent.setCurrent(1); // currently on tab 1
+    await expect(tabSwitch(tabs, agent, { id: "2" })).rejects.toThrow();
+    expect(agent.current()).toBe(1); // not moved onto the dead tab
+  });
 });
 
 describe("tabClose", () => {

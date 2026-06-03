@@ -43,8 +43,11 @@ export async function tabSwitch(
   args: Record<string, unknown>,
 ): Promise<TabDescriptor> {
   const id = tabId(args);
-  agentTabs.setCurrent(id); // refuses a non-owned tab — the cross-tab guard
+  if (!agentTabs.isOwned(id)) throw new Error(`tab ${id} is not agent-controlled`);
+  // Activate first; only move `current` once it succeeds, so a failed switch to
+  // a stale (closed) tab doesn't wedge the session pointing at a dead tab.
   const tab = await tabs.activate(id);
+  agentTabs.setCurrent(id);
   return describe(tab, agentTabs);
 }
 

@@ -18,7 +18,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
 
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals", "chrome"]
   },
-  "include": ["src", "vitest.config.ts"]
+  "include": ["src", "vite.config.ts", "vitest.config.ts", "manifest.config.ts"]
 }

@@ -1,3 +1,4 @@
+import type { ActionRecorder } from "./actionRecorder";
 import type { DomainSkills } from "./domainSkills";
 import type { HelperRegistry } from "./helperRegistry";
 import type { SkillsLibrary } from "./skillsLibrary";
@@ -11,8 +12,12 @@ export interface ToolRouterDeps {
   helpers: HelperRegistry;
   /** Per-site notes the agent saves/searches (pure persistence, all local). */
   domainSkills: DomainSkills;
+  /** Records the agent's tool stream into replayable workflows. */
+  recorder: ActionRecorder;
   /** Relay a tool to the browser executor — used by callHelper to run an `evaluate`. */
   relay: (tool: string, args: Record<string, unknown>) => Promise<unknown>;
+  /** Route a tool through the full daemon-or-browser dispatch — used to replay workflow steps. */
+  dispatch: (tool: string, args: Record<string, unknown>) => Promise<unknown>;
 }
 
 /**
@@ -134,6 +139,45 @@ export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
       async (args) => ({
         removed: await deps.domainSkills.remove(requireString(args, "host"), requireString(args, "name")),
       }),
+    ],
+    // Workflows — record/list/delete are local; run replays steps through dispatch.
+    [
+      "workflowRecordStart",
+      async (args) => {
+        deps.recorder.start(requireString(args, "name"), optionalString(args, "description"));
+        return { recording: args.name };
+      },
+    ],
+    [
+      "workflowRecordStop",
+      async () => {
+        const wf = deps.recorder.stop();
+        return { name: wf.name, steps: wf.steps.length };
+      },
+    ],
+    ["workflowList", async () => deps.recorder.list()],
+    ["workflowDelete", async (args) => ({ removed: deps.recorder.remove(requireString(args, "name")) })],
+    [
+      "workflowRun",
+      async (args) => {
+        const name = requireString(args, "name");
+        const wf = deps.recorder.get(name);
+        if (!wf) throw new Error(`workflow not found: ${name}`);
+        const stepDelayMs = optionalNumber(args, "stepDelayMs");
+        const results: Array<{ tool: string; ok: boolean; error?: string }> = [];
+        for (const step of wf.steps) {
+          try {
+            await deps.dispatch(step.tool, step.args);
+            results.push({ tool: step.tool, ok: true });
+          } catch (err) {
+            // A step failed — replaying the rest on a broken page is pointless.
+            results.push({ tool: step.tool, ok: false, error: (err as Error).message });
+            break;
+          }
+          if (stepDelayMs) await new Promise((r) => setTimeout(r, stepDelayMs));
+        }
+        return { name, steps: wf.steps.length, results };
+      },
     ],
   ]);
 

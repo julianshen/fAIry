@@ -28,13 +28,40 @@ function fakeHelpers(initial: JsHelper[] = []): HelperRegistry {
   };
 }
 
+/** A stateful in-memory ActionRecorder double. */
+function fakeRecorder(over: Partial<import("./actionRecorder").ActionRecorder> = {}) {
+  const saved = new Map<string, { name: string; steps: Array<{ tool: string; args: Record<string, unknown> }> }>();
+  let active: { name: string; steps: Array<{ tool: string; args: Record<string, unknown> }> } | null = null;
+  const base: import("./actionRecorder").ActionRecorder = {
+    start: (name) => {
+      active = { name, steps: [] };
+    },
+    capture: (tool, args) => void active?.steps.push({ tool, args }),
+    stop: () => {
+      const wf = { ...active!, description: undefined, createdAt: 0, updatedAt: 0 };
+      saved.set(wf.name, active!);
+      active = null;
+      return wf;
+    },
+    list: () => [...saved.values()].map((w) => ({ name: w.name, steps: w.steps.length })),
+    get: (name) => {
+      const w = saved.get(name);
+      return w ? { ...w, description: undefined, createdAt: 0, updatedAt: 0 } : undefined;
+    },
+    remove: (name) => saved.delete(name),
+  };
+  return { ...base, ...over, saved };
+}
+
 function deps(over: Partial<ToolRouterDeps> = {}): ToolRouterDeps {
   return {
     compact: () => {},
     skills: fakeSkills(),
     helpers: fakeHelpers(),
     domainSkills: fakeDomainSkills(),
+    recorder: fakeRecorder(),
     relay: () => Promise.resolve({ ok: true, value: undefined }),
+    dispatch: () => Promise.resolve({ ok: true }),
     ...over,
   };
 }
@@ -56,6 +83,11 @@ describe("createToolRouter", () => {
       "domainSkillSave",
       "domainSkillSearch",
       "domainSkillRemove",
+      "workflowRecordStart",
+      "workflowRecordStop",
+      "workflowList",
+      "workflowRun",
+      "workflowDelete",
     ]) {
       expect(router.owns(t), t).toBe(true);
     }
@@ -222,6 +254,82 @@ describe("createToolRouter", () => {
       await expect(router.handle("domainSkillSave", { host: "x.com", name: "n.md" })).rejects.toThrow(/body/i);
       await expect(router.handle("domainSkillSearch", {})).rejects.toThrow(/query/i);
       await expect(router.handle("domainSkillSearch", { query: "g", limit: "no" })).rejects.toThrow(/limit/i);
+    });
+  });
+
+  describe("workflows", () => {
+    it("record start/stop persists the captured steps", async () => {
+      const recorder = fakeRecorder();
+      const router = createToolRouter(deps({ recorder }));
+      expect(await router.handle("workflowRecordStart", { name: "f" })).toEqual({ recording: "f" });
+      recorder.capture("click", { x: 1, y: 2 }); // simulated by the daemon relay
+      expect(await router.handle("workflowRecordStop", {})).toEqual({ name: "f", steps: 1 });
+      expect(await router.handle("workflowList", {})).toEqual([{ name: "f", steps: 1 }]);
+    });
+
+    it("workflowRun replays each step through dispatch (not the recorder, not relay)", async () => {
+      const recorder = fakeRecorder();
+      recorder.start("f");
+      recorder.capture("navigate", { url: "https://x.com" });
+      recorder.capture("click", { x: 3, y: 4 });
+      recorder.stop();
+      const dispatch = vi.fn(() => Promise.resolve({ ok: true }));
+      const router = createToolRouter(deps({ recorder, dispatch }));
+      const result = await router.handle("workflowRun", { name: "f" });
+      expect(dispatch.mock.calls).toEqual([
+        ["navigate", { url: "https://x.com" }],
+        ["click", { x: 3, y: 4 }],
+      ]);
+      expect(result).toEqual({
+        name: "f",
+        steps: 2,
+        results: [
+          { tool: "navigate", ok: true },
+          { tool: "click", ok: true },
+        ],
+      });
+    });
+
+    it("workflowRun stops at the first failing step", async () => {
+      const recorder = fakeRecorder();
+      recorder.start("f");
+      recorder.capture("navigate", { url: "x" });
+      recorder.capture("click", { x: 1, y: 1 });
+      recorder.stop();
+      const dispatch = vi.fn((tool: string) =>
+        tool === "navigate" ? Promise.reject(new Error("boom")) : Promise.resolve({}),
+      );
+      const router = createToolRouter(deps({ recorder, dispatch }));
+      const result = (await router.handle("workflowRun", { name: "f" })) as { results: unknown[] };
+      expect(result.results).toEqual([{ tool: "navigate", ok: false, error: "boom" }]);
+      expect(dispatch).toHaveBeenCalledTimes(1); // didn't replay click after navigate failed
+    });
+
+    it("workflowRun honors stepDelayMs between steps", async () => {
+      const recorder = fakeRecorder();
+      recorder.start("f");
+      recorder.capture("click", { x: 1, y: 1 });
+      recorder.capture("click", { x: 2, y: 2 });
+      recorder.stop();
+      const router = createToolRouter(deps({ recorder }));
+      const result = (await router.handle("workflowRun", { name: "f", stepDelayMs: 1 })) as {
+        results: unknown[];
+      };
+      expect(result.results).toHaveLength(2);
+    });
+
+    it("workflowRun throws for an unknown workflow", async () => {
+      const router = createToolRouter(deps());
+      await expect(router.handle("workflowRun", { name: "nope" })).rejects.toThrow(/workflow not found/i);
+    });
+
+    it("workflowDelete reports whether it existed", async () => {
+      const recorder = fakeRecorder();
+      recorder.start("f");
+      recorder.stop();
+      const router = createToolRouter(deps({ recorder }));
+      expect(await router.handle("workflowDelete", { name: "f" })).toEqual({ removed: true });
+      expect(await router.handle("workflowDelete", { name: "f" })).toEqual({ removed: false });
     });
   });
 

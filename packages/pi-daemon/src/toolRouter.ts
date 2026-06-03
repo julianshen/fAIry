@@ -1,3 +1,4 @@
+import type { HelperRegistry } from "./helperRegistry";
 import type { SkillsLibrary } from "./skillsLibrary";
 
 export interface ToolRouterDeps {
@@ -5,6 +6,10 @@ export interface ToolRouterDeps {
   compact: (customInstructions?: string) => void;
   /** The bundled skills library. */
   skills: SkillsLibrary;
+  /** Persistent JS-helper registry (save/list/remove are local; callHelper relays). */
+  helpers: HelperRegistry;
+  /** Relay a tool to the browser executor — used by callHelper to run an `evaluate`. */
+  relay: (tool: string, args: Record<string, unknown>) => Promise<unknown>;
 }
 
 /**
@@ -18,6 +23,18 @@ export interface ToolRouterDeps {
 export interface ToolRouter {
   owns(tool: string): boolean;
   handle(tool: string, args: Record<string, unknown>): Promise<unknown>;
+}
+
+/** Narrow a required non-empty string arg, or throw a named error (the wire args are untyped). */
+function requireString(args: Record<string, unknown>, key: string): string {
+  const v = args[key];
+  if (typeof v !== "string" || v.trim() === "") throw new Error(`${key} must be a non-empty string`);
+  return v;
+}
+
+function optionalString(args: Record<string, unknown>, key: string): string | undefined {
+  const v = args[key];
+  return typeof v === "string" ? v : undefined;
 }
 
 export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
@@ -38,10 +55,41 @@ export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
     [
       "skillReadInteraction",
       async (args) => {
-        if (typeof args.name !== "string") throw new Error("name must be a string");
-        const body = await deps.skills.readInteraction(args.name);
+        const body = await deps.skills.readInteraction(requireString(args, "name"));
         if (body === null) throw new Error(`skill not found: ${args.name}`);
         return body;
+      },
+    ],
+    [
+      "saveHelper",
+      async (args) => {
+        deps.helpers.save({
+          name: requireString(args, "name"),
+          expression: requireString(args, "expression"),
+          description: optionalString(args, "description"),
+        });
+        return { ok: true };
+      },
+    ],
+    [
+      "listHelpers",
+      () =>
+        Promise.resolve(deps.helpers.list().map((h) => ({ name: h.name, description: h.description }))),
+    ],
+    ["removeHelper", async (args) => ({ removed: deps.helpers.remove(requireString(args, "name")) })],
+    [
+      "callHelper",
+      // Hybrid: the helper SOURCE lives on the daemon, but it must RUN in the
+      // page — so resolve it here and relay an `evaluate` to the browser.
+      async (args) => {
+        const name = requireString(args, "name");
+        if (!deps.helpers.get(name)) throw new Error(`helper not found: ${name}`);
+        // Missing args is fine (→ []); a present-but-non-array is a malformed call.
+        if (args.args !== undefined && !Array.isArray(args.args)) {
+          throw new Error("args must be an array");
+        }
+        const callArgs = Array.isArray(args.args) ? args.args : [];
+        return deps.relay("evaluate", { expression: deps.helpers.callExpression(name, callArgs) });
       },
     ],
   ]);

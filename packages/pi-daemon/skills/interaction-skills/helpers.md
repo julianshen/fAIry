@@ -28,7 +28,7 @@ browser_save_helper({
 })
 ```
 
-`(x) => ...`, `async (...) => ...`, IIFE returning a function — all valid. The registry doesn't care, it just injects `window.__horizon.helpers[name] = (your expression)`.
+`(x) => ...`, `async (...) => ...`, IIFE returning a function — all valid. Call a saved helper with `browser_call_helper({ name, args })`; the registry runs your expression in the page and applies it to `args`.
 
 ## Call
 

@@ -2,6 +2,7 @@ import { BridgeServer } from "./bridgeServer";
 import type { BridgeSession } from "./bridgeSession";
 import { ConversationServer } from "./conversationServer";
 import type { ConversationSession } from "./conversationSession";
+import type { HelperRegistry } from "./helperRegistry";
 import { HttpServer } from "./httpServer";
 import type { ChildLike } from "./jsonLineProcess";
 import type { PairingStore } from "./pairing";
@@ -23,6 +24,8 @@ export interface DaemonOptions {
   settings: SettingsStore;
   /** Bundled skills library — served by the daemon's tool-router (not the browser). */
   skills: SkillsLibrary;
+  /** Persistent JS-helper registry — served by the tool-router (callHelper relays an evaluate). */
+  helpers: HelperRegistry;
   /** Spawn Pi for a conversation, given the loopback bridge it should connect back on. */
   spawnPi: (bridge: PiBridgeInfo) => ChildLike;
   /** Loopback host for all servers. Defaults to 127.0.0.1. */
@@ -98,10 +101,17 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
   // correlated to its spawning ConversationSession.
   let activeConversation: ConversationSession | undefined;
 
+  // Relay a tool to the active Chrome executor (or fail if none is connected).
+  const relayToBrowser = (tool: string, args: Record<string, unknown>): Promise<unknown> =>
+    chrome ? chrome.requestTool(tool, args) : Promise.reject(new Error("no browser connected"));
+
   // Daemon-owned tools (helpers/skills/workflows/compact) are handled here, not
-  // forwarded to the browser. compact reaches the active conversation's Pi.
+  // forwarded to the browser. compact reaches the active conversation's Pi;
+  // callHelper resolves the helper source then relays an `evaluate`.
   const router = createToolRouter({
     skills: opts.skills,
+    helpers: opts.helpers,
+    relay: relayToBrowser,
     compact: (customInstructions) => {
       if (!activeConversation?.compact(customInstructions)) {
         // Undefined (no conversation) or false (not yet authenticated / disposed):
@@ -117,10 +127,8 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     authTimeoutMs,
     port: opts.ports?.piBridge,
     // Route daemon-owned tools locally; relay everything else to the browser.
-    requestTool: (tool, args) => {
-      if (router.owns(tool)) return router.handle(tool, args);
-      return chrome ? chrome.requestTool(tool, args) : Promise.reject(new Error("no browser connected"));
-    },
+    requestTool: (tool, args) =>
+      router.owns(tool) ? router.handle(tool, args) : relayToBrowser(tool, args),
   });
 
   // The WS ports are known only once those servers are listening (below); the

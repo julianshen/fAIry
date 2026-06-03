@@ -1,6 +1,22 @@
 import { randomBytes } from "node:crypto";
-import { chmodSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
+
+/**
+ * Read a JSON array from `file`, returning `[]` for the recoverable cases — a
+ * missing file (first run) or corrupt JSON — while letting a real I/O failure
+ * (permissions, etc.) surface rather than silently dropping state. The pair to
+ * {@link writeJsonFile} for the daemon's load-once JSON-array stores.
+ */
+export function loadJsonArray<T>(file: string): T[] {
+  try {
+    const data = JSON.parse(readFileSync(file, "utf8"));
+    return Array.isArray(data) ? (data as T[]) : [];
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT" || err instanceof SyntaxError) return [];
+    throw err;
+  }
+}
 
 /**
  * Atomically write a JSON file, creating parent directories as needed:

@@ -1,3 +1,4 @@
+import type { ActionRecorder } from "./actionRecorder";
 import { BridgeServer } from "./bridgeServer";
 import type { BridgeSession } from "./bridgeSession";
 import { ConversationServer } from "./conversationServer";
@@ -29,6 +30,8 @@ export interface DaemonOptions {
   helpers: HelperRegistry;
   /** Per-site notes store — served by the tool-router (all local). */
   domainSkills: DomainSkills;
+  /** Records the agent's tool stream into replayable workflows (tool-router served). */
+  recorder: ActionRecorder;
   /** Spawn Pi for a conversation, given the loopback bridge it should connect back on. */
   spawnPi: (bridge: PiBridgeInfo) => ChildLike;
   /** Loopback host for all servers. Defaults to 127.0.0.1. */
@@ -108,14 +111,26 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
   const relayToBrowser = (tool: string, args: Record<string, unknown>): Promise<unknown> =>
     chrome ? chrome.requestTool(tool, args) : Promise.reject(new Error("no browser connected"));
 
-  // Daemon-owned tools (helpers/skills/workflows/compact) are handled here, not
-  // forwarded to the browser. compact reaches the active conversation's Pi;
-  // callHelper resolves the helper source then relays an `evaluate`.
+  // The full routing: daemon-owned tools handled locally, everything else relayed
+  // to the browser. A hoisted declaration so the router's `dispatch` (workflow
+  // replay) and requestTool can both close over it while it forward-references
+  // `router` below. It carries NO capture hook, so replaying a workflow's steps
+  // doesn't re-record them.
+  function route(tool: string, args: Record<string, unknown>): Promise<unknown> {
+    return router.owns(tool) ? router.handle(tool, args) : relayToBrowser(tool, args);
+  }
+
+  // Daemon-owned tools (helpers/skills/domain-skills/workflows/compact) are
+  // handled here, not forwarded to the browser. compact reaches the active
+  // conversation's Pi; callHelper resolves the helper source then relays an
+  // `evaluate`; workflowRun replays its steps through `dispatch`.
   const router = createToolRouter({
     skills: opts.skills,
     helpers: opts.helpers,
     domainSkills: opts.domainSkills,
+    recorder: opts.recorder,
     relay: relayToBrowser,
+    dispatch: route,
     compact: (customInstructions) => {
       if (!activeConversation?.compact(customInstructions)) {
         // Undefined (no conversation) or false (not yet authenticated / disposed):
@@ -130,9 +145,17 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     host,
     authTimeoutMs,
     port: opts.ports?.piBridge,
-    // Route daemon-owned tools locally; relay everything else to the browser.
-    requestTool: (tool, args) =>
-      router.owns(tool) ? router.handle(tool, args) : relayToBrowser(tool, args),
+    // Route the call, then (on success) offer browser-effecting tools to the
+    // recorder. Daemon-owned tools aren't browser steps and so aren't recorded
+    // (keeping compact / saveHelper / workflow* out of workflows) — EXCEPT
+    // callHelper, the one daemon tool that runs in the page (it relays an
+    // evaluate), so a workflow that uses a saved helper replays it. capture
+    // itself drops the browser *reads*.
+    requestTool: async (tool, args) => {
+      const result = await route(tool, args);
+      if (!router.owns(tool) || tool === "callHelper") opts.recorder.capture(tool, args);
+      return result;
+    },
   });
 
   // The WS ports are known only once those servers are listening (below); the

@@ -3,11 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { WebSocket } from "ws";
+import { createActionRecorder } from "./actionRecorder";
 import { createDaemon, type PiBridgeInfo } from "./daemon";
 import { createHelperRegistry } from "./helperRegistry";
 import { HttpServer } from "./httpServer";
 import { createPairingStore } from "./pairing";
-import { fakeDomainSkills, fakeHelpers, fakeSkills, lineClient, RecordingChild, SilentChild, silentSpawn } from "./testFakes";
+import { fakeDomainSkills, fakeHelpers, fakeRecorder, fakeSkills, lineClient, RecordingChild, SilentChild, silentSpawn } from "./testFakes";
 import type { SettingsStore } from "./settings";
 import type { PiConfig } from "./piConfig";
 
@@ -30,7 +31,7 @@ async function wsAuth(port: number): Promise<unknown> {
 
 describe("createDaemon", () => {
   it("starts the four loopback servers on distinct ports and authenticates each", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: silentSpawn });
     try {
       const { bridge, piBridge, conversation, http } = daemon.ports;
       expect(new Set([bridge, piBridge, conversation, http]).size).toBe(4);
@@ -56,6 +57,7 @@ describe("createDaemon", () => {
       skills: fakeSkills(),
       helpers: fakeHelpers(),
       domainSkills: fakeDomainSkills(),
+      recorder: fakeRecorder(),
       spawnPi: (bridge) => {
         spawns.push(bridge);
         return new SilentChild();
@@ -74,7 +76,7 @@ describe("createDaemon", () => {
   });
 
   it("relays a Pi tool call through to the connected Chrome bridge", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: silentSpawn });
     try {
       // Chrome side (executor): a WS client that answers every tool request.
       const chrome = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
@@ -102,7 +104,7 @@ describe("createDaemon", () => {
   });
 
   it("keeps the authenticated Chrome bridge when a second connection arrives unauthenticated", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: silentSpawn });
     try {
       // Chrome #1 authenticates and answers tool calls — the active bridge.
       const chrome1 = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
@@ -135,7 +137,7 @@ describe("createDaemon", () => {
   });
 
   it("reports 'no browser connected' after the Chrome bridge disconnects", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: silentSpawn });
     try {
       const chrome = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
       await once(chrome, "open");
@@ -159,7 +161,7 @@ describe("createDaemon", () => {
 
   it("routes compact to the active authenticated conversation's Pi", async () => {
     const child = new RecordingChild();
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), spawnPi: () => child });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: () => child });
     try {
       // Authenticate a conversation: Pi (the recording child) is spawned and the
       // session becomes the active conversation (promoted on auth).
@@ -188,7 +190,7 @@ describe("createDaemon", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "fairy-daemon-helpers-"));
     const helpers = createHelperRegistry(path.join(dir, "helpers.json"));
     helpers.save({ name: "double", expression: "(x) => x * 2" });
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers, domainSkills: fakeDomainSkills(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers, domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: silentSpawn });
     try {
       // Chrome answers `evaluate` and records the expression it was asked to run.
       let evaluated = "";
@@ -222,8 +224,74 @@ describe("createDaemon", () => {
     }
   });
 
+  it("records browser steps + callHelper (not other daemon tools) and replays them", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "fairy-daemon-wf-"));
+    const recorder = createActionRecorder(path.join(dir, "workflows.json"));
+    const helpers = createHelperRegistry(path.join(dir, "helpers.json"));
+    helpers.save({ name: "h", expression: "() => 1" });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers, domainSkills: fakeDomainSkills(), recorder, spawnPi: silentSpawn });
+    try {
+      // Chrome answers every browser tool, counting navigate + evaluate (callHelper relays evaluate).
+      const seen: Record<string, number> = {};
+      const chrome = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
+      await once(chrome, "open");
+      chrome.send(JSON.stringify({ type: "auth", token: TOKEN }));
+      await once(chrome, "message"); // auth_ok
+      chrome.on("message", (raw: Buffer) => {
+        const req = JSON.parse(raw.toString()) as { id?: string; tool?: string };
+        if (!req.id || !req.tool) return;
+        seen[req.tool] = (seen[req.tool] ?? 0) + 1;
+        chrome.send(JSON.stringify({ id: req.id, ok: true, result: { ok: true } }));
+      });
+
+      const pi = lineClient(daemon.ports.piBridge);
+      await once(pi.socket, "connect");
+      pi.send({ type: "auth", token: TOKEN });
+      expect(await pi.next()).toEqual({ type: "auth_ok" });
+
+      // Record: navigate (browser → recorded) + callHelper (daemon tool that runs
+      // in the page → recorded) + domainSkillSave (daemon write → NOT recorded).
+      pi.send({ id: "1", tool: "workflowRecordStart", args: { name: "go" } });
+      expect(await pi.next()).toEqual({ id: "1", ok: true, result: { recording: "go" } });
+      pi.send({ id: "2", tool: "navigate", args: { url: "https://x.com" } });
+      await pi.next();
+      pi.send({ id: "2b", tool: "callHelper", args: { name: "h", args: [] } });
+      await pi.next();
+      pi.send({ id: "2c", tool: "domainSkillSave", args: { host: "x.com", name: "n.md", body: "b" } });
+      await pi.next();
+      pi.send({ id: "3", tool: "workflowRecordStop", args: {} });
+      // steps:2 — navigate + callHelper; domainSkillSave excluded.
+      expect(await pi.next()).toEqual({ id: "3", ok: true, result: { name: "go", steps: 2 } });
+      expect(seen.navigate).toBe(1);
+      expect(seen.evaluate).toBe(1); // callHelper relayed one evaluate
+
+      // Replay: both steps re-dispatch (callHelper relays evaluate again), no re-recording.
+      pi.send({ id: "4", tool: "workflowRun", args: { name: "go", stepDelayMs: 0 } });
+      expect(await pi.next()).toEqual({
+        id: "4",
+        ok: true,
+        result: {
+          name: "go",
+          steps: 2,
+          results: [
+            { tool: "navigate", ok: true },
+            { tool: "callHelper", ok: true },
+          ],
+        },
+      });
+      expect(seen.navigate).toBe(2);
+      expect(seen.evaluate).toBe(2); // replayed callHelper relayed evaluate again
+
+      chrome.close();
+      pi.socket.destroy();
+    } finally {
+      await daemon.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("handles a daemon-owned tool (skill) locally — not relayed, no browser needed", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: silentSpawn });
     try {
       // No Chrome bridge connected: a browser tool would answer "no browser
       // connected", but a daemon-owned tool is served by the router.
@@ -240,7 +308,7 @@ describe("createDaemon", () => {
   });
 
   it("answers a Pi tool call with 'no browser connected' when no Chrome bridge is present", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: silentSpawn });
     try {
       const pi = lineClient(daemon.ports.piBridge);
       await once(pi.socket, "connect");
@@ -261,6 +329,7 @@ describe("createDaemon", () => {
       skills: fakeSkills(),
       helpers: fakeHelpers(),
       domainSkills: fakeDomainSkills(),
+      recorder: fakeRecorder(),
       spawnPi: silentSpawn,
       pairing: createPairingStore({ token: TOKEN, code: "PAIRCODE" }),
     });
@@ -278,7 +347,7 @@ describe("createDaemon", () => {
   });
 
   it("GET /info reports the live bridge + conversation ports", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: silentSpawn });
     try {
       const res = await fetch(`http://127.0.0.1:${daemon.ports.http}/info`, {
         headers: { authorization: `Bearer ${TOKEN}` },
@@ -294,7 +363,7 @@ describe("createDaemon", () => {
   });
 
   it("close() stops every server", async () => {
-    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), spawnPi: silentSpawn });
+    const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: silentSpawn });
     const httpPort = daemon.ports.http;
     await daemon.close();
     await expect(
@@ -307,7 +376,7 @@ describe("createDaemon", () => {
     const taken = await occupier.listen();
     try {
       await expect(
-        createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), spawnPi: silentSpawn, ports: { http: taken } }),
+        createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: silentSpawn, ports: { http: taken } }),
       ).rejects.toBeDefined();
     } finally {
       await occupier.close();

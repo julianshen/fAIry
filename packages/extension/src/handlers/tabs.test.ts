@@ -5,9 +5,16 @@ import { fakeTabs } from "../tabs/testTabs";
 import { tabClose, tabList, tabOpen, tabSwitch } from "./tabs";
 
 describe("tabOpen", () => {
+  /** A session must be bound (via taskStart) before the agent can open tabs. */
+  function boundAgent() {
+    const agent = createAgentTabs();
+    agent.bindSession(1);
+    return agent;
+  }
+
   it("creates a tab, takes ownership, makes it current, returns its descriptor", async () => {
     const tabs = fakeTabs();
-    const agent = createAgentTabs();
+    const agent = boundAgent();
     const result = await tabOpen(tabs, agent, { url: "https://example.com" });
     expect(result).toMatchObject({ url: "https://example.com", isActive: true });
     const id = Number((result as { id: string }).id);
@@ -17,15 +24,20 @@ describe("tabOpen", () => {
 
   it("opens a blank tab when no url is given", async () => {
     const tabs = fakeTabs();
-    const agent = createAgentTabs();
-    await tabOpen(tabs, agent, {});
+    await tabOpen(tabs, boundAgent(), {});
     expect(tabs.store.size).toBe(1);
   });
 
   it("refuses a non-http(s) url without creating a tab (same gate as navigate)", async () => {
     const tabs = fakeTabs();
-    const agent = createAgentTabs();
-    await expect(tabOpen(tabs, agent, { url: "file:///etc/passwd" })).rejects.toThrow(/http/);
+    await expect(tabOpen(tabs, boundAgent(), { url: "file:///etc/passwd" })).rejects.toThrow(/http/);
+    expect(tabs.store.size).toBe(0);
+  });
+
+  it("refuses to open a tab when no session is bound (fail closed, like the CDP path)", async () => {
+    const tabs = fakeTabs();
+    const agent = createAgentTabs(); // never bound
+    await expect(tabOpen(tabs, agent, { url: "https://example.com" })).rejects.toThrow(/no tab bound/i);
     expect(tabs.store.size).toBe(0);
   });
 });

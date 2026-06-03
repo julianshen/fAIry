@@ -62,6 +62,7 @@ describe("createBrowserHandlers", () => {
 
   it("routes a tab call through the agent-tab binding", async () => {
     const agentTabs = createAgentTabs();
+    agentTabs.bindSession(1); // a task must be bound before opening tabs
     const handlers = createBrowserHandlers(deps({ agentTabs }));
     const result = (await handlers.tabOpen!({ url: "https://example.com" })) as { id: string };
     expect(agentTabs.isOwned(Number(result.id))).toBe(true);

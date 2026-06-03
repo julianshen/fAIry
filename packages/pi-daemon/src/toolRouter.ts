@@ -170,10 +170,20 @@ export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
         for (const [i, step] of wf.steps.entries()) {
           if (i > 0 && stepDelayMs > 0) await new Promise((r) => setTimeout(r, stepDelayMs));
           try {
-            await deps.dispatch(step.tool, step.args);
+            const result = await deps.dispatch(step.tool, step.args);
+            // Some tools report a semantic failure in their RESULT rather than
+            // throwing (wait_for timeout, evaluate/callHelper page exception).
+            // Honor "stop on the first failed step" for those too.
+            const r = result as { ok?: unknown; error?: unknown; reason?: unknown } | null;
+            if (r && typeof r === "object" && r.ok === false) {
+              const error =
+                typeof r.error === "string" ? r.error : typeof r.reason === "string" ? r.reason : "step failed";
+              results.push({ tool: step.tool, ok: false, error });
+              break;
+            }
             results.push({ tool: step.tool, ok: true });
           } catch (err) {
-            // A step failed — replaying the rest on a broken page is pointless.
+            // A step threw — replaying the rest on a broken page is pointless.
             results.push({ tool: step.tool, ok: false, error: err instanceof Error ? err.message : String(err) });
             break;
           }

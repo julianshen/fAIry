@@ -330,6 +330,37 @@ describe("createToolRouter", () => {
       expect(result.results).toEqual([{ tool: "click", ok: true }]);
     });
 
+    it("workflowRun stops when a step resolves a semantic failure (ok:false), not just on throw", async () => {
+      const recorder = fakeRecorder();
+      recorder.start("f");
+      recorder.capture("waitFor", { selector: ".x" });
+      recorder.capture("click", { x: 1, y: 1 });
+      recorder.stop();
+      // waitFor resolves {ok:false, reason} (timeout) without throwing.
+      const dispatch = vi.fn((tool: string) =>
+        Promise.resolve(tool === "waitFor" ? { ok: false, reason: "timeout" } : { ok: true }),
+      );
+      const router = createToolRouter(deps({ recorder, dispatch }));
+      const result = (await router.handle("workflowRun", { name: "f", stepDelayMs: 0 })) as {
+        results: unknown[];
+      };
+      expect(result.results).toEqual([{ tool: "waitFor", ok: false, error: "timeout" }]);
+      expect(dispatch).toHaveBeenCalledTimes(1); // didn't click after the failed wait
+    });
+
+    it("workflowRun reports an ok:false step's `error` field (evaluate/callHelper page exception)", async () => {
+      const recorder = fakeRecorder();
+      recorder.start("f");
+      recorder.capture("evaluate", { expression: "boom" });
+      recorder.stop();
+      const dispatch = () => Promise.resolve({ ok: false, error: "ReferenceError: boom" });
+      const router = createToolRouter(deps({ recorder, dispatch }));
+      const result = (await router.handle("workflowRun", { name: "f", stepDelayMs: 0 })) as {
+        results: unknown[];
+      };
+      expect(result.results).toEqual([{ tool: "evaluate", ok: false, error: "ReferenceError: boom" }]);
+    });
+
     it("workflowRun throws for an unknown workflow", async () => {
       const router = createToolRouter(deps());
       await expect(router.handle("workflowRun", { name: "nope" })).rejects.toThrow(/workflow not found/i);

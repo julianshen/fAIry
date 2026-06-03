@@ -176,6 +176,13 @@ describe("reduce — result, confirm, takeover", () => {
     expect(only(s, "result")[0]!.result).toEqual(RESULT);
   });
 
+  it("adds a ui card from a ui beat", () => {
+    const s = run({ kind: "ui", a2ui: { type: "text", text: "hello" } });
+    const ui = only(s, "ui");
+    expect(ui).toHaveLength(1);
+    expect(ui[0]!.a2ui).toEqual({ type: "text", text: "hello" });
+  });
+
   it("adds an unanswered confirm and marks the agent active", () => {
     const s = run({ kind: "confirm", agent: "sage", confirm: "Yes", decline: "No" });
     const c = only(s, "confirm")[0]!;
@@ -253,7 +260,8 @@ describe("counts", () => {
       { kind: "act", agent: "atlas", verb: "Clicked", target: "y" },
       { kind: "say", agent: "atlas", text: "hi" },
       { kind: "result", result: RESULT },
+      { kind: "ui", a2ui: { type: "text", text: "x" } },
     );
-    expect(counts(s.items)).toEqual({ chat: 3, activity: 2, plan: 2 });
+    expect(counts(s.items)).toEqual({ chat: 4, activity: 2, plan: 2 });
   });
 });

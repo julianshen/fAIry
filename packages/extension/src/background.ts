@@ -24,7 +24,12 @@ let connecting: Promise<void> | null = null;
 function connectBridgeForConnection(): Promise<void> {
   connecting = (connecting ?? Promise.resolve()).then(async () => {
     const conn = await loadConnection();
-    if (!conn) return; // not paired yet
+    if (!conn) {
+      // Unpaired (or never paired): tear down any live bridge, don't orphan it.
+      bridge?.close();
+      bridge = null;
+      return;
+    }
     bridge?.close();
     const executor = createToolExecutor(createBrowserHandlers(createDebuggerCdpClient()));
     bridge = connectBridge({

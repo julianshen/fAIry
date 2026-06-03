@@ -20,18 +20,31 @@ export function createDebuggerCdpClient(): CdpClient {
     if (source.tabId === attached) attached = null;
   });
 
-  async function ensureAttached(): Promise<number> {
-    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    if (typeof tab?.id !== "number") throw new Error("no active tab to drive");
-    const tabId = tab.id;
-    if (attached !== tabId) {
-      if (attached !== null) {
-        await chrome.debugger.detach({ tabId: attached }).catch(() => {});
+  // Concurrent sends (e.g. screenshot's parallel reads) must not each fire
+  // chrome.debugger.attach — the second throws "already attached". Share one
+  // in-flight attach so they serialize behind it.
+  let attaching: Promise<number> | null = null;
+
+  function ensureAttached(): Promise<number> {
+    if (attaching) return attaching;
+    attaching = (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (typeof tab?.id !== "number") throw new Error("no active tab to drive");
+        const tabId = tab.id;
+        if (attached !== tabId) {
+          if (attached !== null) {
+            await chrome.debugger.detach({ tabId: attached }).catch(() => {});
+          }
+          await chrome.debugger.attach({ tabId }, "1.3");
+          attached = tabId;
+        }
+        return tabId;
+      } finally {
+        attaching = null;
       }
-      await chrome.debugger.attach({ tabId }, "1.3");
-      attached = tabId;
-    }
-    return tabId;
+    })();
+    return attaching;
   }
 
   return {

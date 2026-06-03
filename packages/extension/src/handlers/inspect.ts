@@ -43,7 +43,7 @@ export async function describeAt(
       return {
         tag: el.tagName.toLowerCase(),
         id: el.id || null,
-        classes: (typeof el.className === 'string' ? el.className : '').split(/\\s+/).filter(Boolean),
+        classes: Array.from(el.classList),
         role: el.getAttribute('role') || null,
         ariaLabel: el.getAttribute('aria-label') || null,
         text: (el.textContent || '').slice(0, 80).trim(),

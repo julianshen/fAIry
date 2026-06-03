@@ -35,7 +35,11 @@ export async function dismissOverlays(
       `(() => {
       const vw = window.innerWidth, vh = window.innerHeight;
       const removed = [];
+      // Inline/text tags are never full-viewport overlays; skipping them avoids
+      // getComputedStyle on every node (layout thrash on large pages).
+      const SKIP = new Set(['span','p','a','li','td','tr','th','option','b','i','strong','em','code','h1','h2','h3','h4','h5','h6','label','small']);
       for (const el of Array.from(document.querySelectorAll('*'))) {
+        if (SKIP.has(el.tagName.toLowerCase())) continue;
         const cs = window.getComputedStyle(el);
         const pos = cs.position;
         const ariaModal = el.getAttribute('aria-modal') === 'true';
@@ -110,7 +114,13 @@ export async function waitFor(
   while (clock.now() < deadline) {
     if (selector) {
       const e = JSON.stringify(selector);
-      if (await truthy(`(()=>{const e=document.querySelector(${e});return !!(e&&e.offsetParent!==null);})()`)) {
+      // offsetParent is null for position:fixed elements even when visible, so
+      // accept those explicitly (sticky headers, cookie banners, FABs, modals).
+      if (
+        await truthy(
+          `(()=>{const e=document.querySelector(${e});if(!e)return false;const cs=getComputedStyle(e);if(cs.display==='none'||cs.visibility==='hidden')return false;return e.offsetParent!==null||cs.position==='fixed';})()`,
+        )
+      ) {
         return { ok: true, reason: "selector" };
       }
     }

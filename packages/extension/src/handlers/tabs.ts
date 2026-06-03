@@ -65,8 +65,5 @@ export async function tabList(
   agentTabs: AgentTabs,
   _args: Record<string, unknown>,
 ): Promise<TabDescriptor[]> {
-  const owned = await Promise.all(
-    agentTabs.ids().map((id) => tabs.get(id).then((tab) => describe(tab, agentTabs))),
-  );
-  return owned;
+  return Promise.all(agentTabs.ids().map((id) => tabs.get(id).then((tab) => describe(tab, agentTabs))));
 }

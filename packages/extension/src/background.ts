@@ -23,6 +23,12 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) 
 // and the CDP event buffer are all stable for the worker's life — build them
 // once. (Rebuilding the CDP client per reconnect would also re-register
 // chrome.debugger listeners each time, leaking dead closures.)
+// The agent-tab binding lives only in this (ephemeral MV3) worker's memory. If
+// the worker is evicted mid-task, the binding is lost and the next tool call
+// fails closed ("no tab bound — start a task first") — the SAFE direction.
+// IMPORTANT: do NOT "recover" by auto-resolving the active tab on a cold call;
+// that would silently rebind to whatever tab is focused then (a cross-tab
+// hijack). Persisting to chrome.storage.session is the proper fix (deferred).
 const agentTabs = createAgentTabs();
 const tabsApi = createChromeTabsApi();
 const events = createEventBuffer();
@@ -30,8 +36,16 @@ const cdp = createDebuggerCdpClient(agentTabs, events);
 const executor = createToolExecutor(createBrowserHandlers({ cdp, tabs: tabsApi, agentTabs, events }));
 
 // Bind the agent to the tab the user started the task on (the panel signals us).
-// Until a task starts, nothing is bound and CDP commands refuse to run.
-chrome.runtime.onMessage.addListener((msg: unknown) => {
+chrome.runtime.onMessage.addListener((msg: unknown, sender) => {
+  // Only our own extension pages (the panel) may bind — never a content script
+  // or web page, which could force a rebind to the user's focused tab at a
+  // moment of its choosing. Extension pages carry our id + a chrome-extension://
+  // url and no sender.tab.
+  const fromOwnPage =
+    sender.id === chrome.runtime.id &&
+    sender.tab === undefined &&
+    (sender.url?.startsWith(chrome.runtime.getURL("")) ?? false);
+  if (!fromOwnPage) return;
   if ((msg as { type?: unknown })?.type === "agent:taskStart") {
     tabsApi
       .queryActive()

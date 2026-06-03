@@ -1,18 +1,28 @@
 import type { CdpClient } from "../cdp/cdpClient";
 import type { CdpEventBuffer } from "../cdp/eventBuffer";
-import { optionalNumber, optionalString, requireString } from "./args";
+import { optionalNumber, optionalObject, optionalString, requireString } from "./args";
+
+// CDP isn't tab-scoped once attached: Target.* (attach to / create other
+// targets) and Browser.* (browser-level control) would let raw passthrough
+// escape the agent-tab binding and drive the user's other tabs. Refuse them so
+// every path — high-level tools and passthrough alike — stays bound to the tab.
+const BLOCKED_CDP_PREFIXES = ["Target.", "Browser."];
+
+function assertBoundMethod(method: string): void {
+  if (BLOCKED_CDP_PREFIXES.some((p) => method.startsWith(p))) {
+    throw new Error(`cdp: ${method} is not allowed (it can escape the agent-tab binding)`);
+  }
+}
 
 /**
  * Raw CDP passthrough — the power-user escape hatch when the high-level tools
- * don't fit. Forwards `method` + `params` verbatim and returns the response.
+ * don't fit. Forwards `method` + `params` verbatim and returns the response,
+ * except target/browser-level methods that would break the tab binding.
  */
 export async function cdpPassthrough(cdp: CdpClient, args: Record<string, unknown>): Promise<unknown> {
   const method = requireString(args, "method");
-  const params =
-    typeof args.params === "object" && args.params !== null && !Array.isArray(args.params)
-      ? (args.params as Record<string, unknown>)
-      : {};
-  return cdp.send(method, params);
+  assertBoundMethod(method);
+  return cdp.send(method, optionalObject(args, "params", {}));
 }
 
 /**
@@ -26,6 +36,7 @@ export async function cdpSubscribe(
   args: Record<string, unknown>,
 ): Promise<{ ok: boolean }> {
   const method = requireString(args, "method");
+  assertBoundMethod(method); // no subscribing to Target.*/Browser.* either
   const { ok, domain } = events.subscribe(method);
   if (!ok || !domain) return { ok: false };
   // Not every domain has `.enable`; a failure there shouldn't undo the subscribe.

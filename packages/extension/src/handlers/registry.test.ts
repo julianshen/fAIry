@@ -2,18 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { fakeCdp } from "../cdp/testCdp";
 import { createEventBuffer } from "../cdp/eventBuffer";
 import { createAgentTabs } from "../tabs/agentTabs";
-import type { TabsApi } from "../tabs/tabsApi";
+import { fakeTabs } from "../tabs/testTabs";
 import { createBrowserHandlers, type BrowserDeps } from "./registry";
-
-function fakeTabs(): TabsApi {
-  return {
-    create: (url) => Promise.resolve({ id: 1, url: url ?? "", title: "", active: true }),
-    get: (id) => Promise.resolve({ id, url: "", title: "", active: true }),
-    activate: (id) => Promise.resolve({ id, url: "", title: "", active: true }),
-    remove: () => Promise.resolve(),
-    queryActive: () => Promise.resolve(null),
-  };
-}
 
 function deps(over: Partial<BrowserDeps> = {}): BrowserDeps {
   return {

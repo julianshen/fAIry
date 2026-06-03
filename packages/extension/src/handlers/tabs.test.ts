@@ -1,39 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createAgentTabs } from "../tabs/agentTabs";
-import type { Tab, TabsApi } from "../tabs/tabsApi";
-import { tabClose, tabList, tabOpen, tabSwitch } from "./tabs";
+import { fakeTabs } from "../tabs/testTabs";
 
-/** In-memory TabsApi: a map of tabs + a record of calls. */
-function fakeTabs(initial: Tab[] = []): TabsApi & { store: Map<number, Tab>; removed: number[] } {
-  const store = new Map<number, Tab>(initial.map((t) => [t.id, t]));
-  const removed: number[] = [];
-  let nextId = 100;
-  return {
-    store,
-    removed,
-    create(url) {
-      const tab: Tab = { id: nextId++, url: url ?? "about:blank", title: "", active: true };
-      store.set(tab.id, tab);
-      return Promise.resolve(tab);
-    },
-    get(id) {
-      const t = store.get(id);
-      if (!t) return Promise.reject(new Error(`no tab ${id}`));
-      return Promise.resolve(t);
-    },
-    activate(id) {
-      const t = store.get(id);
-      if (!t) return Promise.reject(new Error(`no tab ${id}`));
-      return Promise.resolve({ ...t, active: true });
-    },
-    remove(id) {
-      store.delete(id);
-      removed.push(id);
-      return Promise.resolve();
-    },
-    queryActive: () => Promise.resolve(null),
-  };
-}
+import { tabClose, tabList, tabOpen, tabSwitch } from "./tabs";
 
 describe("tabOpen", () => {
   it("creates a tab, takes ownership, makes it current, returns its descriptor", async () => {

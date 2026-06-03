@@ -47,3 +47,15 @@ export function optionalNumber(
   if (typeof v !== "number" || Number.isNaN(v)) throw new Error(`${key} must be a number`);
   return v;
 }
+
+type Obj = Record<string, unknown>;
+export function optionalObject(args: Obj, key: string): Obj | undefined;
+export function optionalObject(args: Obj, key: string, fallback: Obj): Obj;
+export function optionalObject(args: Obj, key: string, fallback?: Obj): Obj | undefined {
+  const v = args[key];
+  if (v === undefined) return fallback;
+  if (typeof v !== "object" || v === null || Array.isArray(v)) {
+    throw new Error(`${key} must be an object`);
+  }
+  return v as Obj;
+}

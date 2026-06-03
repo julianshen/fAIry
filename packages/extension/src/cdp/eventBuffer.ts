@@ -40,7 +40,11 @@ export function createEventBuffer(cap: number = DEFAULT_CAP): CdpEventBuffer {
       const bucket = buffers.get(method);
       if (!bucket) return; // not subscribed
       bucket.push({ at, method, params });
-      if (bucket.length > cap) bucket.splice(0, bucket.length - cap); // drop oldest
+      // `splice(0, …)` is O(n), so trimming on every push once at cap would be
+      // O(cap) per event — costly for high-frequency domains (Network.*). Only
+      // trim past a slack margin, making push amortized O(1); the buffer stays
+      // bounded at ~1.5×cap between trims.
+      if (bucket.length > cap * 1.5) bucket.splice(0, bucket.length - cap);
     },
     collect(method, max) {
       if (method !== undefined) {

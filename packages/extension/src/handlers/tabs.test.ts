@@ -80,4 +80,13 @@ describe("tabList", () => {
     expect(result.find((t) => t.id === "1")?.isActive).toBe(true);
     expect(result.find((t) => t.id === "2")?.isActive).toBe(false);
   });
+
+  it("skips an owned tab that can no longer be fetched (closed mid-call)", async () => {
+    const tabs = fakeTabs([{ id: 1, url: "a", title: "A", active: true }]);
+    const agent = createAgentTabs();
+    agent.bindSession(1);
+    agent.add(2); // owned but not in the store → get(2) rejects
+    const result = (await tabList(tabs, agent, {})) as Array<{ id: string }>;
+    expect(result.map((t) => t.id)).toEqual(["1"]); // 2 skipped, no overall failure
+  });
 });

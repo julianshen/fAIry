@@ -65,5 +65,15 @@ export async function tabList(
   agentTabs: AgentTabs,
   _args: Record<string, unknown>,
 ): Promise<TabDescriptor[]> {
-  return Promise.all(agentTabs.ids().map((id) => tabs.get(id).then((tab) => describe(tab, agentTabs))));
+  // An owned tab may have just closed (the onRemoved cleanup can race this call),
+  // so a failed get() skips that tab rather than failing the whole list.
+  const owned = await Promise.all(
+    agentTabs.ids().map((id) =>
+      tabs
+        .get(id)
+        .then((tab): TabDescriptor | null => describe(tab, agentTabs))
+        .catch(() => null),
+    ),
+  );
+  return owned.filter((t): t is TabDescriptor => t !== null);
 }

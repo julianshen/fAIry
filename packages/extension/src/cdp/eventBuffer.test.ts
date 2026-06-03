@@ -51,6 +51,29 @@ describe("createEventBuffer", () => {
     expect(b.collect()).toEqual([]); // both drained
   });
 
+  it("collect with no method returns events in chronological order across methods", () => {
+    const b = createEventBuffer();
+    b.subscribe("Network.responseReceived"); // first bucket
+    b.subscribe("Network.requestWillBeSent"); // second bucket
+    // The earliest event lands in the SECOND bucket: a bucket-by-bucket drain
+    // would return it last; we want global chronological order.
+    b.push("Network.responseReceived", {}, 20);
+    b.push("Network.requestWillBeSent", {}, 5);
+    b.push("Network.responseReceived", {}, 10);
+    expect(b.collect().map((e) => e.at)).toEqual([5, 10, 20]);
+  });
+
+  it("collect-all with max returns the earliest events and leaves the rest", () => {
+    const b = createEventBuffer();
+    b.subscribe("Network.responseReceived");
+    b.subscribe("Network.requestWillBeSent");
+    b.push("Network.responseReceived", {}, 20);
+    b.push("Network.requestWillBeSent", {}, 5);
+    b.push("Network.responseReceived", {}, 10);
+    expect(b.collect(undefined, 2).map((e) => e.at)).toEqual([5, 10]);
+    expect(b.collect().map((e) => e.at)).toEqual([20]); // remainder still buffered
+  });
+
   it("unsubscribe(method) stops buffering it and clears its events", () => {
     const b = createEventBuffer();
     b.subscribe("Network.responseReceived");

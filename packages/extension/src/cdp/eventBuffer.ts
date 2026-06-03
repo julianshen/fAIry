@@ -51,13 +51,19 @@ export function createEventBuffer(cap: number = DEFAULT_CAP): CdpEventBuffer {
         const bucket = buffers.get(method) ?? [];
         return max !== undefined ? bucket.splice(0, max) : bucket.splice(0);
       }
-      const out: BufferedEvent[] = [];
+      // Drain ALL methods in global arrival order (by `at`), not bucket-by-bucket
+      // — a multi-method trace (Network request/response) must read chronologically.
+      const all: BufferedEvent[] = [];
+      for (const bucket of buffers.values()) all.push(...bucket);
+      all.sort((a, b) => a.at - b.at);
+      const selected = max !== undefined ? all.slice(0, max) : all;
+      const taken = new Set(selected);
       for (const bucket of buffers.values()) {
-        if (max !== undefined && out.length >= max) break;
-        const room = max !== undefined ? max - out.length : bucket.length;
-        out.push(...bucket.splice(0, room));
+        const kept = bucket.filter((e) => !taken.has(e));
+        bucket.length = 0;
+        bucket.push(...kept);
       }
-      return out;
+      return selected;
     },
     unsubscribe(method) {
       if (method === undefined) {

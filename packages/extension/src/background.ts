@@ -36,7 +36,8 @@ const cdp = createDebuggerCdpClient(agentTabs, events);
 const executor = createToolExecutor(createBrowserHandlers({ cdp, tabs: tabsApi, agentTabs, events }));
 
 // Bind the agent to the tab the user started the task on (the panel signals us).
-chrome.runtime.onMessage.addListener((msg: unknown, sender) => {
+// Responds AFTER the bind so the panel can wait before starting the task.
+chrome.runtime.onMessage.addListener((msg: unknown, sender, sendResponse) => {
   // Only our own extension pages (the panel) may bind — never a content script
   // or web page, which could force a rebind to the user's focused tab at a
   // moment of its choosing. Extension pages carry our id + a chrome-extension://
@@ -45,15 +46,26 @@ chrome.runtime.onMessage.addListener((msg: unknown, sender) => {
     sender.id === chrome.runtime.id &&
     sender.tab === undefined &&
     (sender.url?.startsWith(chrome.runtime.getURL("")) ?? false);
-  if (!fromOwnPage) return;
-  if ((msg as { type?: unknown })?.type === "agent:taskStart") {
-    tabsApi
-      .queryActive()
-      .then((id) => {
-        if (id !== null) agentTabs.bindSession(id);
-      })
-      .catch((err) => console.error("[fairy] could not bind the active tab", err));
-  }
+  if (!fromOwnPage) return undefined;
+  if ((msg as { type?: unknown })?.type !== "agent:taskStart") return undefined;
+  tabsApi
+    .queryActive()
+    .then((id) => {
+      if (id === null) {
+        sendResponse({ ok: false, error: "no active tab to bind" });
+        return;
+      }
+      // Fresh task: bind the tab and drop the previous task's CDP subscriptions/
+      // events so cdpCollect can't surface a prior tab's events (task isolation).
+      agentTabs.bindSession(id);
+      events.unsubscribe();
+      sendResponse({ ok: true });
+    })
+    .catch((err) => {
+      console.error("[fairy] could not bind the active tab", err);
+      sendResponse({ ok: false, error: String(err) });
+    });
+  return true; // keep the channel open for the async sendResponse
 });
 
 // If a tab the agent owns is closed (by the user or the page), drop ownership so

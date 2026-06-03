@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createAgentTabs } from "../tabs/agentTabs";
 import { fakeTabs } from "../tabs/testTabs";
+import { fakeCdp } from "../cdp/testCdp";
 
 import { tabClose, tabList, tabOpen, tabSwitch } from "./tabs";
 
@@ -15,29 +16,49 @@ describe("tabOpen", () => {
   it("creates a tab, takes ownership, makes it current, returns its descriptor", async () => {
     const tabs = fakeTabs();
     const agent = boundAgent();
-    const result = await tabOpen(tabs, agent, { url: "https://example.com" });
+    const result = await tabOpen(tabs, agent, fakeCdp(), { url: "https://example.com" });
     expect(result).toMatchObject({ url: "https://example.com", isActive: true });
     const id = Number((result as { id: string }).id);
     expect(agent.isOwned(id)).toBe(true);
     expect(agent.current()).toBe(id);
   });
 
-  it("opens a blank tab when no url is given", async () => {
+  it("opens a blank drivable tab first, then navigates via CDP (debugger attaches before the load)", async () => {
     const tabs = fakeTabs();
-    await tabOpen(tabs, boundAgent(), {});
+    const cdp = fakeCdp();
+    const agent = boundAgent();
+    await tabOpen(tabs, agent, cdp, { url: "https://example.com" });
+    // the tab was created blank (drivable), not via chrome.tabs.create(url)
+    const created = [...tabs.store.values()].find((t) => t.id !== 1);
+    expect(created?.url).toBe("about:blank");
+    // navigation went through CDP after ownership/attach, so subscriptions replay first
+    expect(cdp.calls.find((c) => c.method === "Page.navigate")?.params).toEqual({
+      url: "https://example.com",
+    });
+  });
+
+  it("opens a blank tab when no url is given (no navigation)", async () => {
+    const tabs = fakeTabs();
+    const cdp = fakeCdp();
+    await tabOpen(tabs, boundAgent(), cdp, {});
     expect(tabs.store.size).toBe(1);
+    expect(cdp.calls.find((c) => c.method === "Page.navigate")).toBeUndefined();
   });
 
   it("refuses a non-http(s) url without creating a tab (same gate as navigate)", async () => {
     const tabs = fakeTabs();
-    await expect(tabOpen(tabs, boundAgent(), { url: "file:///etc/passwd" })).rejects.toThrow(/http/);
+    await expect(tabOpen(tabs, boundAgent(), fakeCdp(), { url: "file:///etc/passwd" })).rejects.toThrow(
+      /http/,
+    );
     expect(tabs.store.size).toBe(0);
   });
 
   it("refuses to open a tab when no session is bound (fail closed, like the CDP path)", async () => {
     const tabs = fakeTabs();
     const agent = createAgentTabs(); // never bound
-    await expect(tabOpen(tabs, agent, { url: "https://example.com" })).rejects.toThrow(/no tab bound/i);
+    await expect(tabOpen(tabs, agent, fakeCdp(), { url: "https://example.com" })).rejects.toThrow(
+      /no tab bound/i,
+    );
     expect(tabs.store.size).toBe(0);
   });
 });

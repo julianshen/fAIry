@@ -56,7 +56,7 @@ export function createBrowserHandlers(deps: BrowserDeps): Record<string, ToolHan
     dismissOverlays: onCdp(dismissOverlays),
     waitFor: onCdp(waitFor),
     // Group 3 — tabs (ownership-gated via agentTabs).
-    tabOpen: (args) => tabOpen(tabs, agentTabs, args),
+    tabOpen: (args) => tabOpen(tabs, agentTabs, cdp, args),
     tabSwitch: (args) => tabSwitch(tabs, agentTabs, args),
     tabClose: (args) => tabClose(tabs, agentTabs, args),
     tabList: (args) => tabList(tabs, agentTabs, args),

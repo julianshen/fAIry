@@ -1,3 +1,4 @@
+import type { CdpClient } from "../cdp/cdpClient";
 import { NO_TAB_BOUND, type AgentTabs } from "../tabs/agentTabs";
 import type { Tab, TabsApi } from "../tabs/tabsApi";
 import { optionalString, requireString } from "./args";
@@ -23,10 +24,11 @@ function tabId(args: Record<string, unknown>): number {
   return id;
 }
 
-/** Open a new tab, take ownership, make it current. */
+/** Open a new tab, take ownership, make it current; navigate it via CDP if a url is given. */
 export async function tabOpen(
   tabs: TabsApi,
   agentTabs: AgentTabs,
+  cdp: CdpClient,
   args: Record<string, unknown>,
 ): Promise<TabDescriptor> {
   // Fail closed like the CDP path: opening a tab is an agent action, so it needs
@@ -35,9 +37,15 @@ export async function tabOpen(
   if (agentTabs.current() === null) throw new Error(NO_TAB_BOUND);
   const url = optionalString(args, "url");
   if (url !== undefined) assertHttpUrl(url); // same gate as navigate — no file:/data:/… tabs
-  const tab = await tabs.create(url);
+
+  // Open a BLANK, drivable tab and take ownership first, so the next CDP command
+  // attaches the debugger and replays subscriptions before we navigate —
+  // otherwise the requested navigation's initial Network/Page events are missed.
+  const tab = await tabs.create();
   agentTabs.add(tab.id);
-  return describe(tab, agentTabs);
+  if (url === undefined) return describe(tab, agentTabs);
+  await cdp.send("Page.navigate", { url }); // attaches (+ re-enables subscriptions), then navigates
+  return { id: String(tab.id), url, title: tab.title, isActive: true };
 }
 
 /** Switch the agent's current tab — only among owned tabs (setCurrent throws otherwise). */

@@ -1,27 +1,15 @@
 import type { CdpClient } from "../cdp/cdpClient";
 import { evaluateExpression } from "./evaluate";
 import { requireString } from "./args";
+import { assertHttpUrl } from "./urlPolicy";
 
-/**
- * Navigate the active tab to a URL. Only `http(s)` is allowed: a tool-supplied
- * `javascript:` / `data:` / `file:` / `chrome:` URL could run script, read local
- * files, or reach privileged pages, so anything else (or an unparseable URL) is
- * refused before it reaches `Page.navigate`.
- */
+/** Navigate the active tab to an http(s) URL (the scheme gate is shared via urlPolicy). */
 export async function navigate(
   cdp: CdpClient,
   args: Record<string, unknown>,
 ): Promise<{ ok: true }> {
   const url = requireString(args, "url");
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error(`navigate: only http(s) URLs are allowed (could not parse: ${url})`);
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error(`navigate: only http(s) URLs are allowed, refused ${parsed.protocol}`);
-  }
+  assertHttpUrl(url);
   await cdp.send("Page.navigate", { url });
   return { ok: true };
 }

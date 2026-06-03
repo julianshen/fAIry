@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { optionalNumber, optionalString, requireNumber, requireString } from "./args";
+import { optionalNumber, optionalObject, optionalString, requireNumber, requireString } from "./args";
 
 describe("requireString", () => {
   it("returns the value when it is a string", () => {
@@ -43,5 +43,18 @@ describe("optionalNumber", () => {
   it("throws when the value is present but not a usable number", () => {
     expect(() => optionalNumber({ n: "3" }, "n", 7)).toThrow(/n.*number/);
     expect(() => optionalNumber({ n: Number.NaN }, "n", 7)).toThrow(/n.*number/);
+  });
+});
+
+describe("optionalObject", () => {
+  it("returns a plain object, or the fallback when the key is absent", () => {
+    expect(optionalObject({ p: { a: 1 } }, "p")).toEqual({ a: 1 });
+    expect(optionalObject({}, "p")).toBeUndefined();
+    expect(optionalObject({}, "p", {})).toEqual({});
+  });
+  it("throws when present but not a plain object (null, array, primitive)", () => {
+    expect(() => optionalObject({ p: null }, "p", {})).toThrow(/p.*object/);
+    expect(() => optionalObject({ p: [1, 2] }, "p", {})).toThrow(/p.*object/);
+    expect(() => optionalObject({ p: "x" }, "p", {})).toThrow(/p.*object/);
   });
 });

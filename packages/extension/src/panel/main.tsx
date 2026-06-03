@@ -34,7 +34,17 @@ function App(): ReactElement {
 
   const send = (task: string): void => {
     controller.reset(); // clear the previous run; the daemon re-echoes the task as a beat
-    clientRef.current?.start(task);
+    // Bind the agent to the tab the user is on right now (starting a task here is
+    // the consent to drive that tab), and WAIT for the background SW to confirm
+    // the bind before starting — otherwise the daemon could issue the first tool
+    // call before a tab is bound and it would fail "no tab bound".
+    chrome.runtime
+      .sendMessage({ type: "agent:taskStart" })
+      .then((res) => {
+        if ((res as { ok?: boolean })?.ok) clientRef.current?.start(task);
+        else console.error("[fairy] could not bind a tab for the task", res);
+      })
+      .catch((err) => console.error("[fairy] taskStart failed", err));
   };
   const stop = (): void => clientRef.current?.stop();
 

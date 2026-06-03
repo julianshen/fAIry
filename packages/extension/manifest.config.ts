@@ -12,10 +12,11 @@ export default defineManifest({
   // debugger/tabs/scripting are for the (later) browser tool handlers; storage
   // holds the paired connection; sidePanel opens the conversation UI.
   permissions: ["storage", "sidePanel", "debugger", "tabs", "scripting"],
-  // Any loopback port (HTTP is :51789; the WS ports are ephemeral, via /info).
-  // `ws://` isn't a valid host_permissions scheme — the WS connections are
+  // Host match patterns carry no port — `http://127.0.0.1/*` already matches the
+  // daemon on ANY port (a `:port` segment is invalid and rejects the manifest).
+  // `ws://` isn't a valid host_permissions scheme either; the WS connections are
   // allowed via the connect-src CSP below instead.
-  host_permissions: ["http://127.0.0.1:*/*"],
+  host_permissions: ["http://127.0.0.1/*"],
   content_security_policy: {
     extension_pages:
       "script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*;",

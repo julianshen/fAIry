@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { createConnection } from "node:net";
 import type { ChildLike, ReadableLine } from "./jsonLineProcess";
+import type { HelperRegistry } from "./helperRegistry";
 import type { SkillsLibrary } from "./skillsLibrary";
 
 // Shared test doubles for the "Pi never emits output" case — enough to exercise
@@ -46,6 +47,16 @@ export const fakeSkills = (over: Partial<SkillsLibrary> = {}): SkillsLibrary => 
   preamble: () => Promise.resolve("# skills"),
   listInteractions: () => Promise.resolve([]),
   readInteraction: () => Promise.resolve(null),
+  ...over,
+});
+
+/** An empty helper-registry double for wiring tests (createDaemon requires one). */
+export const fakeHelpers = (over: Partial<HelperRegistry> = {}): HelperRegistry => ({
+  list: () => [],
+  get: () => undefined,
+  save: () => {},
+  remove: () => false,
+  callExpression: (name, args) => `CALL(${name}, ${JSON.stringify(args)})`,
   ...over,
 });
 

@@ -1,3 +1,4 @@
+import type { DomainSkills } from "./domainSkills";
 import type { HelperRegistry } from "./helperRegistry";
 import type { SkillsLibrary } from "./skillsLibrary";
 
@@ -8,6 +9,8 @@ export interface ToolRouterDeps {
   skills: SkillsLibrary;
   /** Persistent JS-helper registry (save/list/remove are local; callHelper relays). */
   helpers: HelperRegistry;
+  /** Per-site notes the agent saves/searches (pure persistence, all local). */
+  domainSkills: DomainSkills;
   /** Relay a tool to the browser executor — used by callHelper to run an `evaluate`. */
   relay: (tool: string, args: Record<string, unknown>) => Promise<unknown>;
 }
@@ -35,6 +38,13 @@ function requireString(args: Record<string, unknown>, key: string): string {
 function optionalString(args: Record<string, unknown>, key: string): string | undefined {
   const v = args[key];
   return typeof v === "string" ? v : undefined;
+}
+
+function optionalNumber(args: Record<string, unknown>, key: string): number | undefined {
+  const v = args[key];
+  if (v === undefined) return undefined;
+  if (typeof v !== "number" || Number.isNaN(v)) throw new Error(`${key} must be a number`);
+  return v;
 }
 
 export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
@@ -91,6 +101,39 @@ export function createToolRouter(deps: ToolRouterDeps): ToolRouter {
         const callArgs = Array.isArray(args.args) ? args.args : [];
         return deps.relay("evaluate", { expression: deps.helpers.callExpression(name, callArgs) });
       },
+    ],
+    // Per-site notes — pure persistence + search, all local.
+    ["domainSkillList", async (args) => deps.domainSkills.list(requireString(args, "host"))],
+    [
+      "domainSkillRead",
+      async (args) => {
+        const host = requireString(args, "host");
+        const name = requireString(args, "name");
+        const skill = await deps.domainSkills.read(host, name);
+        if (!skill) throw new Error(`domain skill not found: ${host}/${name}`);
+        return skill;
+      },
+    ],
+    [
+      "domainSkillSave",
+      async (args) => {
+        await deps.domainSkills.save(
+          requireString(args, "host"),
+          requireString(args, "name"),
+          requireString(args, "body"),
+        );
+        return { ok: true };
+      },
+    ],
+    [
+      "domainSkillSearch",
+      async (args) => deps.domainSkills.search(requireString(args, "query"), optionalNumber(args, "limit")),
+    ],
+    [
+      "domainSkillRemove",
+      async (args) => ({
+        removed: await deps.domainSkills.remove(requireString(args, "host"), requireString(args, "name")),
+      }),
     ],
   ]);
 

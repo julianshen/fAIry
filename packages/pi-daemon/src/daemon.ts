@@ -2,6 +2,7 @@ import { BridgeServer } from "./bridgeServer";
 import type { BridgeSession } from "./bridgeSession";
 import { ConversationServer } from "./conversationServer";
 import type { ConversationSession } from "./conversationSession";
+import type { DomainSkills } from "./domainSkills";
 import type { HelperRegistry } from "./helperRegistry";
 import { HttpServer } from "./httpServer";
 import type { ChildLike } from "./jsonLineProcess";
@@ -26,6 +27,8 @@ export interface DaemonOptions {
   skills: SkillsLibrary;
   /** Persistent JS-helper registry — served by the tool-router (callHelper relays an evaluate). */
   helpers: HelperRegistry;
+  /** Per-site notes store — served by the tool-router (all local). */
+  domainSkills: DomainSkills;
   /** Spawn Pi for a conversation, given the loopback bridge it should connect back on. */
   spawnPi: (bridge: PiBridgeInfo) => ChildLike;
   /** Loopback host for all servers. Defaults to 127.0.0.1. */
@@ -111,6 +114,7 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
   const router = createToolRouter({
     skills: opts.skills,
     helpers: opts.helpers,
+    domainSkills: opts.domainSkills,
     relay: relayToBrowser,
     compact: (customInstructions) => {
       if (!activeConversation?.compact(customInstructions)) {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createToolRouter, type ToolRouterDeps } from "./toolRouter";
 import { fakeSkills as baseSkills } from "./testFakes";
 import type { HelperRegistry, JsHelper } from "./helperRegistry";
+import type { DomainSkills } from "./domainSkills";
 
 const fakeSkills = () =>
   baseSkills({
@@ -28,11 +29,25 @@ function fakeHelpers(initial: JsHelper[] = []): HelperRegistry {
   };
 }
 
+/** An in-memory DomainSkills double. */
+function fakeDomainSkills(over: Partial<DomainSkills> = {}): DomainSkills {
+  return {
+    list: () => Promise.resolve([]),
+    read: () => Promise.resolve(null),
+    save: (host, name, body) =>
+      Promise.resolve({ host, name, body, bytes: body.length, updatedAt: 1 }),
+    remove: () => Promise.resolve(false),
+    search: () => Promise.resolve([]),
+    ...over,
+  };
+}
+
 function deps(over: Partial<ToolRouterDeps> = {}): ToolRouterDeps {
   return {
     compact: () => {},
     skills: fakeSkills(),
     helpers: fakeHelpers(),
+    domainSkills: fakeDomainSkills(),
     relay: () => Promise.resolve({ ok: true, value: undefined }),
     ...over,
   };
@@ -50,6 +65,11 @@ describe("createToolRouter", () => {
       "listHelpers",
       "removeHelper",
       "callHelper",
+      "domainSkillList",
+      "domainSkillRead",
+      "domainSkillSave",
+      "domainSkillSearch",
+      "domainSkillRemove",
     ]) {
       expect(router.owns(t), t).toBe(true);
     }
@@ -168,6 +188,54 @@ describe("createToolRouter", () => {
       const router = createToolRouter(deps({ helpers, relay }));
       await expect(router.handle("callHelper", { name: "f", args: "nope" })).rejects.toThrow(/args.*array/i);
       expect(relay).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("domain skills", () => {
+    it("domainSkillSave/list/read/remove route to the store", async () => {
+      const calls: string[] = [];
+      const domainSkills = fakeDomainSkills({
+        save: (host, name, body) => {
+          calls.push(`save:${host}/${name}=${body}`);
+          return Promise.resolve({ host, name, body, bytes: body.length, updatedAt: 1 });
+        },
+        list: (host) => Promise.resolve([`${host}-note.md`]),
+        read: (host, name) =>
+          Promise.resolve({ host, name, body: "B", bytes: 1, updatedAt: 1 }),
+        remove: () => Promise.resolve(true),
+      });
+      const router = createToolRouter(deps({ domainSkills }));
+      expect(await router.handle("domainSkillSave", { host: "x.com", name: "n.md", body: "hi" })).toEqual({
+        ok: true,
+      });
+      expect(calls).toEqual(["save:x.com/n.md=hi"]);
+      expect(await router.handle("domainSkillList", { host: "x.com" })).toEqual(["x.com-note.md"]);
+      expect(await router.handle("domainSkillRead", { host: "x.com", name: "n.md" })).toMatchObject({ body: "B" });
+      expect(await router.handle("domainSkillRemove", { host: "x.com", name: "n.md" })).toEqual({ removed: true });
+    });
+
+    it("domainSkillRead throws when the note is missing", async () => {
+      const router = createToolRouter(deps()); // fake read returns null
+      await expect(router.handle("domainSkillRead", { host: "x.com", name: "n.md" })).rejects.toThrow(
+        /not found/i,
+      );
+    });
+
+    it("domainSkillSearch passes the query + optional limit through", async () => {
+      const search = vi.fn(() => Promise.resolve([]));
+      const router = createToolRouter(deps({ domainSkills: fakeDomainSkills({ search }) }));
+      await router.handle("domainSkillSearch", { query: "gold", limit: 3 });
+      expect(search).toHaveBeenCalledWith("gold", 3);
+      await router.handle("domainSkillSearch", { query: "gold" });
+      expect(search).toHaveBeenLastCalledWith("gold", undefined);
+    });
+
+    it("domain-skill handlers reject a missing host/name/query", async () => {
+      const router = createToolRouter(deps());
+      await expect(router.handle("domainSkillList", {})).rejects.toThrow(/host/i);
+      await expect(router.handle("domainSkillSave", { host: "x.com", name: "n.md" })).rejects.toThrow(/body/i);
+      await expect(router.handle("domainSkillSearch", {})).rejects.toThrow(/query/i);
+      await expect(router.handle("domainSkillSearch", { query: "g", limit: "no" })).rejects.toThrow(/limit/i);
     });
   });
 

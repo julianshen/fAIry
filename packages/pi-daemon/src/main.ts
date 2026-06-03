@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { createDaemon, type PiBridgeInfo, type RunningDaemon } from "./daemon";
 import { writeJsonFile } from "./fsAtomic";
 import type { ChildLike } from "./jsonLineProcess";
+import { createDomainSkills } from "./domainSkills";
 import { createHelperRegistry } from "./helperRegistry";
 import { createPairingStore } from "./pairing";
 import { resolvePaths, type DaemonPaths } from "./paths";
@@ -61,6 +62,7 @@ async function main(): Promise<void> {
       settings,
       skills: createSkillsLibrary(SKILLS_ROOT),
       helpers: createHelperRegistry(path.join(paths.appData, "helpers.json")),
+      domainSkills: createDomainSkills(path.join(paths.appData, "domain-skills")),
       pairing,
       spawnPi: piSpawner(paths),
       ports: { http: httpPort },

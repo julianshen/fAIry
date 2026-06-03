@@ -1,6 +1,7 @@
 import type { CdpClient } from "../cdp/cdpClient";
 import type { CdpEventBuffer } from "../cdp/eventBuffer";
 import { optionalNumber, optionalObject, optionalString, requireString } from "./args";
+import { assertHttpUrl } from "./urlPolicy";
 
 // CDP isn't tab-scoped once attached: Target.* (attach to / create other
 // targets) and Browser.* (browser-level control) would let raw passthrough
@@ -22,7 +23,11 @@ function assertBoundMethod(method: string): void {
 export async function cdpPassthrough(cdp: CdpClient, args: Record<string, unknown>): Promise<unknown> {
   const method = requireString(args, "method");
   assertBoundMethod(method);
-  return cdp.send(method, optionalObject(args, "params", {}));
+  const params = optionalObject(args, "params", {});
+  // Raw Page.navigate must honor the same scheme gate as the navigate tool, or
+  // it's a file:/data:/javascript: bypass.
+  if (method === "Page.navigate" && typeof params.url === "string") assertHttpUrl(params.url);
+  return cdp.send(method, params);
 }
 
 /**

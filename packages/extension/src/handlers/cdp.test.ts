@@ -30,6 +30,16 @@ describe("cdpPassthrough", () => {
     }
     expect(cdp.calls).toEqual([]); // nothing reached the debugger
   });
+
+  it("applies the http(s) gate to a raw Page.navigate (no scheme bypass)", async () => {
+    const cdp = fakeCdp({ "Page.navigate": { frameId: "1" } });
+    await expect(cdpPassthrough(cdp, { method: "Page.navigate", params: { url: "file:///x" } })).rejects.toThrow(
+      /http/,
+    );
+    expect(cdp.calls).toEqual([]); // never reached the debugger
+    await cdpPassthrough(cdp, { method: "Page.navigate", params: { url: "https://ok.com" } });
+    expect(cdp.calls[0]?.method).toBe("Page.navigate");
+  });
 });
 
 describe("cdpSubscribe", () => {

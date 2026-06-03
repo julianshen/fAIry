@@ -1,6 +1,7 @@
 import type { AgentTabs } from "../tabs/agentTabs";
 import type { Tab, TabsApi } from "../tabs/tabsApi";
-import { requireString } from "./args";
+import { optionalString, requireString } from "./args";
+import { assertHttpUrl } from "./urlPolicy";
 
 interface TabDescriptor {
   id: string;
@@ -28,7 +29,8 @@ export async function tabOpen(
   agentTabs: AgentTabs,
   args: Record<string, unknown>,
 ): Promise<TabDescriptor> {
-  const url = typeof args.url === "string" ? args.url : undefined;
+  const url = optionalString(args, "url");
+  if (url !== undefined) assertHttpUrl(url); // same gate as navigate — no file:/data:/… tabs
   const tab = await tabs.create(url);
   agentTabs.add(tab.id);
   return describe(tab, agentTabs);

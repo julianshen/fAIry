@@ -14,6 +14,20 @@ describe("tabOpen", () => {
     expect(agent.isOwned(id)).toBe(true);
     expect(agent.current()).toBe(id);
   });
+
+  it("opens a blank tab when no url is given", async () => {
+    const tabs = fakeTabs();
+    const agent = createAgentTabs();
+    await tabOpen(tabs, agent, {});
+    expect(tabs.store.size).toBe(1);
+  });
+
+  it("refuses a non-http(s) url without creating a tab (same gate as navigate)", async () => {
+    const tabs = fakeTabs();
+    const agent = createAgentTabs();
+    await expect(tabOpen(tabs, agent, { url: "file:///etc/passwd" })).rejects.toThrow(/http/);
+    expect(tabs.store.size).toBe(0);
+  });
 });
 
 describe("tabSwitch", () => {

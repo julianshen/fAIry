@@ -126,6 +126,16 @@ describe("A2UIView", () => {
     expect(container.querySelectorAll("tbody tr")[1]?.children).toHaveLength(0);
   });
 
+  it("renders an object table cell as text instead of crashing", () => {
+    const table = {
+      type: "table",
+      columns: ["Item"],
+      rows: [[{ price: 842 }]],
+    } as unknown as A2UINode;
+    const { container } = render(<A2UIView message={table} />);
+    expect(container.querySelector("tbody td")).toHaveTextContent('{"price":842}');
+  });
+
   it("renders a list missing items without crashing", () => {
     const list = { type: "list" } as unknown as A2UINode;
     const { container } = render(<A2UIView message={list} />);

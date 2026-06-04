@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { A2UINode } from "./types";
 import { A2UIChart } from "./A2UIChart";
 import { asArray } from "./safe";
@@ -6,6 +6,16 @@ import { asArray } from "./safe";
 /** Renders one A2UI message (a single root node), recursing into containers. */
 export function A2UIView({ message }: { message: A2UINode }): ReactElement {
   return <div className="a2ui">{renderNode(message)}</div>;
+}
+
+/**
+ * Table cells are opaque wire data: an object/array isn't a valid React child
+ * and would throw. Pass primitives through; stringify anything else so the value
+ * is at least visible instead of crashing the feed.
+ */
+function renderCell(cell: unknown): ReactNode {
+  if (typeof cell === "string" || typeof cell === "number") return cell;
+  return JSON.stringify(cell);
 }
 
 function renderNode(node: A2UINode, key?: number): ReactElement {
@@ -71,7 +81,7 @@ function renderNode(node: A2UINode, key?: number): ReactElement {
               {asArray(node.rows).map((row, r) => (
                 <tr key={r}>
                   {asArray(row).map((cell, c) => (
-                    <td key={c}>{cell}</td>
+                    <td key={c}>{renderCell(cell)}</td>
                   ))}
                 </tr>
               ))}

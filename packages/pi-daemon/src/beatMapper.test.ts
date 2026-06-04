@@ -229,6 +229,14 @@ describe("BeatMapper — convenience tools (render_table/chart/list)", () => {
     expect(beats.filter((b) => b.kind === "ui")).toHaveLength(0);
   });
 
+  it("emits no beat when a convenience tool's result is null", () => {
+    const beats = run(
+      { type: "tool_use", id: "r1", name: "render_table", input: {} },
+      { type: "tool_result", id: "r1", output: JSON.stringify(null), isError: false },
+    );
+    expect(beats.filter((b) => b.kind === "ui")).toHaveLength(0);
+  });
+
   it("ignores a tool_result whose id is not a pending convenience call", () => {
     const mapper = new BeatMapper();
     mapper.apply({ type: "tool_use", id: "t", name: "navigate", input: {} });

@@ -39,12 +39,17 @@ const RENDER_RESULT_TOOLS = new Set(["render_table", "render_chart", "render_lis
 
 /** Parse a convenience tool's result into the opaque A2UI value, or undefined if unusable. */
 function parseA2ui(output: unknown): unknown {
-  if (typeof output !== "string") return output;
-  try {
-    return JSON.parse(output);
-  } catch {
-    return undefined;
+  let value: unknown = output;
+  if (typeof output === "string") {
+    try {
+      value = JSON.parse(output);
+    } catch {
+      return undefined;
+    }
   }
+  // null is not a renderable message — treat it as unusable (no beat), like a
+  // parse failure, rather than emitting a ui beat with no content.
+  return value ?? undefined;
 }
 
 /** Human-facing verb for a tool name; falls back to the name itself. */

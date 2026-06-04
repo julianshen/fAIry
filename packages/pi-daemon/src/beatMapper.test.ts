@@ -249,4 +249,21 @@ describe("BeatMapper — convenience tools (render_table/chart/list)", () => {
     mapper.reset();
     expect(mapper.apply({ type: "tool_result", id: "r1", output: "{}", isError: false })).toEqual([]);
   });
+
+  it("emits no beat when a convenience tool's result is an error", () => {
+    const errored = { type: "table", columns: [], rows: [] }; // valid A2UI, but isError
+    const beats = run(
+      { type: "tool_use", id: "r1", name: "render_table", input: {} },
+      { type: "tool_result", id: "r1", output: JSON.stringify(errored), isError: true },
+    );
+    expect(beats.filter((b) => b.kind === "ui")).toHaveLength(0);
+  });
+
+  it("drops a pending convenience call when the turn ends before its result", () => {
+    const mapper = new BeatMapper();
+    mapper.apply({ type: "tool_use", id: "r1", name: "render_table", input: {} });
+    mapper.apply({ type: "turn_end", reason: "cancelled" });
+    // A late result for the cancelled call must not render stale UI after the run.
+    expect(mapper.apply({ type: "tool_result", id: "r1", output: "{}", isError: false })).toEqual([]);
+  });
 });

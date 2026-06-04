@@ -135,12 +135,18 @@ export class BeatMapper {
       case "tool_result": {
         if (!this.pendingUi.has(event.id)) return [];
         this.pendingUi.delete(event.id);
+        // An errored convenience call returns an error message, not A2UI — don't
+        // surface it as a (faux) ui beat.
+        if (event.isError) return [];
         const a2ui = parseA2ui(event.output);
         return a2ui === undefined ? [] : [{ kind: "ui", a2ui }];
       }
       case "turn_end": {
         const beats = this.flush();
         this.groupOpen = false;
+        // The turn is over: abandon any convenience call still awaiting a result
+        // so a late/cancelled result can't render stale UI after the run ends.
+        this.pendingUi.clear();
         beats.push({ kind: "status", run: event.reason === "cancelled" ? "paused" : "done" });
         return beats;
       }

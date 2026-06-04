@@ -127,9 +127,9 @@ milestones are **M5 (Swift shell)** and **M6 (packaging)**.
       the extension a **pure browser executor**.
 - [ ] **"PR4" — finish the extension tool layer** (decomposed into sub-projects, each
       its own spec → plan → PR):
-  - [ ] `learnPageActions` — page scanner (perception + URL analysis + `data-agent-action`
-        + classification; opt-in network observation). **In design** (`docs/superpowers/
-        specs/2026-06-04-learn-page-actions-design.md`).
+  - [x] `learnPageActions` — page scanner (perception + URL analysis + `data-agent-action`
+        + classification; opt-in network observation) (#41). Collector `evaluate` + pure
+        analyzers/classifier; lean v1 (no framework/state probes; no `agentPolicyLevel`).
   - [ ] `getAgentPolicy` — `/agent.json` resolver + policy model (+ enforcement decision).
   - [ ] `invokeStructuredAction` — call a site-declared action via the page session.
   - [ ] navigate-enrichment — `navigate` returns `domainSkillsAvailable` + `agentPolicy`.

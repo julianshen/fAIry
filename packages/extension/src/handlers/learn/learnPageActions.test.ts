@@ -58,6 +58,16 @@ describe("learnPageActions", () => {
     expect(buffer.isSubscribed("Network.requestWillBeSent")).toBe(false); // ours released
   });
 
+  it("skips observation (preserving the agent's events) when it already captures the network method", async () => {
+    const buffer = createEventBuffer();
+    buffer.subscribe("Network.requestWillBeSent"); // the agent is already capturing this
+    buffer.push("Network.requestWillBeSent", { request: { url: "https://x.com/a", method: "GET" } }, 1);
+    const res = await learnPageActions(cdpWithCollected(), buffer, async () => {}, { mode: "active" });
+    expect(res.network).toBeUndefined(); // didn't observe → didn't steal
+    expect(buffer.isSubscribed("Network.requestWillBeSent")).toBe(true); // agent's sub left intact
+    expect(buffer.collect("Network.requestWillBeSent")).toHaveLength(1); // agent's event still there
+  });
+
   it("skips the network block (still unsubscribes) when subscribe fails", async () => {
     const buffer = createEventBuffer();
     const cdp: CdpClient & { calls: { method: string }[] } = {

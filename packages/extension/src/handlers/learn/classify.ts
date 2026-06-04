@@ -32,6 +32,7 @@ export function classify(
   const actions: ClassifiedAction[] = [];
 
   for (const da of collected.declaredActions) {
+    if (!da.name) continue; // a blank data-agent-action attribute isn't an action
     actions.push({
       name: da.name,
       category: "custom",

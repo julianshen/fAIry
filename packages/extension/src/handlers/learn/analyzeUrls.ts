@@ -10,11 +10,11 @@ function segPattern(seg: string): string {
 
 function safeUrl(href: string, base?: URL): URL | undefined {
   try {
-    // Accept absolute URLs unconditionally; accept relative only if they look
-    // like a valid path (starts with /, ./, ../) so bare strings like
-    // "not a url" are rejected even though URL() would resolve them.
+    // Accept absolute URLs unconditionally; for relative hrefs accept path-like
+    // values (/about, users/9, ../x) but reject obvious non-URLs — a bare phrase
+    // like "not a url" would otherwise be "resolved" into an escaped path.
     if (base && !href.includes("://")) {
-      if (!/^\.{0,2}\//.test(href)) return undefined;
+      if (href.trim() === "" || /\s/.test(href)) return undefined;
     }
     return base ? new URL(href, base) : new URL(href);
   } catch {

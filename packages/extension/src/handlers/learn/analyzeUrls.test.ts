@@ -33,4 +33,10 @@ describe("analyzeUrls", () => {
     const r = analyzeUrls(["https://x.com/p/1", "https://other.com/p/2"], "https://x.com/home");
     expect(r.patterns).toEqual([{ pattern: "/p/:id", count: 1 }]);
   });
+
+  it("accepts bare path-relative hrefs (no leading slash)", () => {
+    const r = analyzeUrls(["users/9", "about"], "https://x.com/home");
+    expect(r.patterns).toContainEqual({ pattern: "/users/:id", count: 1 });
+    expect(r.patterns).toContainEqual({ pattern: "/about", count: 1 });
+  });
 });

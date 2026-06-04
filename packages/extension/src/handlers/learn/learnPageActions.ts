@@ -30,19 +30,19 @@ async function observeNetwork(
   sleep: Sleep,
   observeMs: number,
 ): Promise<{ endpoints: NetworkEndpoint[] } | undefined> {
-  // Don't tear down a subscription the agent already had on this method.
-  const preexisting = events.isSubscribed(NETWORK_METHOD);
-  let mine = false;
+  // If the agent is already capturing this method, a scan must not drain its
+  // buffer — collecting would consume requests the caller plans to read later.
+  // Skip observation in that case rather than steal the events.
+  if (events.isSubscribed(NETWORK_METHOD)) return undefined;
   try {
     const sub = await cdpSubscribe(cdp, events, { method: NETWORK_METHOD });
     if (!sub.ok) return undefined;
-    mine = !preexisting;
     await sleep(observeMs);
     const evts = (await cdpCollect(events, { method: NETWORK_METHOD })) as BufferedEvent[];
     return analyzeNetwork(evts);
   } finally {
-    // Release only our own method; leave the agent's other (and pre-existing) subscriptions alone.
-    if (mine) await cdpUnsubscribe(events, { method: NETWORK_METHOD });
+    // We created this subscription (it didn't pre-exist), so release only it.
+    await cdpUnsubscribe(events, { method: NETWORK_METHOD });
   }
 }
 

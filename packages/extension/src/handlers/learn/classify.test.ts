@@ -24,6 +24,11 @@ describe("classify", () => {
     );
   });
 
+  it("ignores a data-agent-action with an empty name", () => {
+    const c = { ...EMPTY, declaredActions: [{ name: "", tag: "button", label: "x" }] };
+    expect(classify(c, NO_URLS)).toEqual([]);
+  });
+
   it("classifies search inputs as a search action", () => {
     const c = { ...EMPTY, searchInputs: [{ label: "Search" }] };
     expect(classify(c, NO_URLS)).toContainEqual(

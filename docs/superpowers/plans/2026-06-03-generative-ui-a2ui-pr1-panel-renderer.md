@@ -18,7 +18,7 @@
 
 ---
 
-### Task 1: A2UI types + recharts dependency
+## Task 1: A2UI types + recharts dependency
 
 **Files:**
 - Create: `packages/agent-panel/src/a2ui/types.ts`
@@ -109,7 +109,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 2: `A2UIChart` (recharts-backed chart widget)
+## Task 2: `A2UIChart` (recharts-backed chart widget)
 
 **Files:**
 - Create: `packages/agent-panel/src/a2ui/A2UIChart.tsx`
@@ -345,7 +345,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 3: `A2UIView` renderer (text / card / group / list / table / unknown + chart routing)
+## Task 3: `A2UIView` renderer (text / card / group / list / table / unknown + chart routing)
 
 **Files:**
 - Create: `packages/agent-panel/src/a2ui/renderA2UI.tsx`
@@ -569,7 +569,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 4: `ui` beat → feed item (types + engine)
+## Task 4: `ui` beat → feed item (types + engine)
 
 **Files:**
 - Modify: `packages/agent-panel/src/types.ts` (add `ui` to `FeedItem` and `Beat`)
@@ -718,7 +718,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 5: Render the `ui` feed item (`UiItem` + `Feed` routing)
+## Task 5: Render the `ui` feed item (`UiItem` + `Feed` routing)
 
 **Files:**
 - Modify: `packages/agent-panel/src/components/FeedItems.tsx` (add `UiItem`)
@@ -924,7 +924,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 6: Public exports, baseline styles, and full verification
+## Task 6: Public exports, baseline styles, and full verification
 
 **Files:**
 - Modify: `packages/agent-panel/src/index.ts` (export `A2UIView` + A2UI types)
@@ -1055,7 +1055,7 @@ After the tasks above, follow the repo's standard merge path for this PR:
 
 PR body must end with:
 
-```
+```text
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 

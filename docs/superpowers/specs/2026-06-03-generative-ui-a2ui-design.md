@@ -59,7 +59,7 @@ is needed.
 
 ## Architecture & data flow
 
-```
+```text
 Pi calls render_ui({ message })            (existing -e tool — pure echo)
   │   (or a convenience tool: render_table/render_chart/render_list, which
   │    BUILD the A2UI message and return it)

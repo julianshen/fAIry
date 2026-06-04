@@ -16,10 +16,16 @@ export type PanelBeat =
   | { kind: "say"; agent: PanelAgentId; text: string }
   | { kind: "actGroup"; agent: PanelAgentId; title: string }
   | { kind: "act"; agent: PanelAgentId; verb: string; target: string; sub?: string }
+  // A2UI message rendered into the panel (from the render_ui tool). The daemon is
+  // A2UI-agnostic: `a2ui` is opaque wire data passed straight through to the panel.
+  | { kind: "ui"; a2ui: unknown }
   | { kind: "status"; run: PanelRun };
 
 /** v1: a single agent. Multi-agent attribution is a deferred product decision. */
 const AGENT: PanelAgentId = "sage";
+
+/** The `-e` tool whose result is generative UI, not a page action (see PR-2 plan). */
+const RENDER_UI_TOOL = "render_ui";
 
 /** Human-facing verb for a tool name; falls back to the name itself. */
 const TOOL_VERBS: Record<string, string> = {
@@ -73,6 +79,13 @@ export class BeatMapper {
       }
       case "tool_use": {
         const beats = this.flush();
+        if (event.name === RENDER_UI_TOOL) {
+          // Generative UI, not a page action: emit a ui beat carrying the A2UI
+          // message (from the call args — see the PR-2 plan's verification note)
+          // and do NOT open an action group.
+          beats.push({ kind: "ui", a2ui: event.input.message });
+          return beats;
+        }
         if (!this.groupOpen) {
           beats.push({ kind: "actGroup", agent: AGENT, title: "Working on the page" });
           this.groupOpen = true;

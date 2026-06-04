@@ -118,6 +118,40 @@ async function bridge(tool: string, args: Record<string, unknown>) {
   }
 }
 
+/** A2UI message object built by the convenience tools (plain JSON for the panel). */
+type A2uiMessage = Record<string, unknown>;
+
+// Args are already validated by each tool's TypeBox schema before execute runs,
+// so the builders take the schema-guaranteed types (matching the execute casts).
+
+/** Build an A2UI table; `title` maps to the table's `caption` slot. */
+function buildTable(args: { title?: string; columns: string[]; rows: (string | number)[][] }): A2uiMessage {
+  const table: A2uiMessage = { type: "table", columns: args.columns, rows: args.rows };
+  if (args.title) table.caption = args.title;
+  return table;
+}
+
+/** Build an A2UI chart node (the `chart` arg is the kind: bar/line/area/pie). */
+function buildChart(args: {
+  chart: string;
+  title?: string;
+  data: unknown;
+  x: string;
+  series: string[];
+}): A2uiMessage {
+  const chart: A2uiMessage = { type: "chart", chart: args.chart, data: args.data, x: args.x, series: args.series };
+  if (args.title) chart.title = args.title;
+  return chart;
+}
+
+/** Build an A2UI list; a `title`, if given, wraps the list in a titled card. */
+function buildList(args: { title?: string; ordered?: boolean; items: string[] }): A2uiMessage {
+  const list: A2uiMessage = { type: "list", items: args.items };
+  // Omit `ordered` when false: an absent flag already means unordered.
+  if (args.ordered) list.ordered = true;
+  return args.title ? { type: "card", title: args.title, children: [list] } : list;
+}
+
 export default function (pi: ExtensionAPI): void {
   pi.registerTool({
     name: "browser_navigate",
@@ -659,6 +693,62 @@ export default function (pi: ExtensionAPI): void {
     }),
     execute: async (_id, params) => {
       const message = (params as { message: unknown }).message;
+      return { content: [{ type: "text" as const, text: JSON.stringify(message) }], details: message };
+    },
+  });
+
+  pi.registerTool({
+    name: "render_table",
+    label: "Render table",
+    description:
+      "Render a table in the Fairy panel. Pass {title?, columns, rows}: columns are header " +
+      "strings; rows are arrays of cell values (string|number), one array per row.",
+    parameters: Type.Object({
+      title: Type.Optional(Type.String()),
+      columns: Type.Array(Type.String()),
+      rows: Type.Array(Type.Array(Type.Union([Type.String(), Type.Number()]))),
+    }),
+    execute: async (_id, params) => {
+      const message = buildTable(params as { title?: string; columns: string[]; rows: (string | number)[][] });
+      return { content: [{ type: "text" as const, text: JSON.stringify(message) }], details: message };
+    },
+  });
+
+  pi.registerTool({
+    name: "render_chart",
+    label: "Render chart",
+    description:
+      "Render a chart in the Fairy panel. Pass {chart, title?, data, x, series}: chart is the " +
+      "kind (bar|line|area|pie); data is an array of row objects; x is the category key; series " +
+      "are the value keys to plot.",
+    parameters: Type.Object({
+      chart: Type.Union([Type.Literal("bar"), Type.Literal("line"), Type.Literal("area"), Type.Literal("pie")]),
+      title: Type.Optional(Type.String()),
+      data: Type.Array(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
+      x: Type.String(),
+      series: Type.Array(Type.String()),
+    }),
+    execute: async (_id, params) => {
+      const message = buildChart(
+        params as { chart: string; title?: string; data: unknown; x: string; series: string[] },
+      );
+      return { content: [{ type: "text" as const, text: JSON.stringify(message) }], details: message };
+    },
+  });
+
+  pi.registerTool({
+    name: "render_list",
+    label: "Render list",
+    description:
+      "Render a list in the Fairy panel. Pass {title?, ordered?, items}: items are strings; set " +
+      "ordered for a numbered list; a title wraps the list in a titled card.",
+    parameters: Type.Object({
+      title: Type.Optional(Type.String()),
+      ordered: Type.Optional(Type.Boolean()),
+      items: Type.Array(Type.String()),
+    }),
+    execute: async (_id, params) => {
+      const message = buildList(params as { title?: string; ordered?: boolean; items: string[] });
       return { content: [{ type: "text" as const, text: JSON.stringify(message) }], details: message };
     },
   });

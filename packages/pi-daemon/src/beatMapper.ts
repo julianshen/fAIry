@@ -30,6 +30,28 @@ const AGENT: PanelAgentId = "sage";
  */
 const RENDER_UI_TOOL = "render_ui";
 
+/**
+ * The `-e` convenience tools whose built A2UI message arrives in the tool RESULT
+ * (constructed from simple args), not the call args — see the PR-3 design. The
+ * mapper records their call id at tool_use and parses the result into a ui beat.
+ */
+const RENDER_RESULT_TOOLS = new Set(["render_table", "render_chart", "render_list"]);
+
+/** Parse a convenience tool's result into the opaque A2UI value, or undefined if unusable. */
+function parseA2ui(output: unknown): unknown {
+  let value: unknown = output;
+  if (typeof output === "string") {
+    try {
+      value = JSON.parse(output);
+    } catch {
+      return undefined;
+    }
+  }
+  // null is not a renderable message — treat it as unusable (no beat), like a
+  // parse failure, rather than emitting a ui beat with no content.
+  return value ?? undefined;
+}
+
 /** Human-facing verb for a tool name; falls back to the name itself. */
 const TOOL_VERBS: Record<string, string> = {
   navigate: "Navigated to",
@@ -66,6 +88,8 @@ function targetFor(input: Record<string, unknown>): string {
 export class BeatMapper {
   private text = "";
   private groupOpen = false;
+  /** Ids of in-flight convenience-tool calls whose result becomes a ui beat. */
+  private pendingUi = new Set<string>();
 
   apply(event: AgentEvent): PanelBeat[] {
     switch (event.type) {
@@ -92,6 +116,15 @@ export class BeatMapper {
           beats.push({ kind: "ui", a2ui: event.input.message });
           return beats;
         }
+        if (RENDER_RESULT_TOOLS.has(event.name)) {
+          // Convenience tool: the built A2UI arrives in the result, not the args.
+          // Record the id so tool_result can emit the ui beat. Like render_ui it's
+          // panel output, not a page action — clear groupOpen (the forthcoming ui
+          // beat finalizes the running group in the panel).
+          this.groupOpen = false;
+          this.pendingUi.add(event.id);
+          return beats;
+        }
         if (!this.groupOpen) {
           beats.push({ kind: "actGroup", agent: AGENT, title: "Working on the page" });
           this.groupOpen = true;
@@ -99,11 +132,21 @@ export class BeatMapper {
         beats.push({ kind: "act", agent: AGENT, verb: verbFor(event.name), target: targetFor(event.input) });
         return beats;
       }
-      case "tool_result":
-        return [];
+      case "tool_result": {
+        if (!this.pendingUi.has(event.id)) return [];
+        this.pendingUi.delete(event.id);
+        // An errored convenience call returns an error message, not A2UI — don't
+        // surface it as a (faux) ui beat.
+        if (event.isError) return [];
+        const a2ui = parseA2ui(event.output);
+        return a2ui === undefined ? [] : [{ kind: "ui", a2ui }];
+      }
       case "turn_end": {
         const beats = this.flush();
         this.groupOpen = false;
+        // The turn is over: abandon any convenience call still awaiting a result
+        // so a late/cancelled result can't render stale UI after the run ends.
+        this.pendingUi.clear();
         beats.push({ kind: "status", run: event.reason === "cancelled" ? "paused" : "done" });
         return beats;
       }
@@ -119,6 +162,7 @@ export class BeatMapper {
   reset(): void {
     this.text = "";
     this.groupOpen = false;
+    this.pendingUi.clear();
   }
 
   private flush(): PanelBeat[] {

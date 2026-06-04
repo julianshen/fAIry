@@ -20,10 +20,15 @@
 | `pi-daemon` | `beatMapper` — `AgentEvent` → panel beats | ✅ merged (#14) |
 | `pi-daemon` | `conversation` + `conversationSession` — controller + WS endpoint logic | ✅ merged (#15, #16) |
 
-**M1 (daemon core) complete** (`paths` → `ndjson` → `jsonLineProcess` →
-`piSession` → `piConfig`). **M2 transport complete** and **M3 logic complete**
-(`bridge`/sessions/servers, `beatMapper`, `conversation`/`conversationSession`).
-Remaining daemon work is integration/wiring — see M2/M3 below (150+ pi-daemon tests).
+**`pi-daemon` COMPLETE** (M1 core + M2 transport + M3 API + lifecycle + pairing +
+the daemon tool-router; PRs #1–#37, 370+ tests). **M4 Chrome extension** —
+connection/dispatch + MV3 build + pairing E2E + browser-tool groups 1–4 + the
+tool-router re-homing all merged; the extension is a pure browser executor. Its
+tool layer is finished except the originally-planned "PR4" group (now decomposed —
+see M4 below). **Generative UI (A2UI) COMPLETE** (PRs #38–#40): the agent renders
+text/card/group/list/table/chart inline in the conversation (`render_ui` + the
+`render_table`/`render_chart`/`render_list` convenience tools). The remaining big
+milestones are **M5 (Swift shell)** and **M6 (packaging)**.
 
 ## Milestones
 
@@ -109,10 +114,39 @@ Remaining daemon work is integration/wiring — see M2/M3 below (150+ pi-daemon 
 > bootstraps: known HTTP port → `POST /pair` (code → token) → `GET /info` (→ WS
 > ports) → connect the bridge + conversation WS. Build: Vite + `@crxjs/vite-plugin`.
 
-- [ ] MV3 scaffold; connect to the daemon at `localhost` (pairing → token → `/info`).
-- [ ] Browser-tool backend: execute `navigate`/`click`/`type`/`screenshot`/CDP
-      via `chrome.debugger` / `chrome.tabs` / `chrome.scripting`.
-- [ ] Host the `agent-panel` as the side-panel UI, wired to the conversation WS.
+- [x] **Connection/dispatch layer** (#27–#29) — `discovery` (pair→token→/info→ports),
+      `conversationClient` (WS→beats), `bridgeClient` (executor side), `toolExecutor`
+      (name→handler Map). MV3 scaffold + crxjs build + pairing UI + side-panel hosting
+      the `agent-panel` (#30); Playwright pairing E2E against a real daemon + browser (#31).
+- [x] **Browser-tool backend (groups 1–4)** — CDP execution core + 14 handlers
+      (nav/see/click/type) (#32); tabs + CDP passthrough/events + the cross-tab TOCTOU
+      fix (`AgentTabs`) (#33). The extension drives only agent-owned tabs.
+- [x] **Tool-router re-homing** (#34–#37) — a daemon tool-router serves the
+      persistence/Pi-session tools (compact, skills, helpers, domain-skills, workflows)
+      locally and relays the rest to the extension; the `-e` script is unchanged. Keeps
+      the extension a **pure browser executor**.
+- [ ] **"PR4" — finish the extension tool layer** (decomposed into sub-projects, each
+      its own spec → plan → PR):
+  - [x] `learnPageActions` — page scanner (perception + URL analysis + `data-agent-action`
+        + classification; opt-in network observation) (#41). Collector `evaluate` + pure
+        analyzers/classifier; lean v1 (no framework/state probes; no `agentPolicyLevel`).
+  - [ ] `getAgentPolicy` — `/agent.json` resolver + policy model (+ enforcement decision).
+  - [ ] `invokeStructuredAction` — call a site-declared action via the page session.
+  - [ ] navigate-enrichment — `navigate` returns `domainSkillsAvailable` + `agentPolicy`.
+  - [ ] `proposeSave` + a panel toast/confirm UI.
+  - [ ] Group-2 finishers — `reader_extract` (inject Readability) + `waitFor` networkIdle.
+
+### Generative UI (A2UI) ✅
+
+- [x] **Panel A2UI renderer** (#38) — `A2UIView` (text/card/group/list/table) +
+      recharts `A2UIChart`; a `ui` beat folded into the feed; wire-data guards so
+      malformed generated UI degrades to a fallback instead of crashing.
+- [x] **Daemon `render_ui` → `ui` beat** (#39) — `beatMapper` emits the beat from the
+      tool call; the daemon stays A2UI-agnostic.
+- [x] **Convenience tools** (#40) — `render_table`/`render_chart`/`render_list` build
+      A2UI in the `-e` script; the daemon parses it out of the tool result.
+- Deferred (own future specs): UI→agent interactivity, full A2UI v0.8 adjacency-list,
+  full AG-UI/CopilotKit.
 
 ### M5 — macOS shell (Swift)
 
@@ -159,3 +193,7 @@ To keep us from "going elsewhere," fAIry explicitly does **not** aim to:
 | 2026-06-02 | Trunk is `main`. Workflow: feature branch → PR → simplify/review → fix comments → wait for bot reviews → merge. |
 | 2026-06-02 | Daemon spawns Pi through `node:child_process` (Bun node-compat), not `Bun.spawn`. |
 | 2026-06-02 | **v1 scope set**: all 27 browser tools; daemon API = WebSocket (stream + bridge) + HTTP (settings/status); per-session token + one-time pairing auth; one conversation on the active tab; provider config via a **native macOS Settings UI from the tray**; shell **code-signed + notarized + Sparkle auto-update from v1**. |
+| 2026-06-03 | Extension stays a **pure browser executor** (groups 1–4 + policy/structured/learn). Persistence/Pi-session tools (helpers, skills, domain-skills, workflows, compact) **re-home to a daemon tool-router** that intercepts before relaying; the `-e` script is unchanged. |
+| 2026-06-04 | **Generative UI = A2UI carried as a `ui` beat over the existing WS + a custom renderer** (recharts for charts). NOT CopilotKit/AG-UI runtime — its renderer is provider-coupled, disproportionate for a display feature. The daemon stays **A2UI-agnostic** (passes/parses opaque JSON; never constructs A2UI). |
+| 2026-06-04 | The originally-planned M4 "PR4" is **decomposed into per-capability sub-projects** (learnPageActions, getAgentPolicy, invokeStructuredAction, navigate-enrichment, proposeSave, group-2 finishers), each its own spec → plan → PR. `learnPageActions` first. |
+| 2026-06-04 | Workflow: finishing a development branch **always means push + open a PR** (never local-merge / no merge-menu prompt). |

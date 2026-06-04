@@ -33,7 +33,9 @@ const agentTabs = createAgentTabs();
 const tabsApi = createChromeTabsApi();
 const events = createEventBuffer();
 const cdp = createDebuggerCdpClient(agentTabs, events);
-const executor = createToolExecutor(createBrowserHandlers({ cdp, tabs: tabsApi, agentTabs, events }));
+const executor = createToolExecutor(
+  createBrowserHandlers({ cdp, tabs: tabsApi, agentTabs, events, sleep: (ms) => new Promise((r) => setTimeout(r, ms)) }),
+);
 
 // Bind the agent to the tab the user started the task on (the panel signals us).
 // Responds AFTER the bind so the panel can wait before starting the task.

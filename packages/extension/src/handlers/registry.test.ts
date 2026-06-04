@@ -11,6 +11,7 @@ function deps(over: Partial<BrowserDeps> = {}): BrowserDeps {
     tabs: fakeTabs(),
     agentTabs: createAgentTabs(),
     events: createEventBuffer(),
+    sleep: async () => {},
     ...over,
   };
 }
@@ -42,6 +43,8 @@ const EXPECTED_TOOLS = [
   "cdpSubscribe",
   "cdpCollect",
   "cdpUnsubscribe",
+  // group 9 (partial) — page understanding
+  "learnPageActions",
 ];
 
 describe("createBrowserHandlers", () => {

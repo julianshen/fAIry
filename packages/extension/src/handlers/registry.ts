@@ -11,6 +11,7 @@ import { axtree, describeAt, getDom } from "./inspect";
 import { dismissOverlays, waitFor } from "./page";
 import { tabClose, tabList, tabOpen, tabSwitch } from "./tabs";
 import { cdpCollect, cdpPassthrough, cdpSubscribe, cdpUnsubscribe } from "./cdp";
+import { learnPageActions } from "./learn/learnPageActions";
 
 /** Everything the browser handlers need: the CDP seam, the chrome.tabs seam, the
  *  agent-tab binding, and the CDP event buffer. */
@@ -19,6 +20,9 @@ export interface BrowserDeps {
   tabs: TabsApi;
   agentTabs: AgentTabs;
   events: CdpEventBuffer;
+  /** Injected delay for learnPageActions' active-mode network window (the SW glue
+   *  passes a setTimeout-backed sleep; tests pass a fake). */
+  sleep: (ms: number) => Promise<void>;
 }
 
 /**
@@ -34,7 +38,7 @@ export interface BrowserDeps {
  * module (the `-e` script can't import daemon/extension code, so it's deferred).
  */
 export function createBrowserHandlers(deps: BrowserDeps): Record<string, ToolHandler> {
-  const { cdp, tabs, agentTabs, events } = deps;
+  const { cdp, tabs, agentTabs, events, sleep } = deps;
   const onCdp =
     (fn: (cdp: CdpClient, args: Record<string, unknown>) => Promise<unknown>): ToolHandler =>
     (args) =>
@@ -65,5 +69,7 @@ export function createBrowserHandlers(deps: BrowserDeps): Record<string, ToolHan
     cdpSubscribe: (args) => cdpSubscribe(cdp, events, args),
     cdpCollect: (args) => cdpCollect(events, args),
     cdpUnsubscribe: (args) => cdpUnsubscribe(events, args),
+    // Group 9 (partial) — page understanding.
+    learnPageActions: (args) => learnPageActions(cdp, events, sleep, args),
   };
 }

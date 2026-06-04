@@ -7,6 +7,16 @@ export function A2UIView({ message }: { message: A2UINode }): ReactElement {
   return <div className="a2ui">{renderNode(message)}</div>;
 }
 
+/**
+ * A2UI arrives as opaque LLM/wire data, so a node with a known `type` may still
+ * be missing (or have a non-array for) a required field. Coerce to an array
+ * before mapping so malformed UI degrades to "render what's valid" instead of
+ * throwing and blanking the whole feed.
+ */
+function asArray<T>(value: T[] | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
 function renderNode(node: A2UINode, key?: number): ReactElement {
   switch (node.type) {
     case "text":
@@ -19,17 +29,17 @@ function renderNode(node: A2UINode, key?: number): ReactElement {
       return (
         <div key={key} className="a2ui-card">
           {node.title && <div className="a2ui-card-title">{node.title}</div>}
-          <div className="a2ui-card-body">{node.children.map((c, i) => renderNode(c, i))}</div>
+          <div className="a2ui-card-body">{asArray(node.children).map((c, i) => renderNode(c, i))}</div>
         </div>
       );
     case "group":
       return (
         <div key={key} className="a2ui-group">
-          {node.children.map((c, i) => renderNode(c, i))}
+          {asArray(node.children).map((c, i) => renderNode(c, i))}
         </div>
       );
     case "list": {
-      const items = node.items.map((it, i) => (
+      const items = asArray(node.items).map((it, i) => (
         <li key={i}>{typeof it === "string" ? it : renderNode(it)}</li>
       ));
       return node.ordered ? (
@@ -51,15 +61,15 @@ function renderNode(node: A2UINode, key?: number): ReactElement {
             {node.caption && <caption>{node.caption}</caption>}
             <thead>
               <tr>
-                {node.columns.map((c, i) => (
+                {asArray(node.columns).map((c, i) => (
                   <th key={i}>{c}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {node.rows.map((row, r) => (
+              {asArray(node.rows).map((row, r) => (
                 <tr key={r}>
-                  {row.map((cell, c) => (
+                  {asArray(row).map((cell, c) => (
                     <td key={c}>{cell}</td>
                   ))}
                 </tr>

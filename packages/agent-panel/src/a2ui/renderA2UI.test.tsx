@@ -102,4 +102,34 @@ describe("A2UIView", () => {
     expect(unknown).toHaveAttribute("data-type", "widget");
     expect(unknown).toHaveTextContent("widget");
   });
+
+  // A2UI arrives as opaque LLM/wire data, so a known type may be missing its
+  // required arrays. These must degrade, not throw (which would blank the feed).
+  it("renders a card missing children without crashing", () => {
+    const card = { type: "card", title: "Summary" } as unknown as A2UINode;
+    const { container } = render(<A2UIView message={card} />);
+    expect(container.querySelector(".a2ui-card-title")).toHaveTextContent("Summary");
+    expect(container.querySelector(".a2ui-card-body")?.children).toHaveLength(0);
+  });
+
+  it("renders a table missing rows without crashing", () => {
+    const table = { type: "table", columns: ["A", "B"] } as unknown as A2UINode;
+    const { container } = render(<A2UIView message={table} />);
+    expect(container.querySelectorAll("thead th")).toHaveLength(2);
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(0);
+  });
+
+  it("renders a table with a malformed (non-array) row without crashing", () => {
+    const table = { type: "table", columns: ["A"], rows: [["ok"], "bad"] } as unknown as A2UINode;
+    const { container } = render(<A2UIView message={table} />);
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(2);
+    expect(container.querySelectorAll("tbody tr")[1]?.children).toHaveLength(0);
+  });
+
+  it("renders a list missing items without crashing", () => {
+    const list = { type: "list" } as unknown as A2UINode;
+    const { container } = render(<A2UIView message={list} />);
+    expect(container.querySelector("ul.a2ui-list")).not.toBeNull();
+    expect(container.querySelectorAll("li")).toHaveLength(0);
+  });
 });

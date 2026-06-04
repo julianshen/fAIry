@@ -50,6 +50,14 @@ describe("learnPageActions", () => {
     expect(buffer.isSubscribed("Network.requestWillBeSent")).toBe(false);
   });
 
+  it("leaves the agent's unrelated subscriptions intact after an active scan", async () => {
+    const buffer = createEventBuffer();
+    buffer.subscribe("Console.messageAdded"); // a capture the agent set up before scanning
+    await learnPageActions(cdpWithCollected(), buffer, async () => {}, { mode: "active" });
+    expect(buffer.isSubscribed("Console.messageAdded")).toBe(true); // preserved, not nuked
+    expect(buffer.isSubscribed("Network.requestWillBeSent")).toBe(false); // ours released
+  });
+
   it("skips the network block (still unsubscribes) when subscribe fails", async () => {
     const buffer = createEventBuffer();
     const cdp: CdpClient & { calls: { method: string }[] } = {

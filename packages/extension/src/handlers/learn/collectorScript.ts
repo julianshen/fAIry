@@ -35,7 +35,7 @@ export const COLLECTOR_JS = `(() => {
     for (const a of n.querySelectorAll('a[href]')) links.push({ label: text(a), href: a.getAttribute('href') || '' });
     nav.push({ label: n.getAttribute('aria-label'), links });
   }
-  const hrefs = Array.from(document.querySelectorAll('a[href]'), (a) => a.href);
+  const hrefs = Array.from(document.querySelectorAll('a[href]'), (a) => typeof a.href === 'string' ? a.href : (a.href && a.href.baseVal) || a.getAttribute('href') || '');
   const declaredActions = Array.from(document.querySelectorAll('[data-agent-action]'), (el) => ({ name: el.getAttribute('data-agent-action') || '', tag: el.tagName.toLowerCase(), label: text(el) }));
   return { origin: location.origin, url: location.href, elementsByRole, interactive, searchInputs, forms, nav, hrefs, declaredActions };
 })()`;

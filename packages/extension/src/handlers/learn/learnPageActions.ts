@@ -20,21 +20,29 @@ function isCollected(v: unknown): v is Collected {
 }
 
 /** Observe network for `observeMs`; returns endpoints, or undefined if it can't subscribe. */
+/** The one CDP event analyzeNetwork reads; scoping to it keeps a scan from
+ *  disturbing other subscriptions in the worker-wide event buffer. */
+const NETWORK_METHOD = "Network.requestWillBeSent";
+
 async function observeNetwork(
   cdp: CdpClient,
   events: CdpEventBuffer,
   sleep: Sleep,
   observeMs: number,
 ): Promise<{ endpoints: NetworkEndpoint[] } | undefined> {
+  // Don't tear down a subscription the agent already had on this method.
+  const preexisting = events.isSubscribed(NETWORK_METHOD);
+  let mine = false;
   try {
-    const sub = await cdpSubscribe(cdp, events, { method: "Network.requestWillBeSent" });
+    const sub = await cdpSubscribe(cdp, events, { method: NETWORK_METHOD });
     if (!sub.ok) return undefined;
-    await cdpSubscribe(cdp, events, { method: "Network.responseReceived" });
+    mine = !preexisting;
     await sleep(observeMs);
-    const evts = (await cdpCollect(events, {})) as BufferedEvent[];
+    const evts = (await cdpCollect(events, { method: NETWORK_METHOD })) as BufferedEvent[];
     return analyzeNetwork(evts);
   } finally {
-    await cdpUnsubscribe(events, {});
+    // Release only our own method; leave the agent's other (and pre-existing) subscriptions alone.
+    if (mine) await cdpUnsubscribe(events, { method: NETWORK_METHOD });
   }
 }
 

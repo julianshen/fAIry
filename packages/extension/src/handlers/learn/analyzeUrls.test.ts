@@ -28,4 +28,9 @@ describe("analyzeUrls", () => {
     const r = analyzeUrls(["/users/9", "not a url"], "https://x.com/home");
     expect(r.patterns).toEqual([{ pattern: "/users/:id", count: 1 }]);
   });
+
+  it("excludes cross-origin links (only same-origin navigation counts)", () => {
+    const r = analyzeUrls(["https://x.com/p/1", "https://other.com/p/2"], "https://x.com/home");
+    expect(r.patterns).toEqual([{ pattern: "/p/:id", count: 1 }]);
+  });
 });

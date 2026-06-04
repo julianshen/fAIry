@@ -31,7 +31,9 @@ export function analyzeUrls(hrefs: string[], currentUrl: string): UrlAnalysis {
   const counts = new Map<string, number>();
   for (const href of hrefs) {
     const u = safeUrl(href, base);
-    if (!u) continue;
+    // Only same-origin links count as this site's navigation — otherwise an
+    // external link sharing a path (e.g. other.com/about) pollutes the patterns.
+    if (!u || (base && u.origin !== base.origin)) continue;
     const pattern = u.pathname.split("/").map(segPattern).join("/");
     counts.set(pattern, (counts.get(pattern) ?? 0) + 1);
   }

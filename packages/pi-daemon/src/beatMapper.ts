@@ -24,7 +24,10 @@ export type PanelBeat =
 /** v1: a single agent. Multi-agent attribution is a deferred product decision. */
 const AGENT: PanelAgentId = "sage";
 
-/** The `-e` tool whose result is generative UI, not a page action (see PR-2 plan). */
+/**
+ * The tool (registered in the Pi browser-bridge `-e` script) whose call produces
+ * generative UI for the panel rather than a page action (see PR-2 plan).
+ */
 const RENDER_UI_TOOL = "render_ui";
 
 /** Human-facing verb for a tool name; falls back to the name itself. */
@@ -82,7 +85,10 @@ export class BeatMapper {
         if (event.name === RENDER_UI_TOOL) {
           // Generative UI, not a page action: emit a ui beat carrying the A2UI
           // message (from the call args — see the PR-2 plan's verification note)
-          // and do NOT open an action group.
+          // instead of opening an action group. The panel finalizes the running
+          // group on a ui beat (like a say), so clear groupOpen to stay in sync —
+          // otherwise a later tool's act lands in a group the panel has closed.
+          this.groupOpen = false;
           beats.push({ kind: "ui", a2ui: event.input.message });
           return beats;
         }

@@ -146,4 +146,17 @@ describe("BeatMapper — render_ui (generative UI)", () => {
     const beats = run({ type: "tool_use", id: "u1", name: "render_ui", input: {} });
     expect(beats).toEqual([{ kind: "ui", a2ui: undefined }]);
   });
+
+  it("closes the open action group: a page tool after render_ui opens a fresh group", () => {
+    // The panel finalizes the running action group on a ui beat (like a say), so
+    // the mapper must too — otherwise the next tool's act lands in a group the
+    // panel already closed and is dropped.
+    const beats = run(
+      { type: "tool_use", id: "t1", name: "navigate", input: { url: "https://x.com" } },
+      { type: "tool_use", id: "u1", name: "render_ui", input: { message: { type: "text", text: "x" } } },
+      { type: "tool_use", id: "t2", name: "click", input: { selector: "#go" } },
+    );
+    expect(beats.filter((b) => b.kind === "actGroup")).toHaveLength(2);
+    expect(beats.filter((b) => b.kind === "act")).toHaveLength(2);
+  });
 });

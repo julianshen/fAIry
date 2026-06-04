@@ -132,4 +132,24 @@ describe("A2UIView", () => {
     expect(container.querySelector("ul.a2ui-list")).not.toBeNull();
     expect(container.querySelectorAll("li")).toHaveLength(0);
   });
+
+  it("renders a fallback for a null root message without crashing", () => {
+    const { container } = render(<A2UIView message={null as unknown as A2UINode} />);
+    expect(container.querySelector(".a2ui-unknown")).toHaveAttribute("data-type", "null");
+  });
+
+  it("renders a fallback for a primitive node", () => {
+    const { container } = render(<A2UIView message={"oops" as unknown as A2UINode} />);
+    expect(container.querySelector(".a2ui-unknown")).toHaveAttribute("data-type", "string");
+  });
+
+  it("renders a null child as a fallback without crashing", () => {
+    const message = {
+      type: "group",
+      children: [null, { type: "text", text: "ok" }],
+    } as unknown as A2UINode;
+    const { container } = render(<A2UIView message={message} />);
+    expect(screen.getByText("ok")).toBeInTheDocument();
+    expect(container.querySelector(".a2ui-group .a2ui-unknown")).not.toBeNull();
+  });
 });

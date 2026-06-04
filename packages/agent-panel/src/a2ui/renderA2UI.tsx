@@ -9,6 +9,16 @@ export function A2UIView({ message }: { message: A2UINode }): ReactElement {
 }
 
 function renderNode(node: A2UINode, key?: number): ReactElement {
+  if (node == null || typeof node !== "object") {
+    // null/undefined/primitive wire data — can't switch on `.type`; degrade to
+    // the unsupported fallback instead of throwing on the dereference.
+    const type = node == null ? String(node) : typeof node;
+    return (
+      <div key={key} className="a2ui-unknown" data-type={type}>
+        Unsupported component: {type}
+      </div>
+    );
+  }
   switch (node.type) {
     case "text":
       return (

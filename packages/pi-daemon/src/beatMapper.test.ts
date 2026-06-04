@@ -111,3 +111,52 @@ describe("BeatMapper — reset", () => {
     expect(beats.filter((b) => b.kind === "say")).toHaveLength(0);
   });
 });
+
+describe("BeatMapper — render_ui (generative UI)", () => {
+  it("emits a ui beat carrying the A2UI message instead of an act", () => {
+    const message = { type: "card", title: "Summary", children: [] };
+    const beats = run({ type: "tool_use", id: "u1", name: "render_ui", input: { message } });
+    expect(beats).toEqual([{ kind: "ui", a2ui: message }]);
+  });
+
+  it("flushes buffered text before the ui beat", () => {
+    const message = { type: "text", text: "hi" };
+    const beats = run(
+      { type: "text_delta", text: "here you go" },
+      { type: "tool_use", id: "u1", name: "render_ui", input: { message } },
+    );
+    expect(beats).toEqual([
+      { kind: "thinking", agent: "sage" },
+      { kind: "say", agent: "sage", text: "here you go" },
+      { kind: "ui", a2ui: message },
+    ]);
+  });
+
+  it("does not open an action group for render_ui (a later page tool opens its own)", () => {
+    const beats = run(
+      { type: "tool_use", id: "u1", name: "render_ui", input: { message: { type: "text", text: "x" } } },
+      { type: "tool_use", id: "t2", name: "click", input: { selector: "#go" } },
+    );
+    expect(beats.filter((b) => b.kind === "actGroup")).toHaveLength(1);
+    expect(beats.filter((b) => b.kind === "ui")).toHaveLength(1);
+    expect(beats.filter((b) => b.kind === "act")).toHaveLength(1);
+  });
+
+  it("still emits a ui beat when the message arg is missing", () => {
+    const beats = run({ type: "tool_use", id: "u1", name: "render_ui", input: {} });
+    expect(beats).toEqual([{ kind: "ui", a2ui: undefined }]);
+  });
+
+  it("closes the open action group: a page tool after render_ui opens a fresh group", () => {
+    // The panel finalizes the running action group on a ui beat (like a say), so
+    // the mapper must too — otherwise the next tool's act lands in a group the
+    // panel already closed and is dropped.
+    const beats = run(
+      { type: "tool_use", id: "t1", name: "navigate", input: { url: "https://x.com" } },
+      { type: "tool_use", id: "u1", name: "render_ui", input: { message: { type: "text", text: "x" } } },
+      { type: "tool_use", id: "t2", name: "click", input: { selector: "#go" } },
+    );
+    expect(beats.filter((b) => b.kind === "actGroup")).toHaveLength(2);
+    expect(beats.filter((b) => b.kind === "act")).toHaveLength(2);
+  });
+});

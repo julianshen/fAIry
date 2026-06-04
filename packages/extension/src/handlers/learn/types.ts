@@ -38,7 +38,6 @@ export interface Collected {
   forms: CollectedForm[];
   nav: CollectedNav[];
   hrefs: string[];
-  queryParams: string[];
   declaredActions: DeclaredAction[];
 }
 

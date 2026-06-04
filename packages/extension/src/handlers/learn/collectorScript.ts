@@ -37,6 +37,5 @@ export const COLLECTOR_JS = `(() => {
   }
   const hrefs = Array.from(document.querySelectorAll('a[href]'), (a) => a.href);
   const declaredActions = Array.from(document.querySelectorAll('[data-agent-action]'), (el) => ({ name: el.getAttribute('data-agent-action') || '', tag: el.tagName.toLowerCase(), label: text(el) }));
-  const queryParams = Array.from(new URLSearchParams(location.search).keys());
-  return { origin: location.origin, url: location.href, elementsByRole, interactive, searchInputs, forms, nav, hrefs, queryParams, declaredActions };
+  return { origin: location.origin, url: location.href, elementsByRole, interactive, searchInputs, forms, nav, hrefs, declaredActions };
 })()`;

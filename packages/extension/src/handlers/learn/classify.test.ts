@@ -11,7 +11,6 @@ const EMPTY: Collected = {
   forms: [],
   nav: [],
   hrefs: [],
-  queryParams: [],
   declaredActions: [],
 };
 const NO_URLS: UrlAnalysis = { patterns: [], queryParams: [] };

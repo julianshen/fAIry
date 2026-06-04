@@ -15,7 +15,6 @@ const COLLECTED: Collected = {
   forms: [],
   nav: [],
   hrefs: ["https://x.com/p/1", "https://x.com/p/2"],
-  queryParams: ["q"],
   declaredActions: [],
 };
 

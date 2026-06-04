@@ -3,16 +3,25 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("recharts", () => {
-  type StubProps = { children?: ReactNode; dataKey?: string; nameKey?: string; data?: unknown[] };
+  type StubProps = {
+    children?: ReactNode;
+    dataKey?: string;
+    nameKey?: string;
+    data?: unknown[];
+    fill?: string;
+    stroke?: string;
+  };
   const stub =
     (testid: string) =>
-    ({ children, dataKey, nameKey, data }: StubProps) =>
+    ({ children, dataKey, nameKey, data, fill, stroke }: StubProps) =>
       (
         <div
           data-testid={testid}
           data-key={dataKey ?? ""}
           data-namekey={nameKey ?? ""}
           data-len={data ? String(data.length) : ""}
+          data-fill={fill ?? ""}
+          data-stroke={stroke ?? ""}
         >
           {children}
         </div>
@@ -98,6 +107,10 @@ describe("A2UIChart", () => {
       data: [{ month: "Jan", a: 1, b: 1, c: 1, d: 1, e: 1, f: 1, g: 1 }],
     };
     render(<A2UIChart node={node} />);
-    expect(screen.getAllByTestId("bar")).toHaveLength(7);
+    const bars = screen.getAllByTestId("bar");
+    expect(bars).toHaveLength(7);
+    // The 7th series (index 6) wraps back to the first palette colour.
+    expect(bars[0]).toHaveAttribute("data-fill", "#6366f1");
+    expect(bars[6]).toHaveAttribute("data-fill", "#6366f1");
   });
 });

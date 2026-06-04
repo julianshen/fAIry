@@ -43,26 +43,30 @@ function renderNode(node: A2UINode, key?: number): ReactElement {
       );
     }
     case "table":
+      // Wrapped so a wide table scrolls horizontally inside a narrow side panel
+      // instead of overflowing the feed.
       return (
-        <table key={key} className="a2ui-table">
-          {node.caption && <caption>{node.caption}</caption>}
-          <thead>
-            <tr>
-              {node.columns.map((c, i) => (
-                <th key={i}>{c}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {node.rows.map((row, r) => (
-              <tr key={r}>
-                {row.map((cell, c) => (
-                  <td key={c}>{cell}</td>
+        <div key={key} className="a2ui-table-container">
+          <table className="a2ui-table">
+            {node.caption && <caption>{node.caption}</caption>}
+            <thead>
+              <tr>
+                {node.columns.map((c, i) => (
+                  <th key={i}>{c}</th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {node.rows.map((row, r) => (
+                <tr key={r}>
+                  {row.map((cell, c) => (
+                    <td key={c}>{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       );
     case "chart":
       return <A2UIChart key={key} node={node} />;

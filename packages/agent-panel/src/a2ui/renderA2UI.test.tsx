@@ -83,6 +83,7 @@ describe("A2UIView", () => {
       ],
     };
     const { container } = render(<A2UIView message={message} />);
+    expect(container.querySelector(".a2ui-table-container > table.a2ui-table")).not.toBeNull();
     expect(container.querySelector("caption")).toHaveTextContent("Fares");
     expect(container.querySelectorAll("thead th")).toHaveLength(2);
     expect(container.querySelectorAll("tbody tr")).toHaveLength(2);

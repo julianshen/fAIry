@@ -47,6 +47,10 @@
   margin: 0;
   padding-left: 1.25em;
 }
+.a2ui-table-container {
+  max-width: 100%;
+  overflow-x: auto;
+}
 .a2ui-table {
   width: 100%;
   border-collapse: collapse;
@@ -66,9 +70,39 @@
 .a2ui-table th {
   font-weight: 600;
 }
+/* min-width:0 lets recharts' ResponsiveContainer shrink inside the flex feed
+   instead of forcing the panel wider. */
+.a2ui-chart {
+  width: 100%;
+  min-width: 0;
+}
 .a2ui-chart-title {
   font-weight: 600;
   margin-bottom: 4px;
+}
+/* recharts emits its own global class names with light-theme defaults; scope
+   the theme overrides under .a2ui-chart so they follow the panel's colours
+   without leaking onto any recharts the embedding host might render. */
+.a2ui-chart .recharts-text {
+  fill: currentColor;
+  font-size: 0.75em;
+}
+.a2ui-chart .recharts-cartesian-grid line {
+  stroke: var(--border-3, rgba(255, 255, 255, 0.08));
+}
+.a2ui-chart .recharts-legend-item-text {
+  color: currentColor;
+  font-size: 0.8em;
+}
+.a2ui-chart .recharts-default-tooltip {
+  background-color: var(--s3, #1e1e1e) !important;
+  border: 1px solid var(--border-3, rgba(255, 255, 255, 0.12)) !important;
+  border-radius: 6px;
+}
+.a2ui-chart .recharts-tooltip-label,
+.a2ui-chart .recharts-tooltip-item {
+  color: currentColor !important;
+  font-size: 0.8em;
 }
 .a2ui-unknown {
   opacity: 0.6;

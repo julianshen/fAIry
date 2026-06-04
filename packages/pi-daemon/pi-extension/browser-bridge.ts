@@ -470,14 +470,13 @@ export default function (pi: ExtensionAPI): void {
     name: "browser_learn_page_actions",
     label: "Learn page actions",
     description:
-      "Analyze the current page to discover what actions the user can perform (interactive elements, forms, " +
-      "URL patterns, optional network + scripting probes). Use on sites without agent.json. Flags: mode, " +
-      "includeNetwork, includeScripting, includeUrlAnalysis.",
+      "Analyze the current page to discover what actions the user can perform: interactive elements, forms, " +
+      "nav, URL patterns, declared [data-agent-action]s, and a classification of likely actions. Use on sites " +
+      "without agent.json. Pass mode:'active' to also observe network endpoints for observeMs (default 2000, " +
+      "max 10000); mode:'passive' (default) skips the network window.",
     parameters: Type.Object({
-      mode: Type.Optional(Type.String()),
-      includeNetwork: Type.Optional(Type.Boolean()),
-      includeScripting: Type.Optional(Type.Boolean()),
-      includeUrlAnalysis: Type.Optional(Type.Boolean()),
+      mode: Type.Optional(Type.Union([Type.Literal("passive"), Type.Literal("active")])),
+      observeMs: Type.Optional(Type.Number()),
     }),
     execute: async (_id, params) => bridge("learnPageActions", params as Record<string, unknown>),
   });

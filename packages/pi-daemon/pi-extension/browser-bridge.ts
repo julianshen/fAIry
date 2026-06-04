@@ -121,8 +121,11 @@ async function bridge(tool: string, args: Record<string, unknown>) {
 /** A2UI message object built by the convenience tools (plain JSON for the panel). */
 type A2uiMessage = Record<string, unknown>;
 
+// Args are already validated by each tool's TypeBox schema before execute runs,
+// so the builders take the schema-guaranteed types (matching the execute casts).
+
 /** Build an A2UI table; `title` maps to the table's `caption` slot. */
-function buildTable(args: { title?: string; columns: unknown; rows: unknown }): A2uiMessage {
+function buildTable(args: { title?: string; columns: string[]; rows: (string | number)[][] }): A2uiMessage {
   const table: A2uiMessage = { type: "table", columns: args.columns, rows: args.rows };
   if (args.title) table.caption = args.title;
   return table;
@@ -130,11 +133,11 @@ function buildTable(args: { title?: string; columns: unknown; rows: unknown }): 
 
 /** Build an A2UI chart node (the `chart` arg is the kind: bar/line/area/pie). */
 function buildChart(args: {
-  chart: unknown;
+  chart: string;
   title?: string;
   data: unknown;
-  x: unknown;
-  series: unknown;
+  x: string;
+  series: string[];
 }): A2uiMessage {
   const chart: A2uiMessage = { type: "chart", chart: args.chart, data: args.data, x: args.x, series: args.series };
   if (args.title) chart.title = args.title;
@@ -142,8 +145,9 @@ function buildChart(args: {
 }
 
 /** Build an A2UI list; a `title`, if given, wraps the list in a titled card. */
-function buildList(args: { title?: string; ordered?: boolean; items: unknown }): A2uiMessage {
+function buildList(args: { title?: string; ordered?: boolean; items: string[] }): A2uiMessage {
   const list: A2uiMessage = { type: "list", items: args.items };
+  // Omit `ordered` when false: an absent flag already means unordered.
   if (args.ordered) list.ordered = true;
   return args.title ? { type: "card", title: args.title, children: [list] } : list;
 }

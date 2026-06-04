@@ -217,6 +217,18 @@ export function reduce(state: PanelState, action: PanelAction): PanelState {
       };
     }
 
+    case "ui": {
+      const seq = state.seq + 1;
+      return {
+        ...state,
+        seq,
+        items: [
+          ...finalizeActions(state.items),
+          { type: "ui", key: seq, a2ui: action.a2ui },
+        ],
+      };
+    }
+
     case "confirm": {
       const seq = state.seq + 1;
       return {
@@ -283,7 +295,7 @@ export function counts(items: FeedItem[]): FeedCounts {
   let activity = 0;
   let plan = 0;
   for (const it of items) {
-    if (it.type === "user" || it.type === "say" || it.type === "result" || it.type === "confirm" || it.type === "takeover") {
+    if (it.type === "user" || it.type === "say" || it.type === "result" || it.type === "confirm" || it.type === "takeover" || it.type === "ui") {
       chat += 1;
     } else if (it.type === "actions") {
       activity += it.rows.length;

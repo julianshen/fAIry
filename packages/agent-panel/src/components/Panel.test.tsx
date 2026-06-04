@@ -145,4 +145,16 @@ describe("Panel tabs filtering", () => {
     expect(screen.getByText("Navigating", { exact: false })).toBeInTheDocument();
     expect(screen.queryByText("go now")).toBeNull();
   });
+
+  it("keeps ui (A2UI) items in the chat tab, matching their chat count", () => {
+    const state = withItems(
+      { kind: "ui", a2ui: { type: "text", text: "generated panel" } },
+      { kind: "actGroup", agent: "atlas", title: "Navigating" },
+    );
+    render(<Panel {...base({ state, config: { headerStyle: "tabs" } })} />);
+    // default view = chat → the A2UI message shows (it is counted as chat), the
+    // action group does not.
+    expect(screen.getByText("generated panel")).toBeInTheDocument();
+    expect(screen.queryByText("Navigating", { exact: false })).toBeNull();
+  });
 });

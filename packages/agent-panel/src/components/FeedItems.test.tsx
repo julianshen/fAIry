@@ -9,6 +9,7 @@ import {
   ResultItem,
   ConfirmItem,
   TakeoverItem,
+  UiItem,
 } from "./FeedItems";
 import { AGENTS } from "../agents";
 import type { FeedItem, ResultCard } from "../types";
@@ -196,5 +197,14 @@ describe("TakeoverItem", () => {
   it("hides the button once control has been taken", () => {
     render(<TakeoverItem item={{ ...base, taken: true }} onTake={() => {}} />);
     expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
+describe("UiItem", () => {
+  it("renders the A2UI message inside a ui-item wrapper", () => {
+    const item: Item<"ui"> = { type: "ui", key: 1, a2ui: { type: "text", text: "rendered" } };
+    const { container } = render(<UiItem item={item} />);
+    expect(screen.getByText("rendered")).toBeInTheDocument();
+    expect(container.querySelector(".ui-item .a2ui")).not.toBeNull();
   });
 });

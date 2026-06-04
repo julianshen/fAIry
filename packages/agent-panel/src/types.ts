@@ -1,4 +1,5 @@
 import type { IconName } from "./components/Icon";
+import type { A2UIMessage } from "./a2ui/types";
 
 /** The four specialist agents on the Fairy team. */
 export type AgentId = "sage" | "atlas" | "quill" | "forge";
@@ -87,6 +88,7 @@ export type FeedItem =
       rows: ActRow[];
     })
   | (ItemBase & { type: "result"; result: ResultCard })
+  | (ItemBase & { type: "ui"; a2ui: A2UIMessage })
   | (ItemBase & {
       type: "confirm";
       agent: AgentId;
@@ -111,6 +113,7 @@ export type Beat =
   | { kind: "actGroup"; agent: AgentId; title: string }
   | { kind: "act"; agent: AgentId; verb: string; target: string; sub?: string }
   | { kind: "result"; result: ResultCard }
+  | { kind: "ui"; a2ui: A2UIMessage }
   | { kind: "confirm"; agent: AgentId; confirm: string; decline: string }
   | { kind: "takeover"; agent: AgentId; text: string };
 

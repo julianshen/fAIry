@@ -42,8 +42,10 @@ deferred); no change to `render_ui`'s PR-2 args path.
 Each tool mirrors `render_ui`: a `Type.Object` schema, and an `execute` that
 builds a plain A2UI object and returns it as
 `{ content: [{ type: "text", text: JSON.stringify(message) }], details: message }`
-(the same shape `onToolEnd` already understands). The build logic is in **pure,
-exported builder functions** so they can be unit-tested:
+(the same shape `onToolEnd` already understands). The build logic is in small,
+**inline pure builder functions** (kept self-contained — the `-e` script imports
+only Pi-runtime-provided modules and must not gain new imports). They are trivial
+object construction:
 
 - `buildTable({ title?, columns, rows })` → `{ type: "table", columns, rows }`,
   plus `caption: title` when `title` is given (the A2UI table's title slot is
@@ -109,16 +111,26 @@ conversation → WS (unchanged) → extension conversationClient (opaque) → pa
 
 ## Testing
 
-- **Builders** (`-e` script): pure-function unit tests — `buildTable`/`buildChart`/
-  `buildList` produce the expected A2UI object for representative args, including
-  the `title` mappings (table→`caption`, chart→native `title`, list→`card` wrap)
-  and the title-absent shapes.
-- **`beatMapper`** (daemon): a `tool_use(render_table)` + `tool_result(id, JSON)`
-  pair → one `{kind:"ui", a2ui}` beat with the parsed message; buffered text
-  flushes to a `say` before it; a following page tool opens a fresh action group
-  (groupOpen cleared); a non-pending `tool_result` → `[]`; a parse-failure result
-  → `[]`; `render_ui` still emits via the args path; `reset()` clears pending ids.
-  Daemon ≥90% coverage gate.
+The daemon logic (the `beatMapper` result-parse path) carries the real risk and
+is fully unit-tested. The `-e` builders are part of the standalone `-e` script —
+outside the daemon's `tsconfig`/coverage, with deps provided by Pi at runtime — so
+they are **not** unit-tested in the daemon suite (consistent with the rest of the
+untested-by-unit `browser-bridge.ts`); they are trivial object construction
+verified by review and the existing `pi -e` integration smoke.
+
+- **`beatMapper`** (daemon, `src/`, fully unit-tested): a `tool_use(render_table)`
+  + `tool_result(id, output=JSON)` pair → one `{kind:"ui", a2ui}` beat with the
+  parsed message; buffered text flushes to a `say` before it; a following page
+  tool opens a fresh action group (groupOpen cleared); a non-pending `tool_result`
+  → `[]`; a parse-failure result → `[]`; `render_ui` still emits via the args
+  path; a non-render tool still maps to `act`; `reset()` clears pending ids.
+  Daemon ≥90% coverage gate (the new branch is covered by these tests).
+- **`-e` builders/tools**: verified structurally (they mirror the existing tool
+  pattern + produce the A2UI shapes the panel renders) and, optionally, by an
+  extended `pi -e` smoke that round-trips a `render_table` call (skipped without a
+  real `pi`, like the existing smoke). No daemon unit test imports
+  `browser-bridge.ts` — doing so would pull its Pi-runtime-only imports into the
+  daemon's tsc/vitest program.
 
 ## Sequencing
 

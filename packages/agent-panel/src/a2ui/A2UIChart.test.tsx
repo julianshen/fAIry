@@ -113,4 +113,19 @@ describe("A2UIChart", () => {
     expect(bars[0]).toHaveAttribute("data-fill", "#6366f1");
     expect(bars[6]).toHaveAttribute("data-fill", "#6366f1");
   });
+
+  // Chart nodes are opaque wire data too — a missing `series` must degrade, not
+  // throw (which would blank the feed).
+  it("tolerates a cartesian chart missing series", () => {
+    const node = { type: "chart", chart: "bar", x: "m", data: [] } as unknown as ChartNode;
+    render(<A2UIChart node={node} />);
+    expect(screen.getByTestId("barchart")).toBeInTheDocument();
+    expect(screen.queryAllByTestId("bar")).toHaveLength(0);
+  });
+
+  it("tolerates a pie chart missing series", () => {
+    const node = { type: "chart", chart: "pie", x: "m", data: [] } as unknown as ChartNode;
+    render(<A2UIChart node={node} />);
+    expect(screen.getByTestId("pie")).toHaveAttribute("data-key", "");
+  });
 });

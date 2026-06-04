@@ -16,6 +16,7 @@ import {
   Legend,
 } from "recharts";
 import type { A2UINode } from "./types";
+import { asArray } from "./safe";
 
 type ChartNode = Extract<A2UINode, { type: "chart" }>;
 
@@ -40,42 +41,46 @@ export function A2UIChart({ node }: { node: ChartNode }): ReactElement {
 }
 
 function renderChart(node: ChartNode): ReactElement {
+  // `node` is opaque wire data: coerce the mapped fields so a malformed chart
+  // (e.g. a missing `series`) degrades instead of throwing mid-render.
+  const data = asArray(node.data);
+  const series = asArray(node.series);
   switch (node.chart) {
     case "bar":
       return (
-        <BarChart data={node.data}>
+        <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey={node.x} />
           <YAxis />
           <Tooltip />
           <Legend />
-          {node.series.map((s, i) => (
+          {series.map((s, i) => (
             <Bar key={s} dataKey={s} fill={colorFor(i)} />
           ))}
         </BarChart>
       );
     case "line":
       return (
-        <LineChart data={node.data}>
+        <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey={node.x} />
           <YAxis />
           <Tooltip />
           <Legend />
-          {node.series.map((s, i) => (
+          {series.map((s, i) => (
             <Line key={s} type="monotone" dataKey={s} stroke={colorFor(i)} />
           ))}
         </LineChart>
       );
     case "area":
       return (
-        <AreaChart data={node.data}>
+        <AreaChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey={node.x} />
           <YAxis />
           <Tooltip />
           <Legend />
-          {node.series.map((s, i) => (
+          {series.map((s, i) => (
             <Area key={s} type="monotone" dataKey={s} stroke={colorFor(i)} fill={colorFor(i)} fillOpacity={0.25} />
           ))}
         </AreaChart>
@@ -88,7 +93,7 @@ function renderChart(node: ChartNode): ReactElement {
         <PieChart>
           <Tooltip />
           <Legend />
-          <Pie data={node.data} dataKey={node.series[0] ?? ""} nameKey={node.x} fill={colorFor(0)} label />
+          <Pie data={data} dataKey={series[0] ?? ""} nameKey={node.x} fill={colorFor(0)} label />
         </PieChart>
       );
   }

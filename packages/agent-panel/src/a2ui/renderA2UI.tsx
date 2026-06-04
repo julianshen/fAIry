@@ -1,20 +1,11 @@
 import type { ReactElement } from "react";
 import type { A2UINode } from "./types";
 import { A2UIChart } from "./A2UIChart";
+import { asArray } from "./safe";
 
 /** Renders one A2UI message (a single root node), recursing into containers. */
 export function A2UIView({ message }: { message: A2UINode }): ReactElement {
   return <div className="a2ui">{renderNode(message)}</div>;
-}
-
-/**
- * A2UI arrives as opaque LLM/wire data, so a node with a known `type` may still
- * be missing (or have a non-array for) a required field. Coerce to an array
- * before mapping so malformed UI degrades to "render what's valid" instead of
- * throwing and blanking the whole feed.
- */
-function asArray<T>(value: T[] | undefined): T[] {
-  return Array.isArray(value) ? value : [];
 }
 
 function renderNode(node: A2UINode, key?: number): ReactElement {

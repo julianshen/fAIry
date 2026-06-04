@@ -84,14 +84,14 @@
    the theme overrides under .a2ui-chart so they follow the panel's colours
    without leaking onto any recharts the embedding host might render. */
 .a2ui-chart .recharts-text {
-  fill: currentColor;
+  fill: currentcolor;
   font-size: 0.75em;
 }
 .a2ui-chart .recharts-cartesian-grid line {
   stroke: var(--border-3, rgba(255, 255, 255, 0.08));
 }
 .a2ui-chart .recharts-legend-item-text {
-  color: currentColor;
+  color: currentcolor;
   font-size: 0.8em;
 }
 .a2ui-chart .recharts-default-tooltip {
@@ -101,7 +101,7 @@
 }
 .a2ui-chart .recharts-tooltip-label,
 .a2ui-chart .recharts-tooltip-item {
-  color: currentColor !important;
+  color: currentcolor !important;
   font-size: 0.8em;
 }
 .a2ui-unknown {

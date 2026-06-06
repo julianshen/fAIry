@@ -60,9 +60,11 @@ In `packages/pi-daemon/src/`:
   `deps = { relay: Relay; domainSkills: DomainSkills; cache: PolicyCache }` and
   `Relay = (tool: string, args: Record<string, unknown>) => Promise<unknown>`.
   Relays `navigate`, then enriches. Deps injected → unit-testable without a daemon.
-- **`daemon.ts`** (modify) — create the cache once in `createDaemon`; in `route`,
-  special-case `tool === "navigate"` →
+- **`daemon.ts`** (modify) — create the cache once in `createDaemon`; in the
+  Pi-facing `requestTool` seam (NOT `route`), special-case `tool === "navigate"` →
   `enrichNavigate(args, { relay: relayToBrowser, domainSkills: opts.domainSkills, cache })`.
+  Enriching in `requestTool` rather than `route` keeps workflow **replay** (which
+  dispatches through `route`) a plain `navigate`, with no wasted policy fetch.
 - **`pi-extension/browser-bridge.ts`** (modify) — update the `browser_navigate` tool
   description to re-promise the enriched return (`domainSkillsAvailable` +
   `agentPolicy`).
@@ -70,7 +72,7 @@ In `packages/pi-daemon/src/`:
 ## Data flow
 
 ```text
-route("navigate", { url })  →  enrichNavigate({ url }, { relay, domainSkills, cache })
+requestTool("navigate", { url })  →  enrichNavigate({ url }, { relay, domainSkills, cache })
 
   base = await relay("navigate", { url })        // {ok:true}; if it THROWS → propagate (no enrich)
   if (!isObject(base)) return base               // defensive

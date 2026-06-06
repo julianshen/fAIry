@@ -28,10 +28,17 @@ function httpOrigin(url: unknown): string | null {
 function hostOf(originOrUrl: string | undefined): string | undefined {
   if (originOrUrl === undefined) return undefined;
   try {
+    const u = new URL(originOrUrl);
+    // Reject non-http(s) or empty-host origins (e.g. a "file://" policy origin)
+    // so the caller's `?? hostOf(origin)` fallback still fires — `??` only catches
+    // nullish, so returning "" would wrongly suppress the fallback.
+    if ((u.protocol !== "http:" && u.protocol !== "https:") || u.hostname.length === 0) {
+      return undefined;
+    }
     // `.hostname` (not `.host`) — drop any port. The domain-skills store keys by
     // bare hostname and rejects a host containing ":" (so "localhost:3000" would
     // silently yield no notes); identical to `.host` for default-port hosts.
-    return new URL(originOrUrl).hostname;
+    return u.hostname;
   } catch {
     return undefined;
   }

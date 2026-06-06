@@ -70,6 +70,22 @@ describe("enrichNavigate", () => {
     expect(askedHost).toBe("localhost");
   });
 
+  it("falls back to the requested host when the policy origin has no usable http host", async () => {
+    const relay = recordingRelay({
+      ...okNav,
+      getAgentPolicy: () => Promise.resolve({ level: 1, origin: "file:///etc", policy: {} }),
+    });
+    let askedHost = "";
+    const domainSkills = fakeDomainSkills({
+      list: (h: string) => {
+        askedHost = h;
+        return Promise.resolve([]);
+      },
+    });
+    await enrichNavigate({ url: "https://shop.example/a" }, { relay, domainSkills, cache: createPolicyCache() });
+    expect(askedHost).toBe("shop.example");
+  });
+
   it("caches under the policy's reported origin, so a stale/redirect read doesn't poison the requested origin", async () => {
     // Policy reports a DIFFERENT origin than requested (a pre-commit/stale read or
     // a cross-origin redirect): the requested origin must not be cached.

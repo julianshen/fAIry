@@ -4,7 +4,9 @@
 
 **Goal:** Enrich `navigate` results (best-effort) with `domainSkillsAvailable` (daemon-local) + `agentPolicy` (relayed `getAgentPolicy`), caching the policy per origin for the session.
 
-**Architecture:** A daemon-side wrapper around the `navigate` relay (a hybrid). `createDaemon`'s `route` special-cases `navigate` → `enrichNavigate(args, { relay, domainSkills, cache })`, which relays navigate then adds the two fields best-effort. The daemon stays policy-agnostic (`agentPolicy` is opaque `unknown`). A per-origin session cache bounds the per-navigate `/agent.json` fetch.
+**Architecture:** A daemon-side wrapper around the `navigate` relay (a hybrid). `createDaemon` special-cases `navigate` → `enrichNavigate(args, { relay, domainSkills, cache })`, which relays navigate then adds the two fields best-effort. The daemon stays policy-agnostic (`agentPolicy` is opaque `unknown`). A per-origin session cache bounds the per-navigate `/agent.json` fetch.
+
+> **Implementation note (post-review):** the special-case was placed in the Pi-facing `requestTool` seam, **not** in `route`, so workflow **replay** (which dispatches through `route`) stays a plain `navigate` with no wasted policy fetch. The Task 3 snippets below show the original `route` placement; the shipped wiring is the `requestTool` variant.
 
 **Tech Stack:** Bun + TypeScript (strict, `noUncheckedIndexedAccess`), Vitest (daemon ≥90% gate).
 
@@ -17,7 +19,7 @@
 In `packages/pi-daemon/src/`:
 - `policyCache.ts` — **new**; `createPolicyCache()` (Map-backed, session-lifetime).
 - `enrichNavigate.ts` — **new**; the best-effort enrichment (deps injected).
-- `daemon.ts` — **modify**; create the cache + special-case `navigate` in `route`.
+- `daemon.ts` — **modify**; create the cache + special-case `navigate` in the Pi-facing `requestTool` seam (see the post-review note above; not `route`, so replay stays plain).
 Plus:
 - `pi-extension/browser-bridge.ts` — **modify**; re-promise the enriched return in the `browser_navigate` description.
 

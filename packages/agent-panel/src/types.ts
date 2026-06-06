@@ -69,6 +69,15 @@ export interface ResultCard {
   tag: string;
 }
 
+/** A user-reviewed proposal to save a skill or action. */
+export interface SaveProposal {
+  kind: "skill" | "action";
+  name: string;
+  content: string;
+  host?: string;
+  attach?: "activeTab" | "allTabs" | "none";
+}
+
 // ── Feed items (rendered list) ───────────────────────────────────────
 interface ItemBase {
   key: number;
@@ -97,7 +106,8 @@ export type FeedItem =
       answered: boolean;
       choice?: string;
     })
-  | (ItemBase & { type: "takeover"; agent: AgentId; text: string; taken: boolean });
+  | (ItemBase & { type: "takeover"; agent: AgentId; text: string; taken: boolean })
+  | (ItemBase & { type: "proposal"; proposal: SaveProposal; resolved?: "saved" | "dismissed" });
 
 export type FeedItemType = FeedItem["type"];
 
@@ -115,7 +125,8 @@ export type Beat =
   | { kind: "result"; result: ResultCard }
   | { kind: "ui"; a2ui: A2UIMessage }
   | { kind: "confirm"; agent: AgentId; confirm: string; decline: string }
-  | { kind: "takeover"; agent: AgentId; text: string };
+  | { kind: "takeover"; agent: AgentId; text: string }
+  | { kind: "proposal"; proposal: SaveProposal };
 
 /** User-initiated transitions dispatched to the same reducer. */
 export type UiAction =
@@ -123,7 +134,8 @@ export type UiAction =
   | { kind: "reset" }
   | { kind: "answerConfirm"; key: number; choice: string }
   | { kind: "toggleActions"; key: number }
-  | { kind: "takeItem"; key: number };
+  | { kind: "takeItem"; key: number }
+  | { kind: "resolveProposal"; key: number; accept: boolean };
 
 export type PanelAction = Beat | UiAction;
 

@@ -261,6 +261,25 @@ export function reduce(state: PanelState, action: PanelAction): PanelState {
       };
     }
 
+    case "proposal": {
+      const seq = state.seq + 1;
+      return {
+        ...state,
+        seq,
+        items: [...finalizeActions(state.items), { type: "proposal", key: seq, proposal: action.proposal }],
+      };
+    }
+
+    case "resolveProposal":
+      return {
+        ...state,
+        items: state.items.map((it) =>
+          it.type === "proposal" && it.key === action.key && it.resolved === undefined
+            ? { ...it, resolved: action.accept ? "saved" : "dismissed" }
+            : it,
+        ),
+      };
+
     case "answerConfirm":
       return {
         ...state,
@@ -295,7 +314,7 @@ export function counts(items: FeedItem[]): FeedCounts {
   let activity = 0;
   let plan = 0;
   for (const it of items) {
-    if (it.type === "user" || it.type === "say" || it.type === "result" || it.type === "confirm" || it.type === "takeover" || it.type === "ui") {
+    if (it.type === "user" || it.type === "say" || it.type === "result" || it.type === "confirm" || it.type === "takeover" || it.type === "ui" || it.type === "proposal") {
       chat += 1;
     } else if (it.type === "actions") {
       activity += it.rows.length;

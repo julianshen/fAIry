@@ -250,6 +250,40 @@ describe("reduce — UI actions", () => {
   });
 });
 
+describe("reduce — proposal", () => {
+  const PROPOSAL = { kind: "skill", name: "checkout", content: "# notes", host: "shop.example" } as const;
+
+  it("a proposal beat appends a proposal feed item", () => {
+    const s = reduce(initialState(), { kind: "proposal", proposal: PROPOSAL });
+    const it = s.items.at(-1)!;
+    expect(it.type).toBe("proposal");
+    expect((it as { proposal: unknown }).proposal).toEqual(PROPOSAL);
+    expect((it as { resolved?: string }).resolved).toBeUndefined();
+  });
+
+  it("resolveProposal(accept) marks the item saved", () => {
+    let s = reduce(initialState(), { kind: "proposal", proposal: PROPOSAL });
+    const key = s.items.at(-1)!.key;
+    s = reduce(s, { kind: "resolveProposal", key, accept: true });
+    expect((s.items.at(-1) as { resolved?: string }).resolved).toBe("saved");
+  });
+
+  it("resolveProposal(dismiss) marks the item dismissed", () => {
+    let s = reduce(initialState(), { kind: "proposal", proposal: PROPOSAL });
+    const key = s.items.at(-1)!.key;
+    s = reduce(s, { kind: "resolveProposal", key, accept: false });
+    expect((s.items.at(-1) as { resolved?: string }).resolved).toBe("dismissed");
+  });
+
+  it("resolving an already-resolved proposal is a no-op", () => {
+    let s = reduce(initialState(), { kind: "proposal", proposal: PROPOSAL });
+    const key = s.items.at(-1)!.key;
+    s = reduce(s, { kind: "resolveProposal", key, accept: true });
+    s = reduce(s, { kind: "resolveProposal", key, accept: false });
+    expect((s.items.at(-1) as { resolved?: string }).resolved).toBe("saved");
+  });
+});
+
 describe("counts", () => {
   it("tallies chat, activity rows, and plan steps", () => {
     const s = run(

@@ -1,38 +1,41 @@
-/** A structured action the site exposes to agents. */
-export interface PolicyAction {
+/** Shapes for the Agent Policy (/agent.json) resolver — see the design doc. */
+
+/** A site-declared structured action (level >= 2). */
+export interface AgentAction {
   name: string;
-  endpoint: string;
-  description?: string;
-  parameters?: Record<string, unknown>;
+  endpoint: string; // "METHOD /path/:id"
+  args_schema?: Record<string, unknown>;
+  auth?: string; // "none" | "cookie" | ...
+  rate_limit?: string; // "N/s" | "N/m" | "N/h"
+  idempotent?: boolean;
 }
 
-/** The parsed shape of a site's /agent.json. */
+/** The /agent.json document (Agent Policy v1). Typed for what we read; extra keys pass through. */
 export interface AgentPolicy {
-  version: string;
-  site?: string;
+  version: string; // "1.x"
+  site: string;
+  summary?: string;
+  capabilities?: Record<string, unknown>;
+  objectives?: unknown[];
+  actions?: AgentAction[];
+  requires_human?: unknown[];
   prohibited?: unknown[];
-  requires_human?: string[];
   consent?: Record<string, unknown>;
-  actions?: PolicyAction[];
+  safety?: Record<string, unknown>;
+  audit?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
-/** The raw fetch result returned by the page-side script. */
+/** Raw result of the page-side fetch of /agent.json. */
 export interface PolicyFetch {
   origin: string | null;
-  status: number;
-  body: string | null;
+  status: number; // HTTP status, or 0 on a network/throw error
+  body: string | null; // response text when ok, else null
 }
 
-/**
- * Classification result returned to the agent.
- *
- * - level 0: no policy (fetch failed or no /agent.json)
- * - level 1: policy present, no structured actions, no governance fields
- * - level 2: policy present with at least one structured action
- * - level 3: policy present with governance fields (prohibited / consent)
- */
-export type AgentPolicyResult =
-  | { level: 0; origin: string | null; policy?: never }
-  | { level: 1; origin: string; policy: AgentPolicy }
-  | { level: 2; origin: string; policy: AgentPolicy }
-  | { level: 3; origin: string; policy: AgentPolicy };
+/** What getAgentPolicy returns to the agent. */
+export interface AgentPolicyResult {
+  level: 0 | 1 | 2 | 3;
+  origin: string | null;
+  policy?: AgentPolicy;
+}

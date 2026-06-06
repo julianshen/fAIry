@@ -6,6 +6,7 @@ export interface ConversationDriver {
   start(task: string): void;
   stop(): void;
   compact(customInstructions?: string): void;
+  resolveProposal(proposal: unknown): void;
   dispose(): void;
 }
 
@@ -50,11 +51,13 @@ export class ConversationSession extends AuthenticatedSession {
 
   protected onAuthedMessage(msg: unknown): void {
     if (typeof msg !== "object" || msg === null) return;
-    const cmd = msg as { type?: string; task?: unknown };
+    const cmd = msg as { type?: string; task?: unknown; proposal?: unknown; accept?: unknown };
     if (cmd.type === "start" && typeof cmd.task === "string") {
       this.driver?.start(cmd.task);
     } else if (cmd.type === "stop") {
       this.driver?.stop();
+    } else if (cmd.type === "resolveProposal" && cmd.accept === true) {
+      this.driver?.resolveProposal(cmd.proposal);
     }
     // Unknown commands are ignored.
   }

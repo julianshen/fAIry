@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { createConnection } from "node:net";
 import type { ChildLike, ReadableLine } from "./jsonLineProcess";
 import type { ActionRecorder } from "./actionRecorder";
+import type { ActionsStore } from "./actionsStore";
 import type { DomainSkills } from "./domainSkills";
 import type { HelperRegistry } from "./helperRegistry";
 import type { SkillsLibrary } from "./skillsLibrary";
@@ -69,6 +70,13 @@ export const fakeDomainSkills = (over: Partial<DomainSkills> = {}): DomainSkills
   save: (host, name, body) => Promise.resolve({ host, name, body, bytes: body.length, updatedAt: 0 }),
   remove: () => Promise.resolve(false),
   search: () => Promise.resolve([]),
+  ...over,
+});
+
+/** An empty actions-store double for wiring tests (createDaemon requires one). */
+export const fakeActionsStore = (over: Partial<ActionsStore> = {}): ActionsStore => ({
+  list: () => [],
+  save: (input) => ({ ...input, createdAt: 0 }),
   ...over,
 });
 

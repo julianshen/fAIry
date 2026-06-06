@@ -8,6 +8,9 @@ export interface ConversationServerOptions {
   token: string;
   /** Spawns Pi for each conversation (injected — testable without a real `pi`). */
   spawn: Spawner;
+  /** Persist a user-confirmed save proposal (skill→domainSkills, action→actionsStore).
+   *  Threaded into each conversation's {@link ConversationController}. */
+  saveProposal?: (proposal: unknown) => Promise<void>;
   /** Port to bind; 0 (default) picks an ephemeral port. */
   port?: number;
   /** Loopback host. Defaults to 127.0.0.1 — local-only. */
@@ -44,7 +47,8 @@ export class ConversationServer {
           token: opts.token,
           connection,
           authTimeoutMs: opts.authTimeoutMs,
-          createDriver: (onBeat) => new ConversationController({ spawn: opts.spawn, onBeat }),
+          createDriver: (onBeat) =>
+            new ConversationController({ spawn: opts.spawn, onBeat, saveProposal: opts.saveProposal }),
           onAuthenticated: () => opts.onAuthenticated?.(session),
           onClose: () => opts.onClose?.(session),
         });

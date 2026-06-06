@@ -1,4 +1,5 @@
 import type { ActionRecorder } from "./actionRecorder";
+import type { ActionsStore } from "./actionsStore";
 import { BridgeServer } from "./bridgeServer";
 import type { BridgeSession } from "./bridgeSession";
 import { ConversationServer } from "./conversationServer";
@@ -32,6 +33,8 @@ export interface DaemonOptions {
   helpers: HelperRegistry;
   /** Per-site notes store — served by the tool-router (all local). */
   domainSkills: DomainSkills;
+  /** Saved-actions store — a user-confirmed action proposal is persisted here. */
+  actionsStore: ActionsStore;
   /** Records the agent's tool stream into replayable workflows (tool-router served). */
   recorder: ActionRecorder;
   /** Spawn Pi for a conversation, given the loopback bridge it should connect back on. */
@@ -48,6 +51,34 @@ export interface DaemonOptions {
   pairing?: PairingStore;
   /** Fixed ports; any omitted one binds an ephemeral port. */
   ports?: { bridge?: number; piBridge?: number; conversation?: number; http?: number };
+}
+
+type CoercedProposal =
+  | { kind: "skill"; name: string; content: string; host: string }
+  | { kind: "action"; name: string; content: string; attach: "activeTab" | "allTabs" | "none"; host?: string };
+
+/**
+ * Validate an (opaque, untrusted-ish) save proposal the panel relayed back after
+ * the user confirmed it. Skill proposals must name a host (they file under it);
+ * action proposals default `attach` to "none" if absent/unknown.
+ */
+export function coerceProposal(v: unknown): CoercedProposal {
+  if (typeof v !== "object" || v === null) throw new Error("invalid proposal");
+  const o = v as Record<string, unknown>;
+  const name = typeof o.name === "string" ? o.name.trim() : "";
+  const content = typeof o.content === "string" ? o.content : "";
+  if (name.length === 0) throw new Error("proposal name required");
+  if (content.trim().length === 0) throw new Error("proposal content required");
+  if (o.kind === "skill") {
+    const host = typeof o.host === "string" ? o.host : "";
+    if (host.trim().length === 0) throw new Error("a skill proposal needs a host");
+    return { kind: "skill", name, content, host };
+  }
+  if (o.kind === "action") {
+    const attach = o.attach === "activeTab" || o.attach === "allTabs" || o.attach === "none" ? o.attach : "none";
+    return { kind: "action", name, content, attach, host: typeof o.host === "string" ? o.host : undefined };
+  }
+  throw new Error(`unknown proposal kind: ${String(o.kind)}`);
 }
 
 export interface DaemonPorts {
@@ -186,6 +217,16 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     authTimeoutMs,
     port: opts.ports?.conversation,
     spawn: () => opts.spawnPi({ port: piBridgePort, token }),
+    // A user-confirmed save proposal (panel → conversation WS) routes here:
+    // skill → domainSkills, action → actionsStore. coerceProposal guards shape.
+    saveProposal: async (proposal: unknown) => {
+      const p = coerceProposal(proposal);
+      if (p.kind === "skill") {
+        await opts.domainSkills.save(p.host, p.name, p.content);
+      } else {
+        opts.actionsStore.save({ name: p.name, content: p.content, attach: p.attach, host: p.host });
+      }
+    },
     onAuthenticated: (session) => (activeConversation = session),
     onClose: (session) => {
       if (activeConversation === session) activeConversation = undefined;

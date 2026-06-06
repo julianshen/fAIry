@@ -489,8 +489,10 @@ export default function (pi: ExtensionAPI): void {
     name: "browser_propose_save",
     label: "Propose a save",
     description:
-      "Surface a draft to the user for confirmation when they ask to save what they learned/did. You do NOT " +
-      "save directly. kind='skill' (markdown content + optional host) or kind='action' (name + prompt + attach).",
+      "Draft something for the user to save — you do NOT save directly; the user reviews a card and confirms. " +
+      "kind='skill' for per-site knowledge (markdown 'content' + 'host' — pass the host of the site you're on); " +
+      "kind='action' for a re-runnable request ('name' + a 'content' prompt + 'attach'=activeTab|allTabs|none). " +
+      "Pick the single most useful thing and give it a short, clear name.",
     parameters: Type.Object({
       kind: Type.Union([Type.Literal("skill"), Type.Literal("action")]),
       name: Type.String(),
@@ -500,7 +502,9 @@ export default function (pi: ExtensionAPI): void {
         Type.Union([Type.Literal("activeTab"), Type.Literal("allTabs"), Type.Literal("none")]),
       ),
     }),
-    execute: async (_id, params) => bridge("proposeSave", params as Record<string, unknown>),
+    // Returns locally (like render_ui) — the proposal surfaces as a panel beat via
+    // the daemon's beatMapper; it is NOT forwarded to the browser executor.
+    execute: async (_id, _params) => ({ proposed: true }),
   });
 
   // ─── Conversation maintenance ────────────────────────────────────────

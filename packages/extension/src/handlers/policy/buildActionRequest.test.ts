@@ -20,6 +20,14 @@ describe("buildActionRequest", () => {
     });
   });
 
+  it("excludes path-param keys from the write body (consumed by the path)", () => {
+    expect(buildActionRequest(action({ endpoint: "POST /api/orders/:id" }), { id: "42", qty: 2 })).toEqual({
+      method: "POST",
+      path: "/api/orders/42",
+      body: { qty: 2 },
+    });
+  });
+
   it("substitutes and URL-encodes path params from args", () => {
     expect(buildActionRequest(action({ endpoint: "GET /api/o/:id" }), { id: "a b" }).path).toBe("/api/o/a%20b");
   });

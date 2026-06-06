@@ -25,11 +25,15 @@ export function buildActionRequest(action: AgentAction, args: Record<string, unk
     }
   }
 
+  const pathParams = new Set<string>();
   const path = rawPath.replace(PARAM_RE, (_full, name: string) => {
     if (!(name in args)) throw new Error(`invokeStructuredAction: missing path param "${name}"`);
+    pathParams.add(name);
     return encodeURIComponent(String(args[name]));
   });
 
   if (method === "GET" || method === "HEAD") return { method, path };
-  return { method, path, body: args };
+  // Path-interpolated args are consumed by the URL — don't duplicate them in the body.
+  const body = Object.fromEntries(Object.entries(args).filter(([k]) => !pathParams.has(k)));
+  return { method, path, body };
 }

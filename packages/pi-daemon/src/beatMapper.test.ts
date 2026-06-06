@@ -169,6 +169,17 @@ describe("BeatMapper — propose_save (proposal)", () => {
     expect(beats).toContainEqual({ kind: "proposal", proposal });
   });
 
+  it("does not surface a Save card for an unsaveable skill draft (no host)", () => {
+    const mapper = new BeatMapper();
+    const beats = mapper.apply({
+      type: "tool_use",
+      id: "p1",
+      name: "browser_propose_save",
+      input: { kind: "skill", name: "checkout", content: "# notes" }, // missing host
+    });
+    expect(beats.some((b) => b.kind === "proposal")).toBe(false);
+  });
+
   it("ignores a propose_save tool_use with a non-object input", () => {
     const mapper = new BeatMapper();
     // A malformed runtime payload (input typed Record<string,unknown>, but the

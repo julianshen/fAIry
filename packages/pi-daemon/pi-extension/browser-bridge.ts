@@ -503,8 +503,16 @@ export default function (pi: ExtensionAPI): void {
       ),
     }),
     // Returns locally (like render_ui) — the proposal surfaces as a panel beat via
-    // the daemon's beatMapper; it is NOT forwarded to the browser executor.
-    execute: async () => ({ proposed: true }),
+    // the daemon's beatMapper; it is NOT forwarded to the browser executor. Reject
+    // an unsaveable skill draft (no host) up front so you fix it now, rather than
+    // the user discovering it can't save only after clicking Save.
+    execute: async (_id, params) => {
+      const p = params as { kind?: unknown; host?: unknown };
+      if (p.kind === "skill" && (typeof p.host !== "string" || p.host.trim() === "")) {
+        throw new Error("a skill proposal needs a host — pass the host of the site you're on");
+      }
+      return { proposed: true };
+    },
   });
 
   // ─── Conversation maintenance ────────────────────────────────────────

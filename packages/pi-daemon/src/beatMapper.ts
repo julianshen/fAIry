@@ -1,4 +1,15 @@
 import type { AgentEvent } from "./piSession";
+import { coerceProposal } from "./proposal";
+
+/** Whether a propose_save draft would actually persist (so it's worth a card). */
+function isSaveable(input: unknown): boolean {
+  try {
+    coerceProposal(input);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The subset of the agent-panel's `Beat` wire shapes the daemon emits. Defined
@@ -130,9 +141,10 @@ export class BeatMapper {
           // a proposal beat. Mirror render_ui — finalize the running action group
           // so a later tool's act doesn't land in a group the panel has closed.
           this.groupOpen = false;
-          // Only surface a proposal for a well-formed draft; a malformed call
-          // shouldn't crash the feed (the panel coerces too).
-          if (typeof event.input === "object" && event.input !== null) {
+          // Only surface a Save card for a draft that would actually save:
+          // coerceProposal is the single validity authority (skill needs a valid
+          // host, etc.), so the user never sees an unsaveable card.
+          if (isSaveable(event.input)) {
             beats.push({ kind: "proposal", proposal: event.input });
           }
           return beats;

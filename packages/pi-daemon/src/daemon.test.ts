@@ -118,9 +118,11 @@ describe("createDaemon", () => {
       await once(chrome, "open");
       chrome.send(JSON.stringify({ type: "auth", token: TOKEN }));
       await once(chrome, "message"); // auth_ok
+      let policyCalls = 0;
       chrome.on("message", (raw: Buffer) => {
         const req = JSON.parse(raw.toString()) as { id?: string; tool?: string };
         if (!req.id || !req.tool) return;
+        if (req.tool === "getAgentPolicy") policyCalls++;
         const result =
           req.tool === "getAgentPolicy"
             ? { level: 2, origin: "https://shop.example", policy: { version: "1.0", site: "shop" } }
@@ -132,16 +134,19 @@ describe("createDaemon", () => {
       await once(pi.socket, "connect");
       pi.send({ type: "auth", token: TOKEN });
       expect(await pi.next()).toEqual({ type: "auth_ok" });
-      pi.send({ id: "1", tool: "navigate", args: { url: "https://shop.example/p/1" } });
-      expect(await pi.next()).toEqual({
-        id: "1",
+      const enriched = {
         ok: true,
-        result: {
-          ok: true,
-          domainSkillsAvailable: ["pricing-quirks"],
-          agentPolicy: { level: 2, origin: "https://shop.example", policy: { version: "1.0", site: "shop" } },
-        },
-      });
+        domainSkillsAvailable: ["pricing-quirks"],
+        agentPolicy: { level: 2, origin: "https://shop.example", policy: { version: "1.0", site: "shop" } },
+      };
+      pi.send({ id: "1", tool: "navigate", args: { url: "https://shop.example/p/1" } });
+      expect(await pi.next()).toEqual({ id: "1", ok: true, result: enriched });
+
+      // Second same-origin navigate: the per-origin policy cache (created once in
+      // createDaemon) serves the policy, so getAgentPolicy is relayed only once.
+      pi.send({ id: "2", tool: "navigate", args: { url: "https://shop.example/p/2" } });
+      expect(await pi.next()).toEqual({ id: "2", ok: true, result: enriched });
+      expect(policyCalls).toBe(1);
 
       chrome.close();
       pi.socket.destroy();

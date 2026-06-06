@@ -121,13 +121,10 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
   // to the browser. A hoisted declaration so the router's `dispatch` (workflow
   // replay) and requestTool can both close over it while it forward-references
   // `router` below. It carries NO capture hook, so replaying a workflow's steps
-  // doesn't re-record them.
+  // doesn't re-record them. Navigate-enrichment is deliberately NOT here: it's a
+  // Pi-facing concern applied in `requestTool` below, so workflow replay (which
+  // routes through `dispatch`) does a plain navigate, not a wasted policy fetch.
   function route(tool: string, args: Record<string, unknown>): Promise<unknown> {
-    if (tool === "navigate") {
-      // Hybrid: relay navigate, then enrich the result (best-effort) with the
-      // landed host's domain skills + agent policy. Enrichment never breaks navigate.
-      return enrichNavigate(args, { relay: relayToBrowser, domainSkills: opts.domainSkills, cache: policyCache });
-    }
     return router.owns(tool) ? router.handle(tool, args) : relayToBrowser(tool, args);
   }
 
@@ -161,9 +158,16 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     // (keeping compact / saveHelper / workflow* out of workflows) — EXCEPT
     // callHelper, the one daemon tool that runs in the page (it relays an
     // evaluate), so a workflow that uses a saved helper replays it. capture
-    // itself drops the browser *reads*.
+    // itself drops the browser *reads*. navigate is enriched here (best-effort
+    // domain-skills + agent-policy) — a Pi-facing concern, so replay (which uses
+    // `dispatch`/`route`, not this seam) does a plain navigate. The captured
+    // workflow step is still the bare navigate; the inner getAgentPolicy relay
+    // bypasses this seam (via relayToBrowser) and so isn't recorded.
     requestTool: async (tool, args) => {
-      const result = await route(tool, args);
+      const result =
+        tool === "navigate"
+          ? await enrichNavigate(args, { relay: relayToBrowser, domainSkills: opts.domainSkills, cache: policyCache })
+          : await route(tool, args);
       if (!router.owns(tool) || tool === "callHelper") opts.recorder.capture(tool, args);
       return result;
     },

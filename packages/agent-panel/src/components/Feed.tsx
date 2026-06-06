@@ -11,6 +11,7 @@ import {
   TakeoverItem,
   UiItem,
 } from "./FeedItems";
+import { ProposalCard } from "./ProposalCard";
 
 export interface FeedProps {
   items: FeedItem[];
@@ -19,6 +20,7 @@ export interface FeedProps {
   onAnswer: (key: number, choice: string) => void;
   onTake: (key: number) => void;
   onToggleActions: (key: number) => void;
+  onResolveProposal: (key: number, accept: boolean) => void;
 }
 
 /** The scrolling conversation/activity feed: routes each item to its renderer. */
@@ -29,6 +31,7 @@ export function Feed({
   onAnswer,
   onTake,
   onToggleActions,
+  onResolveProposal,
 }: FeedProps): ReactElement {
   return (
     <div className="feed" data-chat={chat}>
@@ -60,6 +63,15 @@ export function Feed({
             return <ConfirmItem key={it.key} item={it} onAnswer={(c) => onAnswer(it.key, c)} />;
           case "takeover":
             return <TakeoverItem key={it.key} item={it} onTake={() => onTake(it.key)} />;
+          case "proposal":
+            return (
+              <ProposalCard
+                key={it.key}
+                proposal={it.proposal}
+                resolved={it.resolved}
+                onResolve={(accept) => onResolveProposal(it.key, accept)}
+              />
+            );
         }
       })}
     </div>

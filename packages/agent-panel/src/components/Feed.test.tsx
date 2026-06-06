@@ -22,6 +22,7 @@ describe("Feed", () => {
         onAnswer={() => {}}
         onTake={() => {}}
         onToggleActions={() => {}}
+        onResolveProposal={() => {}}
       />,
     );
     expect(container.querySelector(".feed")).toHaveAttribute("data-chat", "flat");
@@ -48,10 +49,37 @@ describe("Feed", () => {
         onAnswer={onAnswer}
         onTake={() => {}}
         onToggleActions={() => {}}
+        onResolveProposal={() => {}}
       />,
     );
     await userEvent.click(screen.getByText("Yes"));
     expect(onAnswer).toHaveBeenCalledWith(9, "Yes");
+  });
+
+  it("routes proposal resolution with the item key", async () => {
+    const onResolveProposal = vi.fn();
+    const items: FeedItem[] = [
+      {
+        type: "proposal",
+        key: 11,
+        proposal: { kind: "skill", name: "checkout", content: "step 1", host: "shop.example" },
+      },
+    ];
+    render(
+      <Feed
+        items={items}
+        chat="flat"
+        actionStyle="timeline"
+        onAnswer={() => {}}
+        onTake={() => {}}
+        onToggleActions={() => {}}
+        onResolveProposal={onResolveProposal}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    expect(onResolveProposal).toHaveBeenCalledWith(11, true);
+    await userEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+    expect(onResolveProposal).toHaveBeenCalledWith(11, false);
   });
 
   it("routes takeover and action-toggle callbacks with the item key", async () => {
@@ -69,6 +97,7 @@ describe("Feed", () => {
         onAnswer={() => {}}
         onTake={onTake}
         onToggleActions={onToggleActions}
+        onResolveProposal={() => {}}
       />,
     );
     await userEvent.click(screen.getByText("Nav", { exact: false }));

@@ -58,4 +58,26 @@ describe("buildActionRequest", () => {
     expect(buildActionRequest(action({ endpoint: "GET /x", auth: "cookie" }), {}).method).toBe("GET");
     expect(buildActionRequest(action({ endpoint: "GET /x", auth: "none" }), {}).method).toBe("GET");
   });
+
+  // Untrusted /agent.json hardening: a malformed action mustn't crash or misbehave.
+  it("rejects a non-string endpoint", () => {
+    expect(() => buildActionRequest(action({ endpoint: 123 as unknown as string }), {})).toThrow(/malformed endpoint/);
+  });
+
+  it("treats auth:null like absent (allowed)", () => {
+    expect(buildActionRequest(action({ endpoint: "GET /x", auth: null as unknown as string }), {}).method).toBe("GET");
+  });
+
+  it("ignores a non-object args_schema instead of erroring", () => {
+    expect(
+      buildActionRequest(action({ endpoint: "GET /x", args_schema: ["foo"] as unknown as Record<string, unknown> }), {})
+        .method,
+    ).toBe("GET");
+  });
+
+  it("treats a null path-param value as missing", () => {
+    expect(() => buildActionRequest(action({ endpoint: "GET /o/:id" }), { id: null })).toThrow(
+      /missing path param "id"/,
+    );
+  });
 });

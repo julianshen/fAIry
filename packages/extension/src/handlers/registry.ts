@@ -12,6 +12,7 @@ import { dismissOverlays, waitFor } from "./page";
 import { tabClose, tabList, tabOpen, tabSwitch } from "./tabs";
 import { cdpCollect, cdpPassthrough, cdpSubscribe, cdpUnsubscribe } from "./cdp";
 import { learnPageActions } from "./learn/learnPageActions";
+import { getAgentPolicy } from "./policy/getAgentPolicy";
 
 /** Everything the browser handlers need: the CDP seam, the chrome.tabs seam, the
  *  agent-tab binding, and the CDP event buffer. */
@@ -71,5 +72,6 @@ export function createBrowserHandlers(deps: BrowserDeps): Record<string, ToolHan
     cdpUnsubscribe: (args) => cdpUnsubscribe(events, args),
     // Group 9 (partial) — page understanding.
     learnPageActions: (args) => learnPageActions(cdp, events, sleep, args),
+    getAgentPolicy: onCdp(getAgentPolicy),
   };
 }

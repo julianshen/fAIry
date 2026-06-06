@@ -45,6 +45,7 @@ const EXPECTED_TOOLS = [
   "cdpUnsubscribe",
   // group 9 (partial) — page understanding
   "learnPageActions",
+  "getAgentPolicy",
 ];
 
 describe("createBrowserHandlers", () => {

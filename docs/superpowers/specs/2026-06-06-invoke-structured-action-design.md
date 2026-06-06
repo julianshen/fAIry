@@ -104,8 +104,9 @@ export interface InvokeResult {
   a `:name` with no `args[name]` → throw `invokeStructuredAction: missing path param "<name>"`.
 - **Auth:** `action.auth` of `undefined`/`"none"`/`"cookie"` is allowed; anything else
   → throw `invokeStructuredAction: auth "<auth>" not supported in v1`.
-- **Body:** `GET`/`HEAD` → no body; otherwise `body = args` (the full args object as JSON;
-  path params are harmlessly duplicated).
+- **Body:** `GET`/`HEAD` → no body; otherwise `body =` the args **minus the keys
+  consumed as path params** (those are interpolated into the URL — strict APIs can
+  reject redundant body fields), as JSON.
 
 ## `buildFetchExpression` (pure) + execution
 

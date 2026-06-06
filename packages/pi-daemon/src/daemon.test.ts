@@ -103,6 +103,53 @@ describe("createDaemon", () => {
     }
   });
 
+  it("enriches a navigate result with domainSkillsAvailable + agentPolicy", async () => {
+    const daemon = await createDaemon({
+      token: TOKEN,
+      settings: fakeStore(),
+      skills: fakeSkills(),
+      helpers: fakeHelpers(),
+      domainSkills: fakeDomainSkills({ list: () => Promise.resolve(["pricing-quirks"]) }),
+      recorder: fakeRecorder(),
+      spawnPi: silentSpawn,
+    });
+    try {
+      const chrome = new WebSocket(`ws://127.0.0.1:${daemon.ports.bridge}`);
+      await once(chrome, "open");
+      chrome.send(JSON.stringify({ type: "auth", token: TOKEN }));
+      await once(chrome, "message"); // auth_ok
+      chrome.on("message", (raw: Buffer) => {
+        const req = JSON.parse(raw.toString()) as { id?: string; tool?: string };
+        if (!req.id || !req.tool) return;
+        const result =
+          req.tool === "getAgentPolicy"
+            ? { level: 2, origin: "https://shop.example", policy: { version: "1.0", site: "shop" } }
+            : { ok: true };
+        chrome.send(JSON.stringify({ id: req.id, ok: true, result }));
+      });
+
+      const pi = lineClient(daemon.ports.piBridge);
+      await once(pi.socket, "connect");
+      pi.send({ type: "auth", token: TOKEN });
+      expect(await pi.next()).toEqual({ type: "auth_ok" });
+      pi.send({ id: "1", tool: "navigate", args: { url: "https://shop.example/p/1" } });
+      expect(await pi.next()).toEqual({
+        id: "1",
+        ok: true,
+        result: {
+          ok: true,
+          domainSkillsAvailable: ["pricing-quirks"],
+          agentPolicy: { level: 2, origin: "https://shop.example", policy: { version: "1.0", site: "shop" } },
+        },
+      });
+
+      chrome.close();
+      pi.socket.destroy();
+    } finally {
+      await daemon.close();
+    }
+  });
+
   it("keeps the authenticated Chrome bridge when a second connection arrives unauthenticated", async () => {
     const daemon = await createDaemon({ token: TOKEN, settings: fakeStore(), skills: fakeSkills(), helpers: fakeHelpers(), domainSkills: fakeDomainSkills(), recorder: fakeRecorder(), spawnPi: silentSpawn });
     try {

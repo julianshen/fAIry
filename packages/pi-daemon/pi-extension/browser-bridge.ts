@@ -156,7 +156,10 @@ export default function (pi: ExtensionAPI): void {
   pi.registerTool({
     name: "browser_navigate",
     label: "Navigate browser",
-    description: "Navigate Fairy's active browser tab to a URL.",
+    description:
+      "Navigate Fairy's active browser tab to a URL (http/https). Returns { ok } plus, " +
+      "when available, `domainSkillsAvailable` (saved notes for the landed host) and " +
+      "`agentPolicy` (the site's /agent.json contract) so you can adapt immediately.",
     parameters: Type.Object({ url: Type.String() }),
     execute: async (_id, params) => bridge("navigate", params as Record<string, unknown>),
   });

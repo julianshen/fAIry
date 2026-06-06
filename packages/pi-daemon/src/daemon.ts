@@ -9,6 +9,8 @@ import { HttpServer } from "./httpServer";
 import type { ChildLike } from "./jsonLineProcess";
 import type { PairingStore } from "./pairing";
 import { PiBridgeServer } from "./piBridgeServer";
+import { createPolicyCache } from "./policyCache";
+import { enrichNavigate } from "./enrichNavigate";
 import type { SettingsStore } from "./settings";
 import type { SkillsLibrary } from "./skillsLibrary";
 import { createToolRouter } from "./toolRouter";
@@ -111,12 +113,21 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
   const relayToBrowser = (tool: string, args: Record<string, unknown>): Promise<unknown> =>
     chrome ? chrome.requestTool(tool, args) : Promise.reject(new Error("no browser connected"));
 
+  // Per-origin Agent Policy cache so navigate-enrichment doesn't re-fetch
+  // /agent.json on every same-host navigation (session-lifetime).
+  const policyCache = createPolicyCache();
+
   // The full routing: daemon-owned tools handled locally, everything else relayed
   // to the browser. A hoisted declaration so the router's `dispatch` (workflow
   // replay) and requestTool can both close over it while it forward-references
   // `router` below. It carries NO capture hook, so replaying a workflow's steps
   // doesn't re-record them.
   function route(tool: string, args: Record<string, unknown>): Promise<unknown> {
+    if (tool === "navigate") {
+      // Hybrid: relay navigate, then enrich the result (best-effort) with the
+      // landed host's domain skills + agent policy. Enrichment never breaks navigate.
+      return enrichNavigate(args, { relay: relayToBrowser, domainSkills: opts.domainSkills, cache: policyCache });
+    }
     return router.owns(tool) ? router.handle(tool, args) : relayToBrowser(tool, args);
   }
 

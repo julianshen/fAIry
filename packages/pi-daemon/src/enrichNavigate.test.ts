@@ -28,12 +28,24 @@ describe("enrichNavigate", () => {
     expect(res).toEqual({ ok: true, domainSkillsAvailable: ["pricing"], agentPolicy: POLICY });
   });
 
-  it("uses the landed policy origin for the domain-skills host", async () => {
-    const relay = recordingRelay({ ...okNav, getAgentPolicy: () => Promise.resolve(POLICY) });
+  it("uses the requested host for domain skills and omits agentPolicy when the policy reports a different origin", async () => {
+    // A stale (pre-commit) read or cross-origin redirect: the policy's origin
+    // doesn't match where the agent asked to go.
+    const OTHER = { level: 1, origin: "https://other.example", policy: {} };
+    const relay = recordingRelay({ ...okNav, getAgentPolicy: () => Promise.resolve(OTHER) });
     let askedHost = "";
-    const domainSkills = fakeDomainSkills({ list: (h: string) => { askedHost = h; return Promise.resolve([]); } });
-    await enrichNavigate({ url: "https://shop.example/p/1" }, { relay, domainSkills, cache: createPolicyCache() });
-    expect(askedHost).toBe("shop.example");
+    const domainSkills = fakeDomainSkills({
+      list: (h: string) => {
+        askedHost = h;
+        return Promise.resolve([]);
+      },
+    });
+    const res = (await enrichNavigate(
+      { url: "https://shop.example/p/1" },
+      { relay, domainSkills, cache: createPolicyCache() },
+    )) as Record<string, unknown>;
+    expect(askedHost).toBe("shop.example"); // requested host, not the policy's
+    expect(res.agentPolicy).toBeUndefined(); // mismatched policy not surfaced
   });
 
   it("caches the policy per origin: a second same-origin navigate relays getAgentPolicy once", async () => {
@@ -68,22 +80,6 @@ describe("enrichNavigate", () => {
     });
     await enrichNavigate({ url: "http://localhost:3000/app" }, { relay, domainSkills, cache: createPolicyCache() });
     expect(askedHost).toBe("localhost");
-  });
-
-  it("falls back to the requested host when the policy origin has no usable http host", async () => {
-    const relay = recordingRelay({
-      ...okNav,
-      getAgentPolicy: () => Promise.resolve({ level: 1, origin: "file:///etc", policy: {} }),
-    });
-    let askedHost = "";
-    const domainSkills = fakeDomainSkills({
-      list: (h: string) => {
-        askedHost = h;
-        return Promise.resolve([]);
-      },
-    });
-    await enrichNavigate({ url: "https://shop.example/a" }, { relay, domainSkills, cache: createPolicyCache() });
-    expect(askedHost).toBe("shop.example");
   });
 
   it("caches under the policy's reported origin, so a stale/redirect read doesn't poison the requested origin", async () => {

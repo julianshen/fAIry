@@ -28,17 +28,10 @@ function httpOrigin(url: unknown): string | null {
 function hostOf(originOrUrl: string | undefined): string | undefined {
   if (originOrUrl === undefined) return undefined;
   try {
-    const u = new URL(originOrUrl);
-    // Reject non-http(s) or empty-host origins (e.g. a "file://" policy origin)
-    // so the caller's `?? hostOf(origin)` fallback still fires — `??` only catches
-    // nullish, so returning "" would wrongly suppress the fallback.
-    if ((u.protocol !== "http:" && u.protocol !== "https:") || u.hostname.length === 0) {
-      return undefined;
-    }
     // `.hostname` (not `.host`) — drop any port. The domain-skills store keys by
     // bare hostname and rejects a host containing ":" (so "localhost:3000" would
     // silently yield no notes); identical to `.host` for default-port hosts.
-    return u.hostname;
+    return new URL(originOrUrl).hostname;
   } catch {
     return undefined;
   }
@@ -50,11 +43,20 @@ function readOrigin(policy: unknown): string | undefined {
 }
 
 /**
- * Relay `navigate`, then enrich the result (best-effort, additive) with the landed
- * host's `domainSkillsAvailable` (daemon-local) and `agentPolicy` (relayed
- * getAgentPolicy, cached per origin for the session). A failed navigate propagates;
- * each enrichment field is independent and omitted on failure; getAgentPolicy
- * failures are not cached. The daemon stays policy-agnostic (agentPolicy is opaque).
+ * Relay `navigate`, then enrich the result (best-effort, additive) with the
+ * requested host's `domainSkillsAvailable` (daemon-local) and `agentPolicy`
+ * (relayed getAgentPolicy, cached per origin for the session). A failed navigate
+ * propagates; each enrichment field is independent and omitted on failure;
+ * getAgentPolicy failures are not cached. The daemon stays policy-agnostic
+ * (agentPolicy is opaque — only its `.origin` is read, to gate/key it).
+ *
+ * navigate resolves before the new document commits, so getAgentPolicy may read
+ * the *previous* (or a cross-origin redirect) document. Two guards keep that from
+ * misleading the caller: the policy is cached under the origin it actually reports
+ * (never poisoning the requested origin), and it is surfaced only when that origin
+ * matches the requested one — a mismatch is dropped for this navigate and
+ * self-heals on the next. domainSkillsAvailable is keyed by the requested host
+ * (where the agent asked to go), independent of the policy read.
  */
 export async function enrichNavigate(args: Record<string, unknown>, deps: EnrichDeps): Promise<unknown> {
   const base = await deps.relay("navigate", args);
@@ -66,19 +68,19 @@ export async function enrichNavigate(args: Record<string, unknown>, deps: Enrich
   if (agentPolicy === undefined) {
     try {
       agentPolicy = await deps.relay("getAgentPolicy", {});
-      // Cache under the origin the policy actually reports (the document we read),
-      // NOT the requested origin. navigate resolves before the new document
-      // commits, so getAgentPolicy can read the previous (or a redirected)
-      // document; keying by the reported origin means a stale read caches under
-      // the old origin (harmless) instead of poisoning the requested origin — the
-      // requested-origin lookup then self-heals on the next navigate.
+      // Key by the origin the policy reports (the document actually read), not the
+      // requested origin: a stale/pre-commit read then caches under the old origin
+      // (harmless) instead of poisoning the requested one.
       deps.cache.set(readOrigin(agentPolicy) ?? origin, agentPolicy);
     } catch {
-      agentPolicy = undefined; // best-effort; don't cache failures
+      agentPolicy = undefined; // best-effort / transient — don't cache, retry next time
     }
   }
+  // Surface the policy only when it belongs to the requested origin; a mismatch
+  // (stale read or cross-origin redirect) is dropped rather than misreported.
+  const matchedPolicy = agentPolicy !== undefined && readOrigin(agentPolicy) === origin ? agentPolicy : undefined;
 
-  const host = hostOf(readOrigin(agentPolicy)) ?? hostOf(origin);
+  const host = hostOf(origin);
   let domainSkillsAvailable: string[] | undefined;
   if (host !== undefined) {
     try {
@@ -91,6 +93,6 @@ export async function enrichNavigate(args: Record<string, unknown>, deps: Enrich
   return {
     ...base,
     ...(domainSkillsAvailable !== undefined ? { domainSkillsAvailable } : {}),
-    ...(agentPolicy !== undefined ? { agentPolicy } : {}),
+    ...(matchedPolicy !== undefined ? { agentPolicy: matchedPolicy } : {}),
   };
 }

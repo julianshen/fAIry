@@ -249,6 +249,9 @@ describe("createDaemon", () => {
       helpers: fakeHelpers(),
       domainSkills: fakeDomainSkills({
         save: (host, name, body) => {
+          // Mirror the real store's safeMdName rule so a missing ".md" is caught
+          // here (the bare fake would mask it — Codex P1).
+          if (!name.endsWith(".md")) return Promise.reject(new Error(`invalid skill name: ${name}`));
           saved.push({ host, name, body });
           return Promise.resolve({ name, host, body, bytes: body.length, updatedAt: 0 });
         },
@@ -270,7 +273,7 @@ describe("createDaemon", () => {
         }),
       );
       while (saved.length < 1) await new Promise((r) => setTimeout(r, 5));
-      expect(saved[0]).toEqual({ host: "shop.example", name: "checkout", body: "# n" });
+      expect(saved[0]).toEqual({ host: "shop.example", name: "checkout.md", body: "# n" });
       panel.close();
     } finally {
       await daemon.close();
@@ -565,6 +568,18 @@ describe("coerceProposal", () => {
     );
     expect(() => coerceProposal({ kind: "skill", name: "n", content: "c", host: "shop:8080" })).toThrow(
       "a skill proposal needs a valid host",
+    );
+  });
+
+  it("rejects a name with newlines/control chars (UI safety)", () => {
+    expect(() => coerceProposal({ kind: "action", name: "bad\nname", content: "c" })).toThrow(
+      "proposal name must be a single line",
+    );
+  });
+
+  it("rejects a skill name with file-unsafe chars (it files as <name>.md)", () => {
+    expect(() => coerceProposal({ kind: "skill", name: "a/b", content: "c", host: "x.com" })).toThrow(
+      "a skill proposal name must be a plain file-safe label",
     );
   });
 

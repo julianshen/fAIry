@@ -66,7 +66,7 @@ export class ConversationController {
           typeof proposal === "object" &&
           proposal !== null &&
           typeof (proposal as { name?: unknown }).name === "string"
-            ? (proposal as { name: string }).name
+            ? (proposal as { name: string }).name.trim() // match the saved (trimmed) name
             : "draft";
         this.opts.onBeat({ kind: "say", agent: "sage", text: `Saved ${name}.` });
       })

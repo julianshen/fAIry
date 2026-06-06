@@ -3,6 +3,7 @@ import type { SaveProposal } from "../types";
 import { Icon } from "./Icon";
 
 const PREVIEW_LINES = 6;
+const PREVIEW_MAX_CHARS = 1000;
 
 /**
  * A user-reviewed proposal to save a skill or action. Renders the proposed
@@ -19,7 +20,9 @@ export function ProposalCard({
   resolved?: "saved" | "dismissed";
   onResolve: (accept: boolean) => void;
 }): ReactElement {
-  const preview = proposal.content.split("\n").slice(0, PREVIEW_LINES).join("\n");
+  // Clip to the first few lines AND a char cap, so a single very long line (no
+  // newlines) can't produce a huge DOM node.
+  const preview = proposal.content.split("\n").slice(0, PREVIEW_LINES).join("\n").slice(0, PREVIEW_MAX_CHARS);
   // Lock on the first click too (not just once `resolved` round-trips back as a
   // prop), so a fast double-click can't fire onResolve — and thus a second save
   // request — twice before the parent re-renders.
@@ -39,7 +42,7 @@ export function ProposalCard({
         Save proposal · <span className="proposal-kind">{proposal.kind}</span>
       </div>
       <div className="proposal-name">{proposal.name}</div>
-      {proposal.host !== undefined && <div className="proposal-meta">Host: {proposal.host}</div>}
+      {proposal.host && <div className="proposal-meta">Host: {proposal.host}</div>}
       {proposal.kind === "action" && proposal.attach !== undefined && (
         <div className="proposal-meta">Attach: {proposal.attach}</div>
       )}

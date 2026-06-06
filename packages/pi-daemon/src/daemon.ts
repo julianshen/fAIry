@@ -68,6 +68,8 @@ export function coerceProposal(v: unknown): CoercedProposal {
   const name = typeof o.name === "string" ? o.name.trim() : "";
   const content = typeof o.content === "string" ? o.content : "";
   if (name.length === 0) throw new Error("proposal name required");
+  // The name is rendered in the panel; reject newlines/NUL to avoid layout breakage.
+  if (/[\r\n\0]/.test(name)) throw new Error("proposal name must be a single line");
   if (content.trim().length === 0) throw new Error("proposal content required");
   if (o.kind === "skill") {
     const host = typeof o.host === "string" ? o.host.trim() : "";
@@ -75,6 +77,11 @@ export function coerceProposal(v: unknown): CoercedProposal {
     // backstop, but a clear message here beats a leaked "invalid host" from disk).
     if (host.length === 0 || /[\\/\0<>:"|?*]/.test(host) || host === "." || host === "..") {
       throw new Error("a skill proposal needs a valid host");
+    }
+    // The skill is filed as "<name>.md"; reject what safeMdName would reject so a
+    // valid proposal here always saves (no "invalid skill name" leaked from disk).
+    if (/[\\/<>:"|?*]/.test(name) || name.startsWith(".")) {
+      throw new Error("a skill proposal name must be a plain file-safe label");
     }
     return { kind: "skill", name, content, host };
   }
@@ -226,7 +233,10 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     saveProposal: async (proposal: unknown) => {
       const p = coerceProposal(proposal);
       if (p.kind === "skill") {
-        await opts.domainSkills.save(p.host, p.name, p.content);
+        // domainSkills files as "<name>.md" (safeMdName requires the suffix); the
+        // agent's "short, clear name" (e.g. "checkout") has none — add it.
+        const fileName = p.name.endsWith(".md") ? p.name : `${p.name}.md`;
+        await opts.domainSkills.save(p.host, fileName, p.content);
       } else {
         opts.actionsStore.save({ name: p.name, content: p.content, attach: p.attach, host: p.host });
       }

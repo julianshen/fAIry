@@ -32,8 +32,11 @@ export function createActionsStore(file: string): ActionsStore {
       if (name.length === 0) throw new Error("action name required");
       if (input.content.trim().length === 0) throw new Error("action content required");
       const record: SavedAction = { name, content: input.content, attach: input.attach, host: input.host, createdAt: Date.now() };
-      actions = actions.filter((a) => a.name !== name).concat(record);
-      writeJsonFile(file, actions, 0o600);
+      // Write first; only adopt the new in-memory state once the disk write
+      // succeeds, so a failed write leaves memory and disk consistent.
+      const updated = actions.filter((a) => a.name !== name).concat(record);
+      writeJsonFile(file, updated, 0o600);
+      actions = updated;
       return record;
     },
   };

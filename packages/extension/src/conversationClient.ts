@@ -19,6 +19,8 @@ export interface ConversationClient {
   start(task: string): void;
   /** Stop the in-flight turn. */
   stop(): void;
+  /** Send a user-confirmed save proposal to the daemon. */
+  resolveProposal(proposal: unknown): void;
   /** Close the connection. */
   close(): void;
 }
@@ -73,6 +75,7 @@ export function connectConversation(opts: ConversationClientOptions): Conversati
   return {
     start: (task) => send({ type: "start", task }),
     stop: () => send({ type: "stop" }),
+    resolveProposal: (proposal) => send({ type: "resolveProposal", proposal, accept: true }),
     close: () => {
       // Set the flag synchronously so a send issued between now and the async
       // `close` event is dropped rather than written to a closing socket.

@@ -28,7 +28,10 @@ function httpOrigin(url: unknown): string | null {
 function hostOf(originOrUrl: string | undefined): string | undefined {
   if (originOrUrl === undefined) return undefined;
   try {
-    return new URL(originOrUrl).host;
+    // `.hostname` (not `.host`) — drop any port. The domain-skills store keys by
+    // bare hostname and rejects a host containing ":" (so "localhost:3000" would
+    // silently yield no notes); identical to `.host` for default-port hosts.
+    return new URL(originOrUrl).hostname;
   } catch {
     return undefined;
   }
@@ -56,7 +59,13 @@ export async function enrichNavigate(args: Record<string, unknown>, deps: Enrich
   if (agentPolicy === undefined) {
     try {
       agentPolicy = await deps.relay("getAgentPolicy", {});
-      deps.cache.set(origin, agentPolicy);
+      // Cache under the origin the policy actually reports (the document we read),
+      // NOT the requested origin. navigate resolves before the new document
+      // commits, so getAgentPolicy can read the previous (or a redirected)
+      // document; keying by the reported origin means a stale read caches under
+      // the old origin (harmless) instead of poisoning the requested origin — the
+      // requested-origin lookup then self-heals on the next navigate.
+      deps.cache.set(readOrigin(agentPolicy) ?? origin, agentPolicy);
     } catch {
       agentPolicy = undefined; // best-effort; don't cache failures
     }

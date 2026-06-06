@@ -54,6 +54,38 @@ describe("enrichNavigate", () => {
     expect(relay.calls.filter((c) => c.tool === "getAgentPolicy")).toHaveLength(2);
   });
 
+  it("passes the hostname without the port to domainSkills.list (URL.hostname, not .host)", async () => {
+    const relay = recordingRelay({
+      ...okNav,
+      getAgentPolicy: () => Promise.resolve({ level: 0, origin: "http://localhost:3000" }),
+    });
+    let askedHost = "";
+    const domainSkills = fakeDomainSkills({
+      list: (h: string) => {
+        askedHost = h;
+        return Promise.resolve([]);
+      },
+    });
+    await enrichNavigate({ url: "http://localhost:3000/app" }, { relay, domainSkills, cache: createPolicyCache() });
+    expect(askedHost).toBe("localhost");
+  });
+
+  it("caches under the policy's reported origin, so a stale/redirect read doesn't poison the requested origin", async () => {
+    // Policy reports a DIFFERENT origin than requested (a pre-commit/stale read or
+    // a cross-origin redirect): the requested origin must not be cached.
+    const OTHER = { level: 1, origin: "https://other.example", policy: {} };
+    const relay = recordingRelay({ ...okNav, getAgentPolicy: () => Promise.resolve(OTHER) });
+    const cache = createPolicyCache();
+    const domainSkills = fakeDomainSkills();
+    await enrichNavigate({ url: "https://shop.example/a" }, { relay, domainSkills, cache });
+    await enrichNavigate({ url: "https://shop.example/b" }, { relay, domainSkills, cache });
+    // requested origin never cached → getAgentPolicy re-relayed (no poisoning)
+    expect(relay.calls.filter((c) => c.tool === "getAgentPolicy")).toHaveLength(2);
+    // but the reported origin WAS cached → navigating to it hits the cache
+    await enrichNavigate({ url: "https://other.example/x" }, { relay, domainSkills, cache });
+    expect(relay.calls.filter((c) => c.tool === "getAgentPolicy")).toHaveLength(2);
+  });
+
   it("omits agentPolicy (and does not cache) when getAgentPolicy fails", async () => {
     const relay = recordingRelay({ ...okNav, getAgentPolicy: () => Promise.reject(new Error("no tab")) });
     const cache = createPolicyCache();

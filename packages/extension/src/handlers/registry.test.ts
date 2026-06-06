@@ -46,6 +46,7 @@ const EXPECTED_TOOLS = [
   // group 9 (partial) — page understanding
   "learnPageActions",
   "getAgentPolicy",
+  "invokeStructuredAction",
 ];
 
 describe("createBrowserHandlers", () => {

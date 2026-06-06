@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { encodeLine } from "./ndjson";
 import { ConversationController } from "./conversation";
 import type { PanelBeat } from "./beatMapper";
+import { silentSpawn } from "./testFakes";
 import type { ChildLike, ReadableLine } from "./jsonLineProcess";
 
 class FakeStream extends EventEmitter implements ReadableLine {
@@ -111,5 +112,42 @@ describe("ConversationController", () => {
     const { controller, child } = setup();
     controller.dispose();
     expect(child.killed).toBe(true);
+  });
+
+  it("resolveProposal saves via the injected saveProposal and emits a success say beat", async () => {
+    const beats: PanelBeat[] = [];
+    const saved: unknown[] = [];
+    const c = new ConversationController({
+      spawn: silentSpawn,
+      onBeat: (b) => beats.push(b),
+      saveProposal: async (p) => {
+        saved.push(p);
+      },
+    });
+    const proposal = { kind: "skill", name: "checkout", content: "# notes", host: "shop.example" };
+    c.resolveProposal(proposal);
+    await new Promise((r) => setTimeout(r, 0)); // let the async save settle
+    expect(saved).toEqual([proposal]);
+    expect(
+      beats.some((b) => b.kind === "say" && /saved/i.test((b as { text: string }).text)),
+    ).toBe(true);
+  });
+
+  it("resolveProposal emits an error say beat when the save fails", async () => {
+    const beats: PanelBeat[] = [];
+    const c = new ConversationController({
+      spawn: silentSpawn,
+      onBeat: (b) => beats.push(b),
+      saveProposal: async () => {
+        throw new Error("bad host");
+      },
+    });
+    c.resolveProposal({ kind: "skill", name: "x", content: "y" });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(
+      beats.some(
+        (b) => b.kind === "say" && /couldn.t save|bad host/i.test((b as { text: string }).text),
+      ),
+    ).toBe(true);
   });
 });

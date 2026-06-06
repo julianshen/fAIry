@@ -8,6 +8,10 @@ export interface ConversationControllerOptions {
   spawn: Spawner;
   /** Receives every panel beat to stream to the client. */
   onBeat: (beat: PanelBeat) => void;
+  /** Persist a user-confirmed save proposal (skill→domainSkills, action→actionsStore).
+   *  Injected so the controller stays free of store wiring. Rejects on invalid/failed save.
+   *  Optional until createDaemon wires it in the next task. */
+  saveProposal?: (proposal: unknown) => Promise<void>;
 }
 
 /**
@@ -50,6 +54,29 @@ export class ConversationController {
   /** Compact this conversation's Pi history (the agent's `browser_compact` tool). */
   compact(customInstructions?: string): void {
     this.session.compact(customInstructions);
+  }
+
+  /** Persist a proposal the user confirmed in the panel, then report the outcome. */
+  resolveProposal(proposal: unknown): void {
+    const save = this.opts.saveProposal;
+    if (!save) return; // not wired (transitional) — nothing to do
+    void save(proposal)
+      .then(() => {
+        const name =
+          typeof proposal === "object" &&
+          proposal !== null &&
+          typeof (proposal as { name?: unknown }).name === "string"
+            ? (proposal as { name: string }).name
+            : "draft";
+        this.opts.onBeat({ kind: "say", agent: "sage", text: `Saved ${name}.` });
+      })
+      .catch((err: unknown) => {
+        this.opts.onBeat({
+          kind: "say",
+          agent: "sage",
+          text: `⚠️ Couldn't save: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      });
   }
 
   /** Terminate the Pi subprocess; ignore any trailing events it emits. */

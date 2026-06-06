@@ -23,14 +23,19 @@ describe("getAgentPolicy", () => {
     expect(res.policy?.site).toBe("shop");
   });
 
-  it("returns level 0 when the page fetch failed (status 0)", async () => {
-    const res = await getAgentPolicy(cdpReturning(policyFetch(null, 0)), {});
+  it("throws when the page fetch never got a response (status 0 — network/timeout)", async () => {
+    // A transport failure is distinct from a real 404 (which classifies as level 0),
+    // so callers — e.g. navigate enrichment's cache — don't store it as "no policy".
+    await expect(getAgentPolicy(cdpReturning(policyFetch(null, 0)), {})).rejects.toThrow(/policy fetch failed/i);
+  });
+
+  it("classifies a real HTTP response with no usable policy as level 0 (e.g. 404)", async () => {
+    const res = await getAgentPolicy(cdpReturning(policyFetch(null, 404)), {});
     expect(res).toEqual({ level: 0, origin: "https://shop.example" });
   });
 
-  it("returns level 0 when the evaluate result is malformed (no value)", async () => {
-    const res = await getAgentPolicy(fakeCdp({ "Runtime.evaluate": {} }), {});
-    expect(res).toEqual({ level: 0, origin: null });
+  it("throws when the evaluate result is malformed (no value → status 0)", async () => {
+    await expect(getAgentPolicy(fakeCdp({ "Runtime.evaluate": {} }), {})).rejects.toThrow(/policy fetch failed/i);
   });
 
   it("propagates an unbound-tab error", async () => {

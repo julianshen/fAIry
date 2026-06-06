@@ -13,15 +13,23 @@
  * - Bails to `body: null` when Content-Length exceeds the cap, so a misconfigured
  *   huge response isn't read into the page + shipped over the CDP bridge (the
  *   parser's MAX_BODY_BYTES is the backstop for chunked/absent Content-Length).
+ * - Bounds the whole fetch (headers + body read) with a 3s AbortController, so a
+ *   slow/never-completing /agent.json can't hang the caller — navigate enrichment
+ *   awaits this, so an unbounded fetch would stall `browser_navigate`. A timeout
+ *   aborts to the `catch` and resolves as `{ status: 0, body: null }` (level 0).
  */
 export const FETCH_POLICY_JS = `(async () => {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 3000);
   try {
-    const r = await fetch(location.origin + '/agent.json', { headers: { Accept: 'application/agent-policy+json, application/json' } });
+    const r = await fetch(location.origin + '/agent.json', { headers: { Accept: 'application/agent-policy+json, application/json' }, signal: ctrl.signal });
     if (!r.ok) return { origin: location.origin, status: r.status, body: null };
     if (new URL(r.url).origin !== location.origin) return { origin: location.origin, status: r.status, body: null };
     if (Number(r.headers.get('content-length') || 0) > 1000000) return { origin: location.origin, status: r.status, body: null };
     return { origin: location.origin, status: r.status, body: await r.text() };
   } catch {
     return { origin: location.origin, status: 0, body: null };
+  } finally {
+    clearTimeout(timer);
   }
 })()`;

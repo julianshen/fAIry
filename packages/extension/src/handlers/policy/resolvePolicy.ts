@@ -23,6 +23,12 @@ function coerceFetch(v: unknown): PolicyFetch {
  * getAgentPolicy and invokeStructuredAction.
  */
 export async function resolvePolicy(cdp: CdpClient): Promise<AgentPolicyResult> {
-  const fetched = await evaluateExpression(cdp, FETCH_POLICY_JS);
-  return parseAgentPolicy(coerceFetch(fetched));
+  const fetched = coerceFetch(await evaluateExpression(cdp, FETCH_POLICY_JS));
+  // status 0 = the page fetch never got an HTTP response (network error, timeout/
+  // abort, CORS) — a transport failure, not a "no policy" answer. Throw so callers
+  // can tell it apart from a real 404 (which classifies as level 0): navigate
+  // enrichment caches level-0 results, and caching a transient failure as "no
+  // policy" would stick for the whole session.
+  if (fetched.status === 0) throw new Error("agent policy fetch failed");
+  return parseAgentPolicy(fetched);
 }

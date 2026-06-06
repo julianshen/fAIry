@@ -56,6 +56,12 @@ describe("invokeStructuredAction", () => {
     ).rejects.toThrow(/no declared agent actions/);
   });
 
+  it("throws on a level-0 page with no policy at all", async () => {
+    await expect(
+      invokeStructuredAction(cdpReturning({}), resolveTo({ level: 0, origin: null }), { actionName: "checkout" }),
+    ).rejects.toThrow(/no declared agent actions/);
+  });
+
   it("throws when the named action is not declared", async () => {
     await expect(
       invokeStructuredAction(cdpReturning({}), resolveTo(policyWith(actions)), { actionName: "refund" }),

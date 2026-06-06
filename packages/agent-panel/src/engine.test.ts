@@ -261,6 +261,15 @@ describe("reduce — proposal", () => {
     expect((it as { resolved?: string }).resolved).toBeUndefined();
   });
 
+  it("drops a malformed proposal beat (renders nothing)", () => {
+    // Opaque wire data: a non-object / missing name|content proposal must not
+    // produce a feed item (it would crash the card on proposal.content).
+    for (const bad of [null, "nope", { name: "x" }, { content: "y" }]) {
+      const s = reduce(initialState(), { kind: "proposal", proposal: bad as never });
+      expect(s.items).toEqual([]);
+    }
+  });
+
   it("resolveProposal(accept) marks the item saved", () => {
     let s = reduce(initialState(), { kind: "proposal", proposal: PROPOSAL });
     const key = s.items.at(-1)!.key;

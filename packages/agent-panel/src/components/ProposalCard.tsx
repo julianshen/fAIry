@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import type { SaveProposal } from "../types";
 import { Icon } from "./Icon";
 
@@ -20,7 +20,16 @@ export function ProposalCard({
   onResolve: (accept: boolean) => void;
 }): ReactElement {
   const preview = proposal.content.split("\n").slice(0, PREVIEW_LINES).join("\n");
-  const done = resolved !== undefined;
+  // Lock on the first click too (not just once `resolved` round-trips back as a
+  // prop), so a fast double-click can't fire onResolve — and thus a second save
+  // request — twice before the parent re-renders.
+  const [acted, setActed] = useState(false);
+  const done = acted || resolved !== undefined;
+  const resolve = (accept: boolean): void => {
+    if (done) return;
+    setActed(true);
+    onResolve(accept);
+  };
   return (
     <div className="proposal" data-resolved={resolved ?? ""}>
       <div className="proposal-head">
@@ -36,15 +45,10 @@ export function ProposalCard({
       )}
       <pre className="proposal-preview">{preview}</pre>
       <div className="proposal-actions">
-        <button
-          type="button"
-          className="btn primary flex"
-          disabled={done}
-          onClick={() => onResolve(true)}
-        >
+        <button type="button" className="btn primary flex" disabled={done} onClick={() => resolve(true)}>
           {resolved === "saved" ? "Saved" : "Save"}
         </button>
-        <button type="button" className="btn flex" disabled={done} onClick={() => onResolve(false)}>
+        <button type="button" className="btn flex" disabled={done} onClick={() => resolve(false)}>
           {resolved === "dismissed" ? "Dismissed" : "Dismiss"}
         </button>
       </div>

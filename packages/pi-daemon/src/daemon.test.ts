@@ -554,7 +554,18 @@ describe("coerceProposal", () => {
   });
 
   it("rejects a skill proposal without a host", () => {
-    expect(() => coerceProposal({ kind: "skill", name: "n", content: "c" })).toThrow("a skill proposal needs a host");
+    expect(() => coerceProposal({ kind: "skill", name: "n", content: "c" })).toThrow(
+      "a skill proposal needs a valid host",
+    );
+  });
+
+  it("rejects a skill proposal with a file-unsafe host (validated at the boundary)", () => {
+    expect(() => coerceProposal({ kind: "skill", name: "n", content: "c", host: "../evil" })).toThrow(
+      "a skill proposal needs a valid host",
+    );
+    expect(() => coerceProposal({ kind: "skill", name: "n", content: "c", host: "shop:8080" })).toThrow(
+      "a skill proposal needs a valid host",
+    );
   });
 
   it("rejects an unknown proposal kind", () => {

@@ -38,7 +38,7 @@ export interface PanelProps {
 }
 
 const VIEW_TYPES: Record<HeaderView, FeedItem["type"][]> = {
-  chat: ["user", "say", "result", "confirm", "takeover", "thinking", "ui"],
+  chat: ["user", "say", "result", "confirm", "takeover", "thinking", "ui", "proposal"],
   activity: ["actions", "handoff"],
   plan: ["plan"],
 };

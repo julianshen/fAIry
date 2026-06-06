@@ -37,12 +37,28 @@ describe("ProposalCard", () => {
     expect(screen.getByText(/activeTab/)).toBeInTheDocument();
   });
 
-  it("calls onResolve(true) on Save and onResolve(false) on Dismiss", async () => {
+  it("calls onResolve(true) on Save", async () => {
     const onResolve = vi.fn();
     render(<ProposalCard proposal={proposal} onResolve={onResolve} />);
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    expect(onResolve.mock.calls).toEqual([[true]]);
+  });
+
+  it("calls onResolve(false) on Dismiss", async () => {
+    const onResolve = vi.fn();
+    render(<ProposalCard proposal={proposal} onResolve={onResolve} />);
     await userEvent.click(screen.getByRole("button", { name: /dismiss/i }));
-    expect(onResolve.mock.calls).toEqual([[true], [false]]);
+    expect(onResolve.mock.calls).toEqual([[false]]);
+  });
+
+  it("locks after the first click so a rapid double-click fires onResolve only once", async () => {
+    const onResolve = vi.fn();
+    render(<ProposalCard proposal={proposal} onResolve={onResolve} />);
+    const save = screen.getByRole("button", { name: /save/i });
+    await userEvent.click(save);
+    await userEvent.click(save); // disabled now — no-op
+    await userEvent.click(screen.getByRole("button", { name: /dismiss/i })); // also locked
+    expect(onResolve.mock.calls).toEqual([[true]]);
   });
 
   it("disables the buttons and reflects the saved label once resolved", () => {

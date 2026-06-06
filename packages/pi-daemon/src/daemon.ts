@@ -70,8 +70,12 @@ export function coerceProposal(v: unknown): CoercedProposal {
   if (name.length === 0) throw new Error("proposal name required");
   if (content.trim().length === 0) throw new Error("proposal content required");
   if (o.kind === "skill") {
-    const host = typeof o.host === "string" ? o.host : "";
-    if (host.trim().length === 0) throw new Error("a skill proposal needs a host");
+    const host = typeof o.host === "string" ? o.host.trim() : "";
+    // Validate at the boundary (domainSkills.normalizeHost is the path-safety
+    // backstop, but a clear message here beats a leaked "invalid host" from disk).
+    if (host.length === 0 || /[\\/\0<>:"|?*]/.test(host) || host === "." || host === "..") {
+      throw new Error("a skill proposal needs a valid host");
+    }
     return { kind: "skill", name, content, host };
   }
   if (o.kind === "action") {

@@ -76,10 +76,11 @@ describe("Feed", () => {
         onResolveProposal={onResolveProposal}
       />,
     );
+    // The card locks after the first click; assert the key+accept threading on
+    // Save (Dismiss→false routing is covered in ProposalCard's own test).
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    expect(onResolveProposal).toHaveBeenCalledTimes(1);
     expect(onResolveProposal).toHaveBeenCalledWith(11, true);
-    await userEvent.click(screen.getByRole("button", { name: /dismiss/i }));
-    expect(onResolveProposal).toHaveBeenCalledWith(11, false);
   });
 
   it("routes takeover and action-toggle callbacks with the item key", async () => {

@@ -504,7 +504,7 @@ export default function (pi: ExtensionAPI): void {
     }),
     // Returns locally (like render_ui) — the proposal surfaces as a panel beat via
     // the daemon's beatMapper; it is NOT forwarded to the browser executor.
-    execute: async (_id, _params) => ({ proposed: true }),
+    execute: async () => ({ proposed: true }),
   });
 
   // ─── Conversation maintenance ────────────────────────────────────────

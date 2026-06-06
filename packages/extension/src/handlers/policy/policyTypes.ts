@@ -39,3 +39,17 @@ export interface AgentPolicyResult {
   origin: string | null;
   policy?: AgentPolicy;
 }
+
+/** A validated, ready-to-issue request derived from an AgentAction + args. */
+export interface ActionRequest {
+  method: string; // GET | POST | PUT | PATCH | DELETE | HEAD
+  path: string; // origin-relative, with :params substituted (e.g. "/api/orders/42")
+  body?: Record<string, unknown>; // JSON body for write methods; absent for GET/HEAD
+}
+
+/** What the page-side fetch returns / invokeStructuredAction returns to the agent. */
+export interface InvokeResult {
+  status: number; // HTTP status, or 0 on a network/throw error
+  ok: boolean; // response.ok (false on 4xx/5xx and on network error)
+  body: unknown; // parsed JSON, or raw text, or an error string
+}

@@ -20,6 +20,14 @@ function isSaveable(input: unknown): boolean {
 export type PanelAgentId = "sage" | "atlas" | "quill" | "forge";
 export type PanelRun = "idle" | "running" | "paused" | "done";
 
+/** A saved, re-runnable action projected for the panel (no on-disk metadata). */
+export interface SavedActionView {
+  name: string;
+  content: string;
+  attach: "activeTab" | "allTabs" | "none";
+  host?: string;
+}
+
 export type PanelBeat =
   // Emitted by the conversation controller (not the mapper) when a task starts.
   | { kind: "user"; text: string }
@@ -33,6 +41,9 @@ export type PanelBeat =
   // A save the agent drafted (from the propose_save tool). The daemon is shape-
   // agnostic — the proposal is opaque, like `a2ui`; the panel coerces it.
   | { kind: "proposal"; proposal: unknown }
+  // The saved-actions list, pushed to the panel as a state update (not a feed
+  // item) — emitted by the session/controller, not derived from a Pi event.
+  | { kind: "actions"; actions: SavedActionView[] }
   | { kind: "status"; run: PanelRun };
 
 /** v1: a single agent. Multi-agent attribution is a deferred product decision. */

@@ -1,7 +1,7 @@
 import { PiSession } from "./piSession";
 import type { AgentEvent } from "./piSession";
 import type { Spawner } from "./jsonLineProcess";
-import { BeatMapper, type PanelBeat } from "./beatMapper";
+import { BeatMapper, type PanelBeat, type SavedActionView } from "./beatMapper";
 
 export interface ConversationControllerOptions {
   /** Spawns the Pi subprocess (injected — testable without a real `pi`). */
@@ -12,6 +12,9 @@ export interface ConversationControllerOptions {
    *  Injected so the controller stays free of store wiring. Rejects on invalid/failed save.
    *  Optional until createDaemon wires it in the next task. */
   saveProposal?: (proposal: unknown) => Promise<void>;
+  /** The current saved-actions list, pushed to the panel on auth + after a save.
+   *  Optional until createDaemon wires it. */
+  listActions?: () => SavedActionView[];
 }
 
 /**
@@ -69,6 +72,7 @@ export class ConversationController {
             ? (proposal as { name: string }).name.trim() // match the saved (trimmed) name
             : "draft";
         this.opts.onBeat({ kind: "say", agent: "sage", text: `Saved ${name}.` });
+        this.pushActions();
       })
       .catch((err: unknown) => {
         this.opts.onBeat({
@@ -77,6 +81,13 @@ export class ConversationController {
           text: `⚠️ Couldn't save: ${err instanceof Error ? err.message : String(err)}`,
         });
       });
+  }
+
+  /** Push the current saved-actions list to the panel (a state-updating beat). */
+  pushActions(): void {
+    const list = this.opts.listActions;
+    if (!list) return;
+    this.opts.onBeat({ kind: "actions", actions: list() });
   }
 
   /** Terminate the Pi subprocess; ignore any trailing events it emits. */

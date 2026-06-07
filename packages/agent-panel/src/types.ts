@@ -78,6 +78,14 @@ export interface SaveProposal {
   attach?: "activeTab" | "allTabs" | "none";
 }
 
+/** A saved action surfaced in the panel (non-feed state). */
+export interface SavedActionView {
+  name: string;
+  content: string;
+  attach: "activeTab" | "allTabs" | "none";
+  host?: string;
+}
+
 // ── Feed items (rendered list) ───────────────────────────────────────
 interface ItemBase {
   key: number;
@@ -126,7 +134,8 @@ export type Beat =
   | { kind: "ui"; a2ui: A2UIMessage }
   | { kind: "confirm"; agent: AgentId; confirm: string; decline: string }
   | { kind: "takeover"; agent: AgentId; text: string }
-  | { kind: "proposal"; proposal: SaveProposal };
+  | { kind: "proposal"; proposal: SaveProposal }
+  | { kind: "actions"; actions: SavedActionView[] };
 
 /** User-initiated transitions dispatched to the same reducer. */
 export type UiAction =
@@ -145,6 +154,8 @@ export interface PanelState {
   active: AgentId | null;
   /** Monotonic counter backing stable item keys. */
   seq: number;
+  /** Saved actions surfaced in the empty state (non-feed state). */
+  savedActions: SavedActionView[];
 }
 
 export interface FeedCounts {

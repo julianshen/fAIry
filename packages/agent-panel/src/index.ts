@@ -44,4 +44,5 @@ export type {
   ActionStyle,
   EmptyVariant,
   HeaderView,
+  SavedActionView,
 } from "./types";

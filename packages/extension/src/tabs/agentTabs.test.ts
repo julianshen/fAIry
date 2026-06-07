@@ -66,4 +66,14 @@ describe("createAgentTabs", () => {
     expect(t.remove(42)).toBe(false);
     expect(t.current()).toBe(1);
   });
+
+  it("clear() drops all owned tabs and the current one (for an unbound run)", () => {
+    const tabs = createAgentTabs();
+    tabs.bindSession(1);
+    tabs.add(2);
+    tabs.clear();
+    expect(tabs.ids()).toEqual([]);
+    expect(tabs.current()).toBeNull();
+    expect(tabs.isOwned(1)).toBe(false);
+  });
 });

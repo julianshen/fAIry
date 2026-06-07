@@ -303,6 +303,50 @@ describe("reduce — proposal", () => {
   });
 });
 
+describe("reduce — actions (savedActions)", () => {
+  const ACTIONS = [{ name: "reorder", content: "re-buy", attach: "none" as const }];
+
+  it("an actions beat replaces savedActions (non-feed state)", () => {
+    const s = reduce(initialState(), { kind: "actions", actions: ACTIONS });
+    expect(s.savedActions).toEqual(ACTIONS);
+    expect(s.items).toEqual([]); // not a feed item
+  });
+
+  it("reset clears the feed but preserves savedActions (the run-chips survive)", () => {
+    let s = reduce(initialState(), { kind: "actions", actions: ACTIONS });
+    s = reduce(s, { kind: "user", text: "hi" });
+    s = reduce(s, { kind: "reset" });
+    expect(s.items).toEqual([]);
+    expect(s.savedActions).toEqual(ACTIONS);
+  });
+
+  it("a second actions beat replaces (not appends)", () => {
+    let s = reduce(initialState(), { kind: "actions", actions: ACTIONS });
+    s = reduce(s, { kind: "actions", actions: [] });
+    expect(s.savedActions).toEqual([]);
+  });
+
+  it("drops malformed actions entries (defensive)", () => {
+    const s = reduce(initialState(), {
+      kind: "actions",
+      actions: [
+        { name: "ok", content: "c", attach: "none" },
+        { name: 1 },
+        null,
+        "x",
+        { name: "bad\nname", content: "c", attach: "none" }, // control char → dropped
+        { name: "weird", content: "c", attach: "wat" }, // non-enum attach → dropped
+      ] as never,
+    });
+    expect(s.savedActions).toEqual([{ name: "ok", content: "c", attach: "none" }]);
+  });
+
+  it("ignores a non-array actions payload", () => {
+    const s = reduce(initialState(), { kind: "actions", actions: "nope" as never });
+    expect(s.savedActions).toEqual([]);
+  });
+});
+
 describe("counts", () => {
   it("tallies chat, activity rows, and plan steps", () => {
     const s = run(

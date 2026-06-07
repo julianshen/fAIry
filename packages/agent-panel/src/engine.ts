@@ -4,10 +4,11 @@ import type {
   FeedItem,
   PanelAction,
   PanelState,
+  SavedActionView,
 } from "./types";
 
 export function initialState(): PanelState {
-  return { items: [], run: "idle", active: null, seq: 0 };
+  return { items: [], run: "idle", active: null, seq: 0, savedActions: [] };
 }
 
 /** Index of the last item satisfying `pred`, or -1. */
@@ -49,7 +50,10 @@ function finalizeActions(items: FeedItem[]): FeedItem[] {
 export function reduce(state: PanelState, action: PanelAction): PanelState {
   switch (action.kind) {
     case "reset":
-      return initialState();
+      // Clear the feed, but keep the daemon-pushed saved-actions library — it's
+      // independent of the run lifecycle (the daemon only re-pushes on auth/save),
+      // so resetting for a new task must not make the run-chips vanish.
+      return { ...initialState(), savedActions: state.savedActions };
 
     case "startTask": {
       const seq = state.seq + 1;
@@ -58,6 +62,7 @@ export function reduce(state: PanelState, action: PanelAction): PanelState {
         run: "running",
         active: "sage",
         seq,
+        savedActions: state.savedActions,
       };
     }
 
@@ -158,6 +163,23 @@ export function reduce(state: PanelState, action: PanelAction): PanelState {
 
     case "status":
       return { ...state, run: action.run, items: finalizeActions(state.items) };
+
+    case "actions": {
+      const raw: unknown = action.actions;
+      const savedActions: SavedActionView[] = Array.isArray(raw)
+        ? raw.filter((a): a is SavedActionView => {
+            if (typeof a !== "object" || a === null) return false;
+            const o = a as { name?: unknown; content?: unknown; attach?: unknown };
+            return (
+              typeof o.name === "string" &&
+              !/[\r\n\0]/.test(o.name) && // rendered in a chip — no layout breakage / spoofing
+              typeof o.content === "string" &&
+              (o.attach === "activeTab" || o.attach === "allTabs" || o.attach === "none") // strict enum
+            );
+          })
+        : [];
+      return { ...state, savedActions };
+    }
 
     case "actGroup": {
       const seq = state.seq + 1;

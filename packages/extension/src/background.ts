@@ -50,6 +50,15 @@ chrome.runtime.onMessage.addListener((msg: unknown, sender, sendResponse) => {
     (sender.url?.startsWith(chrome.runtime.getURL("")) ?? false);
   if (!fromOwnPage) return undefined;
   if ((msg as { type?: unknown })?.type !== "agent:taskStart") return undefined;
+  const bind = (msg as { bind?: unknown }).bind !== false; // default true
+  if (!bind) {
+    // Unbound run (an action with attach:"none"): clear ownership + drop prior
+    // CDP subscriptions for task isolation, then ack — no active tab needed.
+    agentTabs.clear();
+    events.unsubscribe();
+    sendResponse({ ok: true });
+    return true;
+  }
   tabsApi
     .queryActive()
     .then((id) => {

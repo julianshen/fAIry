@@ -133,6 +133,38 @@ describe("ConversationController", () => {
     ).toBe(true);
   });
 
+  it("pushActions emits an actions beat from the injected listActions", () => {
+    const beats: PanelBeat[] = [];
+    const actions = [{ name: "reorder", content: "re-buy", attach: "none" as const }];
+    const c = new ConversationController({
+      spawn: silentSpawn,
+      onBeat: (b) => beats.push(b),
+      listActions: () => actions,
+    });
+    c.pushActions();
+    expect(beats).toContainEqual({ kind: "actions", actions });
+  });
+
+  it("pushActions is a no-op when listActions is not wired", () => {
+    const beats: PanelBeat[] = [];
+    const c = new ConversationController({ spawn: silentSpawn, onBeat: (b) => beats.push(b) });
+    c.pushActions();
+    expect(beats).toEqual([]);
+  });
+
+  it("resolveProposal re-pushes the actions list after a successful save", async () => {
+    const beats: PanelBeat[] = [];
+    const c = new ConversationController({
+      spawn: silentSpawn,
+      onBeat: (b) => beats.push(b),
+      saveProposal: async () => {},
+      listActions: () => [{ name: "reorder", content: "x", attach: "none" as const }],
+    });
+    c.resolveProposal({ kind: "action", name: "reorder", content: "x", attach: "none" });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(beats.some((b) => b.kind === "actions")).toBe(true);
+  });
+
   it("resolveProposal emits an error say beat when the save fails", async () => {
     const beats: PanelBeat[] = [];
     const c = new ConversationController({

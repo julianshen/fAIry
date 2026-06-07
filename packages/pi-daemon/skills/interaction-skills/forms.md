@@ -34,7 +34,7 @@ Most forms run validation on `blur`, not on every keystroke. After typing the la
 
 ```
 browser_cdp({ method: "Input.dispatchKeyEvent", params: { type: "rawKeyDown", key: "Tab" } })
-browser_wait_for({ networkIdleMs: 300 })
+browser_wait_for({ networkIdle: true, idleMs: 300 })
 ```
 
 ## Captcha-on-submit
@@ -43,7 +43,7 @@ Some sites only mount the captcha after the first failed submit. If submit silen
 
 ## Multi-step wizards
 
-Each step is usually a separate `<form>` with its own submit. Wait for `Page.frameNavigated` or `networkIdleMs` between steps; don't fire all the clicks in a row.
+Each step is usually a separate `<form>` with its own submit. Wait for `Page.frameNavigated` or `networkIdle` between steps; don't fire all the clicks in a row.
 
 ## Don't autofill financial fields
 

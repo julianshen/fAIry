@@ -7,7 +7,7 @@ The CDP subscribe/collect pair is for watching what the page _does_ in response 
 ```
 browser_cdp_subscribe({ method: "Network.responseReceived" })
 browser_click({ x, y })                              // checkout button
-browser_wait_for({ networkIdleMs: 600 })
+browser_wait_for({ networkIdle: true, idleMs: 600 })
 const events = await browser_cdp_collect({ method: "Network.responseReceived" })
 ```
 

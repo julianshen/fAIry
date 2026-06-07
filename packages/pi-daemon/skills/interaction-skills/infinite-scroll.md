@@ -14,7 +14,7 @@ Once found, scroll it into view:
 
 ```
 browser_evaluate({ expression: "document.querySelector('.scroll-sentinel').scrollIntoView()" })
-browser_wait_for({ networkIdleMs: 500 })
+browser_wait_for({ networkIdle: true, idleMs: 500 })
 ```
 
 Each call loads one more page worth of items.

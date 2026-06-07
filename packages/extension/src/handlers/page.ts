@@ -91,8 +91,13 @@ export async function waitFor(
   const urlMatch = optionalString(args, "urlMatch");
   const predicate = optionalString(args, "predicate");
   const networkIdle = args.networkIdle === true;
-  // Clamp to [0, MAX]: a negative idleMs would make the quiet check trivially true.
-  const idleMs = Math.max(0, Math.min(optionalNumber(args, "idleMs", 500), MAX_IDLE_MS));
+  // A non-number idleMs falls back to the default (don't throw — it's a soft timing
+  // hint); clamp to [0, MAX] (a negative would make the quiet check trivially true).
+  const rawIdle = args.idleMs;
+  const idleMs = Math.max(
+    0,
+    Math.min(typeof rawIdle === "number" && Number.isFinite(rawIdle) ? rawIdle : 500, MAX_IDLE_MS),
+  );
 
   // Compile the url regex once, up front — never per tick (a constant recompile,
   // and an untrusted pattern shouldn't be fed to `new RegExp` in a hot loop).

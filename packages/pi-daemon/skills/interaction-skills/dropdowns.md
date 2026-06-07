@@ -31,7 +31,7 @@ browser_wait_for({ selector: "[role=option]" })
 // screenshot, click "Brazil"
 ```
 
-Some comboboxes need a deliberate pause between keystrokes (debounced fetch). If the suggestion list doesn't appear, give it `browser_wait_for({ networkIdleMs: 400 })`.
+Some comboboxes need a deliberate pause between keystrokes (debounced fetch). If the suggestion list doesn't appear, give it `browser_wait_for({ networkIdle: true, idleMs: 400 })`.
 
 ## Virtualized menu
 

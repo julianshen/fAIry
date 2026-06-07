@@ -15,6 +15,7 @@ export interface PanelController {
   answer: (key: number, choice: string) => void;
   toggleActions: (key: number) => void;
   take: (key: number) => void;
+  resolveProposal: (key: number, accept: boolean) => void;
 }
 
 /**
@@ -49,6 +50,21 @@ export function usePanelController(): PanelController {
   );
   const toggleActions = useCallback((key: number) => dispatch({ kind: "toggleActions", key }), []);
   const take = useCallback((key: number) => dispatch({ kind: "takeItem", key }), []);
+  const resolveProposal = useCallback(
+    (key: number, accept: boolean) => dispatch({ kind: "resolveProposal", key, accept }),
+    [],
+  );
 
-  return { state, elapsed, start, apply, setRun, reset, answer, toggleActions, take };
+  return {
+    state,
+    elapsed,
+    start,
+    apply,
+    setRun,
+    reset,
+    answer,
+    toggleActions,
+    take,
+    resolveProposal,
+  };
 }

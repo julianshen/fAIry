@@ -22,6 +22,7 @@ describe("Feed", () => {
         onAnswer={() => {}}
         onTake={() => {}}
         onToggleActions={() => {}}
+        onResolveProposal={() => {}}
       />,
     );
     expect(container.querySelector(".feed")).toHaveAttribute("data-chat", "flat");
@@ -48,10 +49,38 @@ describe("Feed", () => {
         onAnswer={onAnswer}
         onTake={() => {}}
         onToggleActions={() => {}}
+        onResolveProposal={() => {}}
       />,
     );
     await userEvent.click(screen.getByText("Yes"));
     expect(onAnswer).toHaveBeenCalledWith(9, "Yes");
+  });
+
+  it("routes proposal resolution with the item key", async () => {
+    const onResolveProposal = vi.fn();
+    const items: FeedItem[] = [
+      {
+        type: "proposal",
+        key: 11,
+        proposal: { kind: "skill", name: "checkout", content: "step 1", host: "shop.example" },
+      },
+    ];
+    render(
+      <Feed
+        items={items}
+        chat="flat"
+        actionStyle="timeline"
+        onAnswer={() => {}}
+        onTake={() => {}}
+        onToggleActions={() => {}}
+        onResolveProposal={onResolveProposal}
+      />,
+    );
+    // The card locks after the first click; assert the key+accept threading on
+    // Save (Dismiss→false routing is covered in ProposalCard's own test).
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    expect(onResolveProposal).toHaveBeenCalledTimes(1);
+    expect(onResolveProposal).toHaveBeenCalledWith(11, true);
   });
 
   it("routes takeover and action-toggle callbacks with the item key", async () => {
@@ -69,6 +98,7 @@ describe("Feed", () => {
         onAnswer={() => {}}
         onTake={onTake}
         onToggleActions={onToggleActions}
+        onResolveProposal={() => {}}
       />,
     );
     await userEvent.click(screen.getByText("Nav", { exact: false }));

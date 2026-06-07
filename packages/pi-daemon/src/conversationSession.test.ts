@@ -38,6 +38,7 @@ class FakeDriver implements ConversationDriver {
   stops = 0;
   disposes = 0;
   compactions: Array<string | undefined> = [];
+  resolved: unknown[] = [];
   emitBeat!: (beat: PanelBeat) => void;
   start(task: string): void {
     this.started.push(task);
@@ -47,6 +48,9 @@ class FakeDriver implements ConversationDriver {
   }
   compact(customInstructions?: string): void {
     this.compactions.push(customInstructions);
+  }
+  resolveProposal(proposal: unknown): void {
+    this.resolved.push(proposal);
   }
   dispose(): void {
     this.disposes += 1;
@@ -178,6 +182,20 @@ describe("ConversationSession — commands", () => {
     const { session, driver } = setup();
     expect(session.compact()).toBe(false);
     expect(driver.compactions).toEqual([]);
+  });
+
+  it("dispatches a resolveProposal command to the driver on accept", () => {
+    const { conn, driver } = setup();
+    auth(conn);
+    conn.emit({ type: "resolveProposal", proposal: { kind: "skill", name: "n" }, accept: true });
+    expect(driver.resolved).toEqual([{ kind: "skill", name: "n" }]);
+  });
+
+  it("ignores resolveProposal when accept is not true", () => {
+    const { conn, driver } = setup();
+    auth(conn);
+    conn.emit({ type: "resolveProposal", proposal: { kind: "skill", name: "n" }, accept: false });
+    expect(driver.resolved).toEqual([]);
   });
 
   it("ignores unknown or malformed commands after auth without crashing", () => {

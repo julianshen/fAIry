@@ -1,4 +1,6 @@
 import type { ActionRecorder } from "./actionRecorder";
+import type { ActionsStore } from "./actionsStore";
+import { coerceProposal } from "./proposal";
 import { BridgeServer } from "./bridgeServer";
 import type { BridgeSession } from "./bridgeSession";
 import { ConversationServer } from "./conversationServer";
@@ -32,6 +34,8 @@ export interface DaemonOptions {
   helpers: HelperRegistry;
   /** Per-site notes store — served by the tool-router (all local). */
   domainSkills: DomainSkills;
+  /** Saved-actions store — a user-confirmed action proposal is persisted here. */
+  actionsStore: ActionsStore;
   /** Records the agent's tool stream into replayable workflows (tool-router served). */
   recorder: ActionRecorder;
   /** Spawn Pi for a conversation, given the loopback bridge it should connect back on. */
@@ -49,6 +53,7 @@ export interface DaemonOptions {
   /** Fixed ports; any omitted one binds an ephemeral port. */
   ports?: { bridge?: number; piBridge?: number; conversation?: number; http?: number };
 }
+
 
 export interface DaemonPorts {
   bridge: number;
@@ -186,6 +191,19 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
     authTimeoutMs,
     port: opts.ports?.conversation,
     spawn: () => opts.spawnPi({ port: piBridgePort, token }),
+    // A user-confirmed save proposal (panel → conversation WS) routes here:
+    // skill → domainSkills, action → actionsStore. coerceProposal guards shape.
+    saveProposal: async (proposal: unknown) => {
+      const p = coerceProposal(proposal);
+      if (p.kind === "skill") {
+        // domainSkills files as "<name>.md" (safeMdName requires the suffix); the
+        // agent's "short, clear name" (e.g. "checkout") has none — add it.
+        const fileName = p.name.endsWith(".md") ? p.name : `${p.name}.md`;
+        await opts.domainSkills.save(p.host, fileName, p.content);
+      } else {
+        opts.actionsStore.save({ name: p.name, content: p.content, attach: p.attach, host: p.host });
+      }
+    },
     onAuthenticated: (session) => (activeConversation = session),
     onClose: (session) => {
       if (activeConversation === session) activeConversation = undefined;

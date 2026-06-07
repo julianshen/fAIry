@@ -60,6 +60,10 @@ function App(): ReactElement {
       onAnswer={controller.answer}
       onToggleActions={controller.toggleActions}
       onTake={controller.take}
+      onResolveProposal={(item, accept) => {
+        controller.resolveProposal(item.key, accept);
+        if (accept) clientRef.current?.resolveProposal(item.proposal);
+      }}
     />
   );
 }

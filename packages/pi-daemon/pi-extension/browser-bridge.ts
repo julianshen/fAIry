@@ -489,8 +489,10 @@ export default function (pi: ExtensionAPI): void {
     name: "browser_propose_save",
     label: "Propose a save",
     description:
-      "Surface a draft to the user for confirmation when they ask to save what they learned/did. You do NOT " +
-      "save directly. kind='skill' (markdown content + optional host) or kind='action' (name + prompt + attach).",
+      "Draft something for the user to save — you do NOT save directly; the user reviews a card and confirms. " +
+      "kind='skill' for per-site knowledge (markdown 'content' + 'host' — pass the host of the site you're on); " +
+      "kind='action' for a re-runnable request ('name' + a 'content' prompt + 'attach'=activeTab|allTabs|none). " +
+      "Pick the single most useful thing and give it a short, clear name.",
     parameters: Type.Object({
       kind: Type.Union([Type.Literal("skill"), Type.Literal("action")]),
       name: Type.String(),
@@ -500,7 +502,30 @@ export default function (pi: ExtensionAPI): void {
         Type.Union([Type.Literal("activeTab"), Type.Literal("allTabs"), Type.Literal("none")]),
       ),
     }),
-    execute: async (_id, params) => bridge("proposeSave", params as Record<string, unknown>),
+    // Returns locally (like render_ui) — the proposal surfaces as a panel beat via
+    // the daemon's beatMapper. Reject an UNSAVEABLE draft up front (same rules the
+    // daemon's coerceProposal enforces, mirrored here since the -e script can't
+    // import daemon code) so you fix it now — otherwise the agent gets "sent" but
+    // the beatMapper gate drops the card and the user never sees it.
+    execute: async (_id, params) => {
+      const p = params as { kind?: unknown; name?: unknown; content?: unknown; host?: unknown };
+      const name = typeof p.name === "string" ? p.name.trim() : "";
+      const content = typeof p.content === "string" ? p.content : "";
+      if (name.length === 0) throw new Error("proposal name required");
+      if (/[\r\n\0]/.test(name) || /[\\/<>:"|?*]/.test(name) || name.startsWith(".")) {
+        throw new Error("proposal name must be a plain, single-line, file-safe label");
+      }
+      if (content.trim().length === 0) throw new Error("proposal content required");
+      if (p.kind === "skill" && (typeof p.host !== "string" || p.host.trim() === "")) {
+        throw new Error("a skill proposal needs a host — pass the host of the site you're on");
+      }
+      // Return Pi's tool-result shape (content block + details), like render_ui —
+      // a bare object would leave the agent without a text result.
+      return {
+        content: [{ type: "text" as const, text: "Proposal sent to the panel — the user will review and confirm it." }],
+        details: { proposed: true },
+      };
+    },
   });
 
   // ─── Conversation maintenance ────────────────────────────────────────

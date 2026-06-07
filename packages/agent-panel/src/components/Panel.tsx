@@ -7,6 +7,7 @@ import type {
   HeaderView,
   PanelConfig,
   PanelState,
+  SaveProposal,
   SuggestionGroup,
 } from "../types";
 import { PanelHeader } from "./PanelHeader";
@@ -31,12 +32,13 @@ export interface PanelProps {
   onAnswer: (key: number, choice: string) => void;
   onToggleActions: (key: number) => void;
   onTake: (key: number) => void;
+  onResolveProposal: (item: { key: number; proposal: SaveProposal }, accept: boolean) => void;
   onSettings?: () => void;
   onClose?: () => void;
 }
 
 const VIEW_TYPES: Record<HeaderView, FeedItem["type"][]> = {
-  chat: ["user", "say", "result", "confirm", "takeover", "thinking", "ui"],
+  chat: ["user", "say", "result", "confirm", "takeover", "thinking", "ui", "proposal"],
   activity: ["actions", "handoff"],
   plan: ["plan"],
 };
@@ -119,6 +121,12 @@ export function Panel(props: PanelProps): ReactElement {
               onAnswer={props.onAnswer}
               onTake={props.onTake}
               onToggleActions={props.onToggleActions}
+              onResolveProposal={(key, accept) => {
+                const item = state.items.find((it) => it.key === key);
+                if (item?.type === "proposal") {
+                  props.onResolveProposal({ key, proposal: item.proposal }, accept);
+                }
+              }}
             />
           ) : (
             <EmptyState variant={config.emptyState} suggestions={suggestions} onPick={send} />

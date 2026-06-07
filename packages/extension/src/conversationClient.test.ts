@@ -91,6 +91,17 @@ describe("connectConversation", () => {
     expect(socket.sent.length).toBe(before); // nothing sent after close()
   });
 
+  it("resolveProposal sends a resolveProposal frame after auth", () => {
+    const { socket, client } = setup();
+    socket.fireOpen();
+    client.resolveProposal({ kind: "skill", name: "checkout", content: "# n", host: "shop.example" });
+    expect(socket.parsed().at(-1)).toEqual({
+      type: "resolveProposal",
+      proposal: { kind: "skill", name: "checkout", content: "# n", host: "shop.example" },
+      accept: true,
+    });
+  });
+
   it("defaults to a real WebSocket adapter when no factory is injected", () => {
     const created: string[] = [];
     class FakeWS {

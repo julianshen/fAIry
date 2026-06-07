@@ -161,6 +161,39 @@ describe("BeatMapper — render_ui (generative UI)", () => {
   });
 });
 
+describe("BeatMapper — propose_save (proposal)", () => {
+  it("maps a propose_save tool_use to a proposal beat carrying the draft", () => {
+    const mapper = new BeatMapper();
+    const proposal = { kind: "skill", name: "checkout", content: "# notes", host: "shop.example" };
+    const beats = mapper.apply({ type: "tool_use", id: "p1", name: "browser_propose_save", input: proposal });
+    expect(beats).toContainEqual({ kind: "proposal", proposal });
+  });
+
+  it("does not surface a Save card for an unsaveable skill draft (no host)", () => {
+    const mapper = new BeatMapper();
+    const beats = mapper.apply({
+      type: "tool_use",
+      id: "p1",
+      name: "browser_propose_save",
+      input: { kind: "skill", name: "checkout", content: "# notes" }, // missing host
+    });
+    expect(beats.some((b) => b.kind === "proposal")).toBe(false);
+  });
+
+  it("ignores a propose_save tool_use with a non-object input", () => {
+    const mapper = new BeatMapper();
+    // A malformed runtime payload (input typed Record<string,unknown>, but the
+    // agent could send anything over the wire) — cast to exercise the guard.
+    const beats = mapper.apply({
+      type: "tool_use",
+      id: "p1",
+      name: "browser_propose_save",
+      input: "nope" as unknown as Record<string, unknown>,
+    });
+    expect(beats.some((b) => b.kind === "proposal")).toBe(false);
+  });
+});
+
 describe("BeatMapper — convenience tools (render_table/chart/list)", () => {
   it("emits a ui beat from the tool result for render_table", () => {
     const message = { type: "table", columns: ["A"], rows: [["1"]] };

@@ -261,6 +261,44 @@ export function reduce(state: PanelState, action: PanelAction): PanelState {
       };
     }
 
+    case "proposal": {
+      // The panel is the trust boundary for opaque wire data: drop a malformed
+      // proposal (non-object / missing name|content) rather than render a card
+      // that would crash on `proposal.content`. Mirrors the a2ui fallback stance.
+      const p = action.proposal as
+        | { kind?: unknown; name?: unknown; content?: unknown; host?: unknown; attach?: unknown }
+        | null;
+      // Every field the card renders must be safe — a non-string host/attach would
+      // throw "Objects are not valid as a React child" in ProposalCard.
+      if (
+        typeof p !== "object" ||
+        p === null ||
+        (p.kind !== "skill" && p.kind !== "action") ||
+        typeof p.name !== "string" ||
+        typeof p.content !== "string" ||
+        (p.host !== undefined && typeof p.host !== "string") ||
+        (p.attach !== undefined && typeof p.attach !== "string")
+      ) {
+        return state;
+      }
+      const seq = state.seq + 1;
+      return {
+        ...state,
+        seq,
+        items: [...finalizeActions(state.items), { type: "proposal", key: seq, proposal: action.proposal }],
+      };
+    }
+
+    case "resolveProposal":
+      return {
+        ...state,
+        items: state.items.map((it) =>
+          it.type === "proposal" && it.key === action.key && it.resolved === undefined
+            ? { ...it, resolved: action.accept ? "saved" : "dismissed" }
+            : it,
+        ),
+      };
+
     case "answerConfirm":
       return {
         ...state,
@@ -295,7 +333,7 @@ export function counts(items: FeedItem[]): FeedCounts {
   let activity = 0;
   let plan = 0;
   for (const it of items) {
-    if (it.type === "user" || it.type === "say" || it.type === "result" || it.type === "confirm" || it.type === "takeover" || it.type === "ui") {
+    if (it.type === "user" || it.type === "say" || it.type === "result" || it.type === "confirm" || it.type === "takeover" || it.type === "ui" || it.type === "proposal") {
       chat += 1;
     } else if (it.type === "actions") {
       activity += it.rows.length;

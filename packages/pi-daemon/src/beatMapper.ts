@@ -1,4 +1,15 @@
 import type { AgentEvent } from "./piSession";
+import { coerceProposal } from "./proposal";
+
+/** Whether a propose_save draft would actually persist (so it's worth a card). */
+function isSaveable(input: unknown): boolean {
+  try {
+    coerceProposal(input);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The subset of the agent-panel's `Beat` wire shapes the daemon emits. Defined
@@ -19,6 +30,9 @@ export type PanelBeat =
   // A2UI message rendered into the panel (from the render_ui tool). The daemon is
   // A2UI-agnostic: `a2ui` is opaque wire data passed straight through to the panel.
   | { kind: "ui"; a2ui: unknown }
+  // A save the agent drafted (from the propose_save tool). The daemon is shape-
+  // agnostic — the proposal is opaque, like `a2ui`; the panel coerces it.
+  | { kind: "proposal"; proposal: unknown }
   | { kind: "status"; run: PanelRun };
 
 /** v1: a single agent. Multi-agent attribution is a deferred product decision. */
@@ -29,6 +43,12 @@ const AGENT: PanelAgentId = "sage";
  * generative UI for the panel rather than a page action (see PR-2 plan).
  */
 const RENDER_UI_TOOL = "render_ui";
+
+/**
+ * The tool whose call carries a draft the agent wants the user to save. Like
+ * render_ui this is panel output (a proposal), not a page action.
+ */
+const PROPOSE_SAVE_TOOL = "browser_propose_save";
 
 /**
  * The `-e` convenience tools whose built A2UI message arrives in the tool RESULT
@@ -114,6 +134,19 @@ export class BeatMapper {
           // otherwise a later tool's act lands in a group the panel has closed.
           this.groupOpen = false;
           beats.push({ kind: "ui", a2ui: event.input.message });
+          return beats;
+        }
+        if (event.name === PROPOSE_SAVE_TOOL) {
+          // A proposal, not a page action: surface the draft (the tool input) as
+          // a proposal beat. Mirror render_ui — finalize the running action group
+          // so a later tool's act doesn't land in a group the panel has closed.
+          this.groupOpen = false;
+          // Only surface a Save card for a draft that would actually save:
+          // coerceProposal is the single validity authority (skill needs a valid
+          // host, etc.), so the user never sees an unsaveable card.
+          if (isSaveable(event.input)) {
+            beats.push({ kind: "proposal", proposal: event.input });
+          }
           return beats;
         }
         if (RENDER_RESULT_TOOLS.has(event.name)) {

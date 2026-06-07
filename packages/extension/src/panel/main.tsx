@@ -1,4 +1,4 @@
-import { Panel, usePanelController, type Beat } from "@fairy/agent-panel";
+import { Panel, usePanelController, type Beat, type SavedActionView } from "@fairy/agent-panel";
 import "@fairy/agent-panel/styles";
 import { StrictMode, useEffect, useRef, type ReactElement } from "react";
 import { createRoot } from "react-dom/client";
@@ -46,6 +46,17 @@ function App(): ReactElement {
       })
       .catch((err) => console.error("[fairy] taskStart failed", err));
   };
+  const runAction = (action: SavedActionView): void => {
+    controller.reset();
+    const bind = action.attach !== "none";
+    chrome.runtime
+      .sendMessage({ type: "agent:taskStart", bind })
+      .then((res) => {
+        if ((res as { ok?: boolean })?.ok) clientRef.current?.start(action.content);
+        else console.error("[fairy] could not prepare a tab for the action", res);
+      })
+      .catch((err) => console.error("[fairy] runAction failed", err));
+  };
   const stop = (): void => clientRef.current?.stop();
 
   return (
@@ -53,6 +64,7 @@ function App(): ReactElement {
       state={controller.state}
       elapsed={controller.elapsed}
       onSend={send}
+      onRunAction={runAction}
       onReset={controller.reset}
       onPause={stop}
       onTakeover={stop}

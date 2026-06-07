@@ -503,11 +503,19 @@ export default function (pi: ExtensionAPI): void {
       ),
     }),
     // Returns locally (like render_ui) — the proposal surfaces as a panel beat via
-    // the daemon's beatMapper; it is NOT forwarded to the browser executor. Reject
-    // an unsaveable skill draft (no host) up front so you fix it now, rather than
-    // the user discovering it can't save only after clicking Save.
+    // the daemon's beatMapper. Reject an UNSAVEABLE draft up front (same rules the
+    // daemon's coerceProposal enforces, mirrored here since the -e script can't
+    // import daemon code) so you fix it now — otherwise the agent gets "sent" but
+    // the beatMapper gate drops the card and the user never sees it.
     execute: async (_id, params) => {
-      const p = params as { kind?: unknown; host?: unknown };
+      const p = params as { kind?: unknown; name?: unknown; content?: unknown; host?: unknown };
+      const name = typeof p.name === "string" ? p.name.trim() : "";
+      const content = typeof p.content === "string" ? p.content : "";
+      if (name.length === 0) throw new Error("proposal name required");
+      if (/[\r\n\0]/.test(name) || /[\\/<>:"|?*]/.test(name) || name.startsWith(".")) {
+        throw new Error("proposal name must be a plain, single-line, file-safe label");
+      }
+      if (content.trim().length === 0) throw new Error("proposal content required");
       if (p.kind === "skill" && (typeof p.host !== "string" || p.host.trim() === "")) {
         throw new Error("a skill proposal needs a host — pass the host of the site you're on");
       }

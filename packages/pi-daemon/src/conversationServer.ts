@@ -11,6 +11,8 @@ export interface ConversationServerOptions {
   /** Persist a user-confirmed save proposal (skill→domainSkills, action→actionsStore).
    *  Threaded into each conversation's {@link ConversationController}. */
   saveProposal?: (proposal: unknown) => Promise<void>;
+  /** The current saved-actions list, threaded into each conversation. */
+  listActions?: () => import("./beatMapper").SavedActionView[];
   /** Port to bind; 0 (default) picks an ephemeral port. */
   port?: number;
   /** Loopback host. Defaults to 127.0.0.1 — local-only. */
@@ -48,7 +50,7 @@ export class ConversationServer {
           connection,
           authTimeoutMs: opts.authTimeoutMs,
           createDriver: (onBeat) =>
-            new ConversationController({ spawn: opts.spawn, onBeat, saveProposal: opts.saveProposal }),
+            new ConversationController({ spawn: opts.spawn, onBeat, saveProposal: opts.saveProposal, listActions: opts.listActions }),
           onAuthenticated: () => opts.onAuthenticated?.(session),
           onClose: () => opts.onClose?.(session),
         });

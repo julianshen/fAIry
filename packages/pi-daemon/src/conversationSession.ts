@@ -7,6 +7,7 @@ export interface ConversationDriver {
   stop(): void;
   compact(customInstructions?: string): void;
   resolveProposal(proposal: unknown): void;
+  pushActions(): void;
   dispose(): void;
 }
 
@@ -46,6 +47,11 @@ export class ConversationSession extends AuthenticatedSession {
     // May throw (Pi spawn failure); the base then closes without authenticating
     // and the callback below doesn't fire.
     this.driver = this.opts.createDriver((beat) => this.sendBeat(beat));
+    // Push the initial saved-actions list once authenticated. Deferred to a
+    // microtask because the base flips `isAuthenticated` true (and acks auth_ok)
+    // only *after* this hook returns — calling it inline would emit before the
+    // ack, and sendBeat would drop the beat as not-yet-authenticated.
+    queueMicrotask(() => this.driver?.pushActions());
     this.opts.onAuthenticated?.();
   }
 

@@ -318,6 +318,37 @@ describe("createDaemon", () => {
     }
   });
 
+  it("pushes an actions beat to the panel on auth", async () => {
+    const daemon = await createDaemon({
+      token: TOKEN,
+      settings: fakeStore(),
+      skills: fakeSkills(),
+      helpers: fakeHelpers(),
+      domainSkills: fakeDomainSkills(),
+      actionsStore: fakeActionsStore({ list: () => [{ name: "reorder", content: "re-buy", attach: "none", createdAt: 0 }] }),
+      recorder: fakeRecorder(),
+      spawnPi: silentSpawn,
+    });
+    try {
+      const panel = new WebSocket(`ws://127.0.0.1:${daemon.ports.conversation}`);
+      // Buffer with a persistent listener: auth_ok and the actions beat arrive
+      // back-to-back, so a per-iteration `once` could miss the beat that fired
+      // between reads.
+      let actions: { kind?: string; actions?: unknown } | undefined;
+      panel.on("message", (raw: Buffer) => {
+        const f = JSON.parse(raw.toString()) as { type?: string; beat?: { kind?: string; actions?: unknown } };
+        if (f.type === "beat" && f.beat?.kind === "actions") actions = f.beat;
+      });
+      await once(panel, "open");
+      panel.send(JSON.stringify({ type: "auth", token: TOKEN }));
+      while (!actions) await new Promise((r) => setTimeout(r, 5));
+      expect(actions).toEqual({ kind: "actions", actions: [{ name: "reorder", content: "re-buy", attach: "none" }] });
+      panel.close();
+    } finally {
+      await daemon.close();
+    }
+  });
+
   it("routes callHelper: resolves the helper on the daemon, relays an evaluate to Chrome", async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "fairy-daemon-helpers-"));
     const helpers = createHelperRegistry(path.join(dir, "helpers.json"));

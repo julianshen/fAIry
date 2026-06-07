@@ -204,6 +204,8 @@ export async function createDaemon(opts: DaemonOptions): Promise<RunningDaemon> 
         opts.actionsStore.save({ name: p.name, content: p.content, attach: p.attach, host: p.host });
       }
     },
+    listActions: () =>
+      opts.actionsStore.list().map((a) => ({ name: a.name, content: a.content, attach: a.attach, host: a.host })),
     onAuthenticated: (session) => (activeConversation = session),
     onClose: (session) => {
       if (activeConversation === session) activeConversation = undefined;

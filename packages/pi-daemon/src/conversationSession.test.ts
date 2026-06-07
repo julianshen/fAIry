@@ -39,6 +39,7 @@ class FakeDriver implements ConversationDriver {
   disposes = 0;
   compactions: Array<string | undefined> = [];
   resolved: unknown[] = [];
+  pushes = 0;
   emitBeat!: (beat: PanelBeat) => void;
   start(task: string): void {
     this.started.push(task);
@@ -54,6 +55,9 @@ class FakeDriver implements ConversationDriver {
   }
   dispose(): void {
     this.disposes += 1;
+  }
+  pushActions(): void {
+    this.pushes += 1;
   }
 }
 
@@ -82,6 +86,14 @@ describe("ConversationSession — handshake", () => {
     expect(session.isAuthenticated).toBe(true);
     expect(conn.parsed()).toContainEqual({ type: "auth_ok" });
     expect(driver.emitBeat).toBeTypeOf("function");
+  });
+
+  it("calls driver.pushActions once the session authenticates", async () => {
+    const { conn, driver } = setup();
+    auth(conn);
+    // Deferred to a microtask (after the base flips isAuthenticated) — flush it.
+    await Promise.resolve();
+    expect(driver.pushes).toBe(1);
   });
 
   it("closes on a wrong token", () => {

@@ -228,6 +228,7 @@
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
 .empty-sub { font-size: var(--fs-sm); color: var(--dim); margin-top: 7px; line-height: 1.5; }
+.saved-actions { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
 .sug-list { display: flex; flex-direction: column; gap: 8px; }
 .sug-cap { font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); margin-bottom: 1px; }
 .sug {

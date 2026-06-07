@@ -8,6 +8,7 @@ import type {
   PanelConfig,
   PanelState,
   SaveProposal,
+  SavedActionView,
   SuggestionGroup,
 } from "../types";
 import { PanelHeader } from "./PanelHeader";
@@ -33,6 +34,7 @@ export interface PanelProps {
   onToggleActions: (key: number) => void;
   onTake: (key: number) => void;
   onResolveProposal: (item: { key: number; proposal: SaveProposal }, accept: boolean) => void;
+  onRunAction: (action: SavedActionView) => void;
   onSettings?: () => void;
   onClose?: () => void;
 }
@@ -129,7 +131,13 @@ export function Panel(props: PanelProps): ReactElement {
               }}
             />
           ) : (
-            <EmptyState variant={config.emptyState} suggestions={suggestions} onPick={send} />
+            <EmptyState
+              variant={config.emptyState}
+              suggestions={suggestions}
+              savedActions={props.state.savedActions}
+              onPick={send}
+              onRunAction={props.onRunAction}
+            />
           )}
         </div>
         <Composer

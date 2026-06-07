@@ -18,6 +18,7 @@ function base(overrides: Partial<PanelProps> = {}): PanelProps {
     onToggleActions: vi.fn(),
     onTake: vi.fn(),
     onResolveProposal: vi.fn(),
+    onRunAction: vi.fn(),
     onSettings: vi.fn(),
     onClose: vi.fn(),
     ...overrides,

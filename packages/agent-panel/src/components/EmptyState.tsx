@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactElement } from "react";
 import { AGENTS, AGENT_ORDER } from "../agents";
-import type { EmptyVariant, Suggestion, SuggestionGroup } from "../types";
+import type { EmptyVariant, SavedActionView, Suggestion, SuggestionGroup } from "../types";
 import { Icon } from "./Icon";
 
 type Vars = CSSProperties & Record<`--${string}`, string>;
@@ -34,15 +34,45 @@ function SuggestionButton({
 export interface EmptyStateProps {
   variant: EmptyVariant;
   suggestions: SuggestionGroup[];
+  savedActions: SavedActionView[];
   onPick: (task: string) => void;
+  onRunAction: (action: SavedActionView) => void;
 }
 
-export function EmptyState({ variant, suggestions, onPick }: EmptyStateProps): ReactElement {
+export function EmptyState({
+  variant,
+  suggestions,
+  savedActions,
+  onPick,
+  onRunAction,
+}: EmptyStateProps): ReactElement {
   const featured = suggestions[0]?.items[0];
+
+  const actionsSection =
+    savedActions.length > 0 ? (
+      <div className="saved-actions">
+        <div className="sug-cap">Saved actions</div>
+        {savedActions.map((a) => (
+          <button key={a.name} className="sug" onClick={() => onRunAction(a)}>
+            <span className="si">
+              <Icon name="play" size={15} />
+            </span>
+            <span className="st">
+              <b>{a.name}</b>
+              <span>{a.host ?? a.attach}</span>
+            </span>
+            <span className="go">
+              <Icon name="arrowR" size={16} />
+            </span>
+          </button>
+        ))}
+      </div>
+    ) : null;
 
   if (variant === "hero") {
     return (
       <div className="empty" data-empty="hero">
+        {actionsSection}
         <div className="hero-orb">
           <Icon name="sparkle" size={42} fill />
         </div>
@@ -65,6 +95,7 @@ export function EmptyState({ variant, suggestions, onPick }: EmptyStateProps): R
   if (variant === "grid") {
     return (
       <div className="empty" data-empty="grid">
+        {actionsSection}
         <div className="eg-head">
           <b>Your agent team</b>
           <p>
@@ -98,6 +129,7 @@ export function EmptyState({ variant, suggestions, onPick }: EmptyStateProps): R
 
   return (
     <div className="empty" data-empty="suggestions">
+      {actionsSection}
       <div>
         <div className="empty-greet">
           Hi — I'm <span className="grad">Fairy</span>.<br />

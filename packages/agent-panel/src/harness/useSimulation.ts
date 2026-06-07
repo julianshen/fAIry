@@ -125,5 +125,6 @@ export function useSimulation(): PanelProps {
     onToggleActions: ctrl.toggleActions,
     onTake: ctrl.take,
     onResolveProposal: (item, accept) => ctrl.resolveProposal(item.key, accept),
+    onRunAction: () => {},
   };
 }

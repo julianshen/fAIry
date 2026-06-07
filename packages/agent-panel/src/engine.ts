@@ -4,10 +4,11 @@ import type {
   FeedItem,
   PanelAction,
   PanelState,
+  SavedActionView,
 } from "./types";
 
 export function initialState(): PanelState {
-  return { items: [], run: "idle", active: null, seq: 0 };
+  return { items: [], run: "idle", active: null, seq: 0, savedActions: [] };
 }
 
 /** Index of the last item satisfying `pred`, or -1. */
@@ -58,6 +59,7 @@ export function reduce(state: PanelState, action: PanelAction): PanelState {
         run: "running",
         active: "sage",
         seq,
+        savedActions: state.savedActions,
       };
     }
 
@@ -158,6 +160,21 @@ export function reduce(state: PanelState, action: PanelAction): PanelState {
 
     case "status":
       return { ...state, run: action.run, items: finalizeActions(state.items) };
+
+    case "actions": {
+      const raw: unknown = action.actions;
+      const savedActions: SavedActionView[] = Array.isArray(raw)
+        ? raw.filter(
+            (a): a is SavedActionView =>
+              typeof a === "object" &&
+              a !== null &&
+              typeof (a as { name?: unknown }).name === "string" &&
+              typeof (a as { content?: unknown }).content === "string" &&
+              typeof (a as { attach?: unknown }).attach === "string",
+          )
+        : [];
+      return { ...state, savedActions };
+    }
 
     case "actGroup": {
       const seq = state.seq + 1;

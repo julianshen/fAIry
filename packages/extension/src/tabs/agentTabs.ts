@@ -30,6 +30,8 @@ export interface AgentTabs {
   remove(tabId: number): boolean;
   /** All owned tab ids. */
   ids(): number[];
+  /** Drop all ownership (unbound run): nothing is owned and `current()` is null. */
+  clear(): void;
 }
 
 export function createAgentTabs(): AgentTabs {
@@ -62,6 +64,10 @@ export function createAgentTabs(): AgentTabs {
     },
     ids() {
       return [...owned];
+    },
+    clear() {
+      owned = new Set();
+      current = null;
     },
   };
 }

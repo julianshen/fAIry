@@ -312,6 +312,14 @@ describe("reduce — actions (savedActions)", () => {
     expect(s.items).toEqual([]); // not a feed item
   });
 
+  it("reset clears the feed but preserves savedActions (the run-chips survive)", () => {
+    let s = reduce(initialState(), { kind: "actions", actions: ACTIONS });
+    s = reduce(s, { kind: "user", text: "hi" });
+    s = reduce(s, { kind: "reset" });
+    expect(s.items).toEqual([]);
+    expect(s.savedActions).toEqual(ACTIONS);
+  });
+
   it("a second actions beat replaces (not appends)", () => {
     let s = reduce(initialState(), { kind: "actions", actions: ACTIONS });
     s = reduce(s, { kind: "actions", actions: [] });

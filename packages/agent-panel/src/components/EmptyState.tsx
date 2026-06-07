@@ -59,7 +59,8 @@ export function EmptyState({
             </span>
             <span className="st">
               <b>{a.name}</b>
-              <span>{a.host ?? a.attach}</span>
+              {/* v1 runs allTabs against the active tab — don't imply multi-tab. */}
+              <span>{a.host ?? (a.attach === "allTabs" ? "activeTab" : a.attach)}</span>
             </span>
             <span className="go">
               <Icon name="arrowR" size={16} />

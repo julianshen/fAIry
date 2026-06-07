@@ -56,6 +56,20 @@ describe("EmptyState — saved actions", () => {
     expect(onRunAction).toHaveBeenCalledWith(SAVED_ACTIONS[0]);
   });
 
+  it("shows an allTabs action's hint as activeTab (v1 runs it on the active tab)", () => {
+    render(
+      <EmptyState
+        variant="suggestions"
+        suggestions={[]}
+        savedActions={[{ name: "everywhere", content: "do it", attach: "allTabs" }]}
+        onPick={() => {}}
+        onRunAction={() => {}}
+      />,
+    );
+    expect(screen.getByText("activeTab")).toBeTruthy();
+    expect(screen.queryByText("allTabs")).toBeNull();
+  });
+
   it("shows no saved-actions section when there are none", () => {
     render(
       <EmptyState

@@ -50,7 +50,10 @@ function finalizeActions(items: FeedItem[]): FeedItem[] {
 export function reduce(state: PanelState, action: PanelAction): PanelState {
   switch (action.kind) {
     case "reset":
-      return initialState();
+      // Clear the feed, but keep the daemon-pushed saved-actions library — it's
+      // independent of the run lifecycle (the daemon only re-pushes on auth/save),
+      // so resetting for a new task must not make the run-chips vanish.
+      return { ...initialState(), savedActions: state.savedActions };
 
     case "startTask": {
       const seq = state.seq + 1;

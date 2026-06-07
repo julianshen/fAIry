@@ -113,18 +113,25 @@ export async function waitFor(
 
   const deadline = clock.now() + timeoutMs;
 
-  // networkIdle: the page's Resource Timing count, or undefined if it can't be read
-  // this tick (navigating page / NaN). Completion-quiescence — a stable count means
-  // no new resource finished; stream-safe (open SSE/WS never adds a completed entry).
-  const resourceCount = async (): Promise<number | undefined> => {
+  // networkIdle: a per-tick signature of the page's network state, or undefined if it
+  // can't be read (navigating page / bad result). It combines `performance.timeOrigin`
+  // (the document's identity — changes on a full navigation, so a click-nav to a new
+  // page with the SAME resource count still reads as activity) with the Resource Timing
+  // count (completion-quiescence within a document). A stable signature means no new
+  // resource finished AND no navigation; stream-safe (an open SSE/WS never adds a
+  // completed entry).
+  const networkSignature = async (): Promise<string | undefined> => {
     try {
-      const v = Number(await evaluateExpression(cdp, "performance.getEntriesByType('resource').length"));
-      return Number.isFinite(v) ? v : undefined;
+      const v = await evaluateExpression(
+        cdp,
+        "performance.timeOrigin + '|' + performance.getEntriesByType('resource').length",
+      );
+      return typeof v === "string" && v.length > 0 ? v : undefined;
     } catch {
       return undefined;
     }
   };
-  let lastCount: number | undefined;
+  let lastSig: string | undefined;
   let idleSince = 0;
 
   const truthy = async (expr: string): Promise<boolean> => {
@@ -159,11 +166,12 @@ export async function waitFor(
       return { ok: true, reason: "predicate" };
     }
     if (networkIdle) {
-      const count = await resourceCount();
-      if (count !== undefined) {
-        if (lastCount === undefined || count !== lastCount) {
-          // any change (growth or a navigation reset that drops the count) = activity
-          lastCount = count;
+      const sig = await networkSignature();
+      if (sig !== undefined) {
+        if (lastSig === undefined || sig !== lastSig) {
+          // any change = activity: a new resource, a count drop, OR a navigation
+          // (timeOrigin changes) even if the new document's count happens to match.
+          lastSig = sig;
           idleSince = clock.now();
         } else if (clock.now() - idleSince >= idleMs) {
           return { ok: true, reason: "networkIdle" };

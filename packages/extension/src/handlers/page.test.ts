@@ -142,6 +142,12 @@ describe("waitFor", () => {
     expect(result).toEqual({ ok: true, reason: "networkIdle" });
   });
 
+  it("clamps a negative idleMs to 0 (resolves when stable, no error)", async () => {
+    const cdp = fakeCdp([5]);
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: -1000 }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+  });
+
   it("networkIdle composes with other conditions — first satisfied wins", async () => {
     const cdp = fakeCdp([true]); // the selector check evaluates truthy first
     const result = await waitFor(cdp, { selector: ".ready", networkIdle: true }, fakeClock());

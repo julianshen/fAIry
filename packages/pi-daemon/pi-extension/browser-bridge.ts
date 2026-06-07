@@ -340,7 +340,7 @@ export default function (pi: ExtensionAPI): void {
       predicate: Type.Optional(Type.String()),
       timeoutMs: Type.Optional(Type.Number()),
       networkIdle: Type.Optional(Type.Boolean()),
-      idleMs: Type.Optional(Type.Number()),
+      idleMs: Type.Optional(Type.Number({ minimum: 0 })),
     }),
     execute: async (_id, params) => bridge("waitFor", params as Record<string, unknown>),
   });

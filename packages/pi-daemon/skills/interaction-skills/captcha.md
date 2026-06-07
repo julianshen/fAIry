@@ -23,7 +23,7 @@ If non-empty, a captcha is on the page.
 
 Tell the user the site is blocking automated access and ask them to clear the challenge manually. Then wait.
 
-If the captcha is _also_ gating the user's normal usage (e.g., Cloudflare's "Checking your browser..." that everyone sees), let it run its 5-10 seconds and `browser_wait_for({ networkIdleMs: 2000 })`. Don't click anything; many of these resolve on their own.
+If the captcha is _also_ gating the user's normal usage (e.g., Cloudflare's "Checking your browser..." that everyone sees), let it run its 5-10 seconds and `browser_wait_for({ networkIdle: true, idleMs: 2000 })`. Don't click anything; many of these resolve on their own.
 
 ## Anti-bot heuristics
 

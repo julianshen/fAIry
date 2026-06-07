@@ -109,4 +109,65 @@ describe("waitFor", () => {
     // capped at 60s of 100ms polls → ~600, not ~10^10
     expect(clock.now()).toBeLessThanOrEqual(60_000);
   });
+
+  // networkIdle reads a `timeOrigin|count` signature each tick (a fixed timeOrigin
+  // token like "1000" means "same document"; a different token means a navigation).
+  it("resolves networkIdle once the signature is stable for idleMs", async () => {
+    const cdp = fakeCdp(["1000|5"]); // same document, count stays 5
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: 100 }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+  });
+
+  it("waits through a growing count, then resolves when it settles", async () => {
+    const cdp = fakeCdp(["1000|1", "1000|2", "1000|2"]);
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: 100 }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+    expect(cdp.calls.filter((c) => c.method === "Runtime.evaluate")).toHaveLength(3);
+  });
+
+  it("treats a count DROP (resource-timing reset) as activity, not idle", async () => {
+    const cdp = fakeCdp(["1000|5", "1000|2", "1000|2"]); // a growth-only check would resolve in 2 polls
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: 100 }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+    expect(cdp.calls.filter((c) => c.method === "Runtime.evaluate")).toHaveLength(3);
+  });
+
+  it("treats a navigation with the SAME count as activity (timeOrigin changes)", async () => {
+    // old doc and new doc both report count 0; a count-only check would falsely
+    // resolve at the 2nd poll. The timeOrigin change (1000→2000) defers to the 3rd.
+    const cdp = fakeCdp(["1000|0", "2000|0", "2000|0"]);
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: 100 }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+    expect(cdp.calls.filter((c) => c.method === "Runtime.evaluate")).toHaveLength(3);
+  });
+
+  it("times out if the network never settles", async () => {
+    const cdp = fakeCdp(["1000|1", "1000|2", "1000|3", "1000|4"]); // changes every poll
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: 100, timeoutMs: 250 }, fakeClock());
+    expect(result).toEqual({ ok: false, reason: "timeout" });
+  });
+
+  it("an unreadable signature is skipped (no false resolve)", async () => {
+    const cdp = fakeCdp([undefined, "1000|5", "1000|5"]); // first read fails → skipped, then stable
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: 100 }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+  });
+
+  it("clamps a negative idleMs to 0 (resolves when stable, no error)", async () => {
+    const cdp = fakeCdp(["1000|5"]);
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: -1000 }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+  });
+
+  it("falls back to the default idleMs on a non-number (no throw)", async () => {
+    const cdp = fakeCdp(["1000|5"]);
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: "fast" as never }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+  });
+
+  it("networkIdle composes with other conditions — first satisfied wins", async () => {
+    const cdp = fakeCdp([true]); // the selector check evaluates truthy first
+    const result = await waitFor(cdp, { selector: ".ready", networkIdle: true }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "selector" });
+  });
 });

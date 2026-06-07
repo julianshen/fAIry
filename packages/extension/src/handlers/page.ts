@@ -17,6 +17,7 @@ const POLL_MS = 100;
 /** Hard ceilings on tool-supplied input: bound the loop and guard against a ReDoS regex. */
 const MAX_TIMEOUT_MS = 60_000;
 const MAX_URL_MATCH_LEN = 256;
+const MAX_IDLE_MS = 10_000;
 
 /**
  * Detect and remove modal/overlay elements that intercept clicks — the common
@@ -76,7 +77,8 @@ export async function dismissOverlays(
  * or the deadline passes. Replaces the agent's "sleep then retry" instinct with
  * a declarative waiter the page satisfies as soon as it's ready. Supported:
  * `selector` (exists + visible), `selectorGone`, `urlMatch` (regex), `predicate`
- * (arbitrary truthy JS). (`networkIdle` arrives with the CDP-event buffer.)
+ * (arbitrary truthy JS). `networkIdle` resolves once the Resource Timing count is
+ * stable for `idleMs`.
  */
 export async function waitFor(
   cdp: CdpClient,
@@ -88,6 +90,14 @@ export async function waitFor(
   const selectorGone = optionalString(args, "selectorGone");
   const urlMatch = optionalString(args, "urlMatch");
   const predicate = optionalString(args, "predicate");
+  const networkIdle = args.networkIdle === true;
+  // A non-number idleMs falls back to the default (don't throw — it's a soft timing
+  // hint); clamp to [0, MAX] (a negative would make the quiet check trivially true).
+  const rawIdle = args.idleMs;
+  const idleMs = Math.max(
+    0,
+    Math.min(typeof rawIdle === "number" && Number.isFinite(rawIdle) ? rawIdle : 500, MAX_IDLE_MS),
+  );
 
   // Compile the url regex once, up front — never per tick (a constant recompile,
   // and an untrusted pattern shouldn't be fed to `new RegExp` in a hot loop).
@@ -102,6 +112,27 @@ export async function waitFor(
   }
 
   const deadline = clock.now() + timeoutMs;
+
+  // networkIdle: a per-tick signature of the page's network state, or undefined if it
+  // can't be read (navigating page / bad result). It combines `performance.timeOrigin`
+  // (the document's identity — changes on a full navigation, so a click-nav to a new
+  // page with the SAME resource count still reads as activity) with the Resource Timing
+  // count (completion-quiescence within a document). A stable signature means no new
+  // resource finished AND no navigation; stream-safe (an open SSE/WS never adds a
+  // completed entry).
+  const networkSignature = async (): Promise<string | undefined> => {
+    try {
+      const v = await evaluateExpression(
+        cdp,
+        "performance.timeOrigin + '|' + performance.getEntriesByType('resource').length",
+      );
+      return typeof v === "string" && v.length > 0 ? v : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  let lastSig: string | undefined;
+  let idleSince = 0;
 
   const truthy = async (expr: string): Promise<boolean> => {
     try {
@@ -133,6 +164,19 @@ export async function waitFor(
     }
     if (predicate && (await truthy(`!!(${predicate})`))) {
       return { ok: true, reason: "predicate" };
+    }
+    if (networkIdle) {
+      const sig = await networkSignature();
+      if (sig !== undefined) {
+        if (lastSig === undefined || sig !== lastSig) {
+          // any change = activity: a new resource, a count drop, OR a navigation
+          // (timeOrigin changes) even if the new document's count happens to match.
+          lastSig = sig;
+          idleSince = clock.now();
+        } else if (clock.now() - idleSince >= idleMs) {
+          return { ok: true, reason: "networkIdle" };
+        }
+      }
     }
     await clock.sleep(POLL_MS);
   }

@@ -22,7 +22,7 @@ browser_evaluate({ expression })     // raw JS in the page; returns { ok, value 
 Six more sit on top of those:
 
 ```
-browser_wait_for({ selector | networkIdleMs | urlContains, timeoutMs? })
+browser_wait_for({ selector | networkIdle | urlContains, timeoutMs? })
 browser_dismiss_overlays()           // removes common cookie/modal/banner clutter
 browser_describe_at({ x, y })        // tag, id, classes, rect, text — for what's under a pixel
 browser_getDom({ depth? })          // structured DOM snapshot
@@ -61,7 +61,7 @@ Sites without a policy → apply your own defaults: read freely, navigate within
 
 ```
 browser_navigate({ url })
-browser_wait_for({ networkIdleMs: 600 })   // or { selector: "main" }, { urlContains: "/dashboard" }
+browser_wait_for({ networkIdle: true, idleMs: 600 })   // or { selector: "main" }, { urlContains: "/dashboard" }
 ```
 
 The navigate call returns when the request is committed, not when the page is interactive. Skipping the wait is the #1 source of "I clicked but nothing happened."
@@ -77,7 +77,7 @@ A helper is a snippet you call inside the page. A **workflow** is a sequence of 
 ```
 browser_workflow_record_start({ name: "amazon-orders-export" })
 browser_navigate({ url: "https://amazon.com/orders" })
-browser_wait_for({ networkIdleMs: 500 })
+browser_wait_for({ networkIdle: true, idleMs: 500 })
 browser_click({ x: ..., y: ... })       // "Download report"
 ...
 browser_workflow_record_stop()
@@ -112,7 +112,7 @@ When you take an action and want to know what network calls fired, use the CDP s
 ```
 browser_cdp_subscribe({ method: "Network.responseReceived" })
 browser_click({ x, y })               // the action whose effects you care about
-browser_wait_for({ networkIdleMs: 600 })
+browser_wait_for({ networkIdle: true, idleMs: 600 })
 browser_cdp_collect({ method: "Network.responseReceived" })  // drains the buffer
 ```
 

@@ -331,15 +331,16 @@ export default function (pi: ExtensionAPI): void {
     label: "Wait for condition",
     description:
       "Wait for a page condition rather than sleeping. Conditions: selector (visible), selectorGone, " +
-      "networkIdleMs, urlMatch (regex), predicate (JS truthy), timeoutMs (default 10s). Returns as soon " +
-      "as ANY holds: {ok:true, reason} or {ok:false, reason:'timeout'}.",
+      "urlMatch (regex), predicate (JS truthy), timeoutMs (default 10s). Returns as soon " +
+      "as ANY holds: {ok:true, reason} or {ok:false, reason:'timeout'}. Set networkIdle:true to wait until the page's network is quiet (no new resource for idleMs, default 500ms).",
     parameters: Type.Object({
       selector: Type.Optional(Type.String()),
       selectorGone: Type.Optional(Type.String()),
-      networkIdleMs: Type.Optional(Type.Number()),
       urlMatch: Type.Optional(Type.String()),
       predicate: Type.Optional(Type.String()),
       timeoutMs: Type.Optional(Type.Number()),
+      networkIdle: Type.Optional(Type.Boolean()),
+      idleMs: Type.Optional(Type.Number({ minimum: 0 })),
     }),
     execute: async (_id, params) => bridge("waitFor", params as Record<string, unknown>),
   });

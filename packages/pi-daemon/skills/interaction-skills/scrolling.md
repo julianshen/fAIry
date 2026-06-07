@@ -26,4 +26,4 @@ See `infinite-scroll.md` — there's an IntersectionObserver pattern that's fast
 
 ## Smooth vs instant
 
-`scrollBy({ behavior: 'smooth' })` returns immediately while the scroll animates. Either pass `behavior: 'instant'` or `browser_wait_for({ networkIdleMs: 400 })` before reading positions.
+`scrollBy({ behavior: 'smooth' })` returns immediately while the scroll animates. Either pass `behavior: 'instant'` or `browser_wait_for({ networkIdle: true, idleMs: 400 })` before reading positions.

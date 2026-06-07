@@ -17,6 +17,7 @@ const POLL_MS = 100;
 /** Hard ceilings on tool-supplied input: bound the loop and guard against a ReDoS regex. */
 const MAX_TIMEOUT_MS = 60_000;
 const MAX_URL_MATCH_LEN = 256;
+const MAX_IDLE_MS = 10_000;
 
 /**
  * Detect and remove modal/overlay elements that intercept clicks — the common
@@ -76,7 +77,8 @@ export async function dismissOverlays(
  * or the deadline passes. Replaces the agent's "sleep then retry" instinct with
  * a declarative waiter the page satisfies as soon as it's ready. Supported:
  * `selector` (exists + visible), `selectorGone`, `urlMatch` (regex), `predicate`
- * (arbitrary truthy JS). (`networkIdle` arrives with the CDP-event buffer.)
+ * (arbitrary truthy JS). `networkIdle` resolves once the Resource Timing count is
+ * stable for `idleMs`.
  */
 export async function waitFor(
   cdp: CdpClient,
@@ -88,6 +90,8 @@ export async function waitFor(
   const selectorGone = optionalString(args, "selectorGone");
   const urlMatch = optionalString(args, "urlMatch");
   const predicate = optionalString(args, "predicate");
+  const networkIdle = args.networkIdle === true;
+  const idleMs = Math.min(optionalNumber(args, "idleMs", 500), MAX_IDLE_MS);
 
   // Compile the url regex once, up front — never per tick (a constant recompile,
   // and an untrusted pattern shouldn't be fed to `new RegExp` in a hot loop).
@@ -102,6 +106,20 @@ export async function waitFor(
   }
 
   const deadline = clock.now() + timeoutMs;
+
+  // networkIdle: the page's Resource Timing count, or undefined if it can't be read
+  // this tick (navigating page / NaN). Completion-quiescence — a stable count means
+  // no new resource finished; stream-safe (open SSE/WS never adds a completed entry).
+  const resourceCount = async (): Promise<number | undefined> => {
+    try {
+      const v = Number(await evaluateExpression(cdp, "performance.getEntriesByType('resource').length"));
+      return Number.isFinite(v) ? v : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  let lastCount: number | undefined;
+  let idleSince = 0;
 
   const truthy = async (expr: string): Promise<boolean> => {
     try {
@@ -133,6 +151,18 @@ export async function waitFor(
     }
     if (predicate && (await truthy(`!!(${predicate})`))) {
       return { ok: true, reason: "predicate" };
+    }
+    if (networkIdle) {
+      const count = await resourceCount();
+      if (count !== undefined) {
+        if (lastCount === undefined || count !== lastCount) {
+          // any change (growth or a navigation reset that drops the count) = activity
+          lastCount = count;
+          idleSince = clock.now();
+        } else if (clock.now() - idleSince >= idleMs) {
+          return { ok: true, reason: "networkIdle" };
+        }
+      }
     }
     await clock.sleep(POLL_MS);
   }

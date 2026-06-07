@@ -109,4 +109,42 @@ describe("waitFor", () => {
     // capped at 60s of 100ms polls → ~600, not ~10^10
     expect(clock.now()).toBeLessThanOrEqual(60_000);
   });
+
+  it("resolves networkIdle once the resource count is stable for idleMs", async () => {
+    const cdp = fakeCdp([5]); // count stays 5 every poll
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: 100 }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+  });
+
+  it("waits through a growing count, then resolves when it settles", async () => {
+    const cdp = fakeCdp([1, 2, 2]);
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: 100 }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+    expect(cdp.calls.filter((c) => c.method === "Runtime.evaluate")).toHaveLength(3);
+  });
+
+  it("treats a count DROP (navigation reset) as activity, not idle", async () => {
+    const cdp = fakeCdp([5, 2, 2]); // a growth-only check would falsely resolve in 2 polls
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: 100 }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+    expect(cdp.calls.filter((c) => c.method === "Runtime.evaluate")).toHaveLength(3);
+  });
+
+  it("times out if the network never settles", async () => {
+    const cdp = fakeCdp([1, 2, 3, 4]); // changes every poll
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: 100, timeoutMs: 250 }, fakeClock());
+    expect(result).toEqual({ ok: false, reason: "timeout" });
+  });
+
+  it("a non-number resource read is skipped (no false resolve)", async () => {
+    const cdp = fakeCdp([undefined, 5, 5]); // first read NaN → skipped, then stable
+    const result = await waitFor(cdp, { networkIdle: true, idleMs: 100 }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "networkIdle" });
+  });
+
+  it("networkIdle composes with other conditions — first satisfied wins", async () => {
+    const cdp = fakeCdp([true]); // the selector check evaluates truthy first
+    const result = await waitFor(cdp, { selector: ".ready", networkIdle: true }, fakeClock());
+    expect(result).toEqual({ ok: true, reason: "selector" });
+  });
 });

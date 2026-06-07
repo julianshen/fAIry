@@ -167,14 +167,16 @@ export function reduce(state: PanelState, action: PanelAction): PanelState {
     case "actions": {
       const raw: unknown = action.actions;
       const savedActions: SavedActionView[] = Array.isArray(raw)
-        ? raw.filter(
-            (a): a is SavedActionView =>
-              typeof a === "object" &&
-              a !== null &&
-              typeof (a as { name?: unknown }).name === "string" &&
-              typeof (a as { content?: unknown }).content === "string" &&
-              typeof (a as { attach?: unknown }).attach === "string",
-          )
+        ? raw.filter((a): a is SavedActionView => {
+            if (typeof a !== "object" || a === null) return false;
+            const o = a as { name?: unknown; content?: unknown; attach?: unknown };
+            return (
+              typeof o.name === "string" &&
+              !/[\r\n\0]/.test(o.name) && // rendered in a chip — no layout breakage / spoofing
+              typeof o.content === "string" &&
+              (o.attach === "activeTab" || o.attach === "allTabs" || o.attach === "none") // strict enum
+            );
+          })
         : [];
       return { ...state, savedActions };
     }

@@ -329,7 +329,14 @@ describe("reduce — actions (savedActions)", () => {
   it("drops malformed actions entries (defensive)", () => {
     const s = reduce(initialState(), {
       kind: "actions",
-      actions: [{ name: "ok", content: "c", attach: "none" }, { name: 1 }, null, "x"] as never,
+      actions: [
+        { name: "ok", content: "c", attach: "none" },
+        { name: 1 },
+        null,
+        "x",
+        { name: "bad\nname", content: "c", attach: "none" }, // control char → dropped
+        { name: "weird", content: "c", attach: "wat" }, // non-enum attach → dropped
+      ] as never,
     });
     expect(s.savedActions).toEqual([{ name: "ok", content: "c", attach: "none" }]);
   });

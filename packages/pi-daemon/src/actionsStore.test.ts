@@ -45,6 +45,11 @@ describe("actionsStore", () => {
     expect(() => store.save({ name: "ok", content: "  ", attach: "none" })).toThrow(/content/i);
   });
 
+  it("rejects a file-unsafe name", () => {
+    const store = createActionsStore(file);
+    expect(() => store.save({ name: "a/b", content: "x", attach: "none" })).toThrow(/invalid action name/i);
+  });
+
   it("reads an absent file as empty", () => {
     expect(createActionsStore(file).list()).toEqual([]);
   });

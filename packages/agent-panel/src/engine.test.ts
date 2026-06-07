@@ -264,7 +264,17 @@ describe("reduce — proposal", () => {
   it("drops a malformed proposal beat (renders nothing)", () => {
     // Opaque wire data: a non-object / missing name|content proposal must not
     // produce a feed item (it would crash the card on proposal.content).
-    for (const bad of [null, "nope", { name: "x" }, { content: "y" }, { kind: "mystery", name: "x", content: "y" }]) {
+    const bads = [
+      null,
+      "nope",
+      { name: "x" },
+      { content: "y" },
+      { kind: "mystery", name: "x", content: "y" },
+      { kind: { obj: 1 }, name: "x", content: "y" },
+      { kind: "skill", name: "x", content: "y", host: { obj: 1 } }, // object host → would crash the card
+      { kind: "action", name: "x", content: "y", attach: { obj: 1 } }, // object attach
+    ];
+    for (const bad of bads) {
       const s = reduce(initialState(), { kind: "proposal", proposal: bad as never });
       expect(s.items).toEqual([]);
     }

@@ -265,13 +265,19 @@ export function reduce(state: PanelState, action: PanelAction): PanelState {
       // The panel is the trust boundary for opaque wire data: drop a malformed
       // proposal (non-object / missing name|content) rather than render a card
       // that would crash on `proposal.content`. Mirrors the a2ui fallback stance.
-      const p = action.proposal as { kind?: unknown; name?: unknown; content?: unknown } | null;
+      const p = action.proposal as
+        | { kind?: unknown; name?: unknown; content?: unknown; host?: unknown; attach?: unknown }
+        | null;
+      // Every field the card renders must be safe — a non-string host/attach would
+      // throw "Objects are not valid as a React child" in ProposalCard.
       if (
         typeof p !== "object" ||
         p === null ||
         (p.kind !== "skill" && p.kind !== "action") ||
         typeof p.name !== "string" ||
-        typeof p.content !== "string"
+        typeof p.content !== "string" ||
+        (p.host !== undefined && typeof p.host !== "string") ||
+        (p.attach !== undefined && typeof p.attach !== "string")
       ) {
         return state;
       }

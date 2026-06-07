@@ -578,9 +578,12 @@ describe("coerceProposal", () => {
     );
   });
 
-  it("rejects a skill name with file-unsafe chars (it files as <name>.md)", () => {
+  it("rejects a file-unsafe name for either kind", () => {
     expect(() => coerceProposal({ kind: "skill", name: "a/b", content: "c", host: "x.com" })).toThrow(
-      "a skill proposal name must be a plain file-safe label",
+      "proposal name must be a plain file-safe label",
+    );
+    expect(() => coerceProposal({ kind: "action", name: "a:b", content: "c" })).toThrow(
+      "proposal name must be a plain file-safe label",
     );
   });
 

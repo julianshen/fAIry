@@ -511,7 +511,12 @@ export default function (pi: ExtensionAPI): void {
       if (p.kind === "skill" && (typeof p.host !== "string" || p.host.trim() === "")) {
         throw new Error("a skill proposal needs a host — pass the host of the site you're on");
       }
-      return { proposed: true };
+      // Return Pi's tool-result shape (content block + details), like render_ui —
+      // a bare object would leave the agent without a text result.
+      return {
+        content: [{ type: "text" as const, text: "Proposal sent to the panel — the user will review and confirm it." }],
+        details: { proposed: true },
+      };
     },
   });
 

@@ -30,6 +30,9 @@ export function createActionsStore(file: string): ActionsStore {
     save: (input) => {
       const name = input.name.trim();
       if (name.length === 0) throw new Error("action name required");
+      // Defense-in-depth (per the design): keep the key file-safe in case it's
+      // ever used in a path/URL/log, even though it's an in-memory key today.
+      if (/[\\/\0<>:"|?*]/.test(name) || name.startsWith(".")) throw new Error("invalid action name");
       if (input.content.trim().length === 0) throw new Error("action content required");
       const record: SavedAction = { name, content: input.content, attach: input.attach, host: input.host, createdAt: Date.now() };
       // Write first; only adopt the new in-memory state once the disk write

@@ -19,6 +19,11 @@ export function coerceProposal(v: unknown): CoercedProposal {
   if (name.length === 0) throw new Error("proposal name required");
   // The name is rendered in the panel; reject newlines/NUL to avoid layout breakage.
   if (/[\r\n\0]/.test(name)) throw new Error("proposal name must be a single line");
+  // File-safe for both kinds: a skill files as "<name>.md" (must pass safeMdName);
+  // an action is a store key but the design asks for file-safety as defense-in-depth.
+  if (/[\\/<>:"|?*]/.test(name) || name.startsWith(".")) {
+    throw new Error("proposal name must be a plain file-safe label");
+  }
   if (content.trim().length === 0) throw new Error("proposal content required");
   if (o.kind === "skill") {
     const host = typeof o.host === "string" ? o.host.trim() : "";
@@ -26,11 +31,6 @@ export function coerceProposal(v: unknown): CoercedProposal {
     // backstop, but a clear message here beats a leaked "invalid host" from disk).
     if (host.length === 0 || /[\\/\0<>:"|?*]/.test(host) || host === "." || host === "..") {
       throw new Error("a skill proposal needs a valid host");
-    }
-    // The skill is filed as "<name>.md"; reject what safeMdName would reject so a
-    // valid proposal here always saves (no "invalid skill name" leaked from disk).
-    if (/[\\/<>:"|?*]/.test(name) || name.startsWith(".")) {
-      throw new Error("a skill proposal name must be a plain file-safe label");
     }
     return { kind: "skill", name, content, host };
   }

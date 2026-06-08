@@ -14,8 +14,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
-    let appData = FileManager.default.homeDirectoryForCurrentUser
-      .appendingPathComponent("Library/Application Support/fairy")
+    // Mirror the daemon's path precedence (FAIRY_HOME → Application Support/fAIry)
+    // so we read the same token.json / pairing.json the daemon wrote.
+    let appData = AppPaths.appData(
+      env: ProcessInfo.processInfo.environment,
+      home: FileManager.default.homeDirectoryForCurrentUser
+    )
     pairingFileURL = appData.appendingPathComponent("pairing.json")
     // Dev: run from packages/mac-shell, so cwd/.. is packages/ and ../pi-daemon is the daemon.
     // Dev: resolve the daemon relative to THIS source file (baked in at build),

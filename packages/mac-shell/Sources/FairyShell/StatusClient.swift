@@ -28,10 +28,5 @@ public struct StatusClient: StatusProbing {
     }
   }
 
-  private func readToken() -> String? {
-    guard let data = try? Data(contentsOf: tokenURL) else { return nil }
-    struct TokenFile: Decodable { let token: String }
-    let token = (try? JSONDecoder().decode(TokenFile.self, from: data))?.token
-    return (token?.isEmpty == false) ? token : nil
-  }
+  private func readToken() -> String? { TokenReader.read(from: tokenURL) }
 }

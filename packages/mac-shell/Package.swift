@@ -6,6 +6,7 @@ let package = Package(
   platforms: [.macOS(.v13)],
   targets: [
     .target(name: "FairyShell", swiftSettings: [.swiftLanguageMode(.v5)]),
+    .executableTarget(name: "fairy-shell", dependencies: ["FairyShell"], swiftSettings: [.swiftLanguageMode(.v5)]),
     .testTarget(name: "FairyShellTests", dependencies: ["FairyShell"], swiftSettings: [.swiftLanguageMode(.v5)]),
   ]
 )

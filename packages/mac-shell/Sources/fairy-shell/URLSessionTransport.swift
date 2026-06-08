@@ -18,7 +18,7 @@ struct URLSessionTransport: HTTPTransport {
     req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     req.httpBody = body
-    req.timeoutInterval = 2
+    req.timeoutInterval = 5
     guard let (data, resp) = try? await URLSession.shared.data(for: req),
           let http = resp as? HTTPURLResponse else { return nil }
     return (http.statusCode, data)

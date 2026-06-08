@@ -32,6 +32,10 @@ final class SettingsViewModel: ObservableObject {
   func addCustomProvider(_ id: String) {
     let t = id.trimmingCharacters(in: .whitespaces)
     guard !t.isEmpty, !form.providers.contains(where: { $0.id == t }) else { return }
+    // Reject control chars / line breaks so a pasted id can't corrupt or spoof
+    // the menu/form rendering (mirrors PairingReader's hardening).
+    let forbidden = CharacterSet.controlCharacters.union(.newlines)
+    guard t.rangeOfCharacter(from: forbidden) == nil else { return }
     form.providers.append(ProviderRow(id: t, hasKey: false))
   }
 

@@ -45,24 +45,19 @@ struct SettingsView: View {
     }
   }
 
-  private func keyBinding(_ i: Int) -> Binding<String> {
-    Binding(get: { model.form.providers[i].keyInput },
-            set: { model.form.providers[i].keyInput = $0 })
-  }
-
   private var providersSection: some View {
     VStack(alignment: .leading, spacing: 8) {
       Text("Providers").font(.headline)
-      ForEach(model.form.providers.indices, id: \.self) { i in
+      ForEach($model.form.providers) { $pr in
         HStack {
-          Text(model.form.providers[i].id).frame(width: 110, alignment: .leading)
-          if model.form.providers[i].removed {
+          Text(pr.id).frame(width: 110, alignment: .leading)
+          if pr.removed {
             Text("removed").foregroundColor(.secondary)
-            Button("Undo") { model.form.providers[i].removed = false }
+            Button("Undo") { $pr.removed.wrappedValue = false }
           } else {
-            SecureField(model.form.providers[i].hasKey ? "key is set — type to replace" : "API key",
-                        text: keyBinding(i)).textFieldStyle(.roundedBorder)
-            Button(role: .destructive) { model.form.providers[i].removed = true } label: {
+            SecureField(pr.hasKey ? "key is set — type to replace" : "API key",
+                        text: $pr.keyInput).textFieldStyle(.roundedBorder)
+            Button(role: .destructive) { $pr.removed.wrappedValue = true } label: {
               Image(systemName: "trash")
             }
           }
@@ -96,14 +91,18 @@ struct SettingsView: View {
   private var enabledModelsSection: some View {
     VStack(alignment: .leading, spacing: 8) {
       Text("Enabled models").font(.headline)
+      // Plain strings have no stable identity, so this stays an index ForEach —
+      // but the binding + remove are bounds-guarded so a mutation mid-render
+      // can't read or delete out of range.
       ForEach(model.form.enabledModels.indices, id: \.self) { i in
         HStack {
-          TextField("model id",
-                    text: Binding(get: { model.form.enabledModels[i] },
-                                  set: { model.form.enabledModels[i] = $0 })).textFieldStyle(.roundedBorder)
-          Button(role: .destructive) { model.form.enabledModels.remove(at: i) } label: {
-            Image(systemName: "minus.circle")
-          }
+          TextField("model id", text: Binding(
+            get: { i < model.form.enabledModels.count ? model.form.enabledModels[i] : "" },
+            set: { if i < model.form.enabledModels.count { model.form.enabledModels[i] = $0 } }))
+            .textFieldStyle(.roundedBorder)
+          Button(role: .destructive) {
+            if i < model.form.enabledModels.count { model.form.enabledModels.remove(at: i) }
+          } label: { Image(systemName: "minus.circle") }
         }
       }
       Button("Add model") { model.form.enabledModels.append("") }

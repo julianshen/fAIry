@@ -1,7 +1,8 @@
 import Foundation
 
-/// One editable provider row in the Settings form.
-public struct ProviderRow: Equatable, Sendable {
+/// One editable provider row in the Settings form. `Identifiable` (via `id`) so
+/// SwiftUI's binding-based `ForEach($rows)` can edit it without index races.
+public struct ProviderRow: Equatable, Sendable, Identifiable {
   public var id: String
   public var hasKey: Bool       // a key is already stored (from the redacted GET)
   public var keyInput: String   // what the user typed; blank = leave the stored key

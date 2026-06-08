@@ -9,6 +9,7 @@ import { evaluate } from "./evaluate";
 import { screenshot, screenshotMarked } from "./capture";
 import { axtree, describeAt, getDom } from "./inspect";
 import { dismissOverlays, waitFor } from "./page";
+import { readerExtract } from "./reader";
 import { tabClose, tabList, tabOpen, tabSwitch } from "./tabs";
 import { cdpCollect, cdpPassthrough, cdpSubscribe, cdpUnsubscribe } from "./cdp";
 import { learnPageActions } from "./learn/learnPageActions";
@@ -62,6 +63,7 @@ export function createBrowserHandlers(deps: BrowserDeps): Record<string, ToolHan
     describeAt: onCdp(describeAt),
     dismissOverlays: onCdp(dismissOverlays),
     waitFor: onCdp(waitFor),
+    reader_extract: onCdp(readerExtract),
     // Group 3 — tabs (ownership-gated via agentTabs).
     tabOpen: (args) => tabOpen(tabs, agentTabs, cdp, args),
     tabSwitch: (args) => tabSwitch(tabs, agentTabs, args),

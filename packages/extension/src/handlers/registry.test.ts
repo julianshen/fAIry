@@ -33,6 +33,7 @@ const EXPECTED_TOOLS = [
   "describeAt",
   "dismissOverlays",
   "waitFor",
+  "reader_extract",
   // group 3 — tabs
   "tabOpen",
   "tabSwitch",

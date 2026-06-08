@@ -628,7 +628,7 @@ export default function (pi: ExtensionAPI): void {
     name: "reader_extract",
     label: "Reader mode",
     description:
-      "Extract the main article from the active tab using Mozilla's Readability. PREFER over browser_getDom " +
+      "Extract the main article from the active tab using a readability-style extraction. PREFER over browser_getDom " +
       "for reading-comprehension tasks. Returns {title, byline, excerpt, textContent, ...} or {error}.",
     parameters: Type.Object({}),
     execute: async () => bridge("reader_extract", {}),

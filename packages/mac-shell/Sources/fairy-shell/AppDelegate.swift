@@ -1,6 +1,7 @@
 import AppKit
 import FairyShell
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private var statusItem: NSStatusItem!
   private var statusMenuItem: NSMenuItem?
@@ -12,7 +13,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let appData = FileManager.default.homeDirectoryForCurrentUser
       .appendingPathComponent("Library/Application Support/fairy")
     // Dev: run from packages/mac-shell, so cwd/.. is packages/ and ../pi-daemon is the daemon.
-    let packagesDir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).deletingLastPathComponent()
+    // Dev: resolve the daemon relative to THIS source file (baked in at build),
+    // so it works regardless of the launch CWD (Xcode/Finder/terminal). The
+    // shipped build bundles the daemon binary instead — that's M6.
+    // #filePath = …/packages/mac-shell/Sources/fairy-shell/AppDelegate.swift
+    let packagesDir = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent() // fairy-shell/
+      .deletingLastPathComponent() // Sources/
+      .deletingLastPathComponent() // mac-shell/
+      .deletingLastPathComponent() // packages/
     let config = DaemonLaunchConfig(
       executable: "bun",
       arguments: ["run", "src/main.ts"],

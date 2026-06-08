@@ -3,6 +3,11 @@ import Foundation
 /// Brings the daemon up (adopting an already-healthy one, else spawning) and
 /// tracks its health as a DaemonState. All I/O is injected, so the state machine
 /// is unit-tested without real processes or networking.
+///
+/// `@MainActor`-isolated: `state` is mutated both after `start()`'s awaits and
+/// from the launcher's `onExit` (the process termination callback), so all
+/// mutation happens on the main actor — no data race.
+@MainActor
 public final class DaemonController {
   private let launcher: DaemonLauncher
   private let status: StatusProbing

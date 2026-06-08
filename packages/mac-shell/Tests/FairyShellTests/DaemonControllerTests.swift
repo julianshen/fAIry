@@ -5,13 +5,14 @@ final class FakeLauncher: DaemonLauncher {
   private(set) var launchCount = 0
   private(set) var terminateCount = 0
   var throwOnLaunch = false
-  private var onExit: (() -> Void)?
-  func launch(_ config: DaemonLaunchConfig, onExit: @escaping () -> Void) throws {
+  private var onExit: (@MainActor () -> Void)?
+  func launch(_ config: DaemonLaunchConfig, onExit: @escaping @MainActor () -> Void) throws {
     if throwOnLaunch { throw NSError(domain: "test", code: 1) }
     launchCount += 1; self.onExit = onExit
   }
   func terminate() { terminateCount += 1 }
-  func simulateExit() { onExit?() }
+  /// Invoked from the @MainActor test, so the @MainActor onExit runs synchronously.
+  @MainActor func simulateExit() { onExit?() }
 }
 
 final class FakeStatus: StatusProbing {
@@ -24,6 +25,7 @@ private func makeConfig() -> DaemonLaunchConfig {
   DaemonLaunchConfig(executable: "bun", arguments: ["run", "src/main.ts"], workdir: URL(fileURLWithPath: "/tmp"))
 }
 
+@MainActor
 final class DaemonControllerTests: XCTestCase {
   func testAdoptsAlreadyHealthyDaemonWithoutLaunching() async {
     let launcher = FakeLauncher()

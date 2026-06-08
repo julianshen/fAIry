@@ -25,4 +25,10 @@ final class PairingReaderTests: XCTestCase {
   func testNilWhenCodeAbsent() {
     XCTAssertNil(PairingReader.read(from: file("{}")))
   }
+  func testNilWhenCodeContainsNewline() {
+    XCTAssertNil(PairingReader.read(from: file("{\"code\":\"8F3K\\n2A91\"}")))
+  }
+  func testNilWhenCodeContainsControlCharacter() {
+    XCTAssertNil(PairingReader.read(from: file("{\"code\":\"8F3K\\u0007A91\"}")))
+  }
 }

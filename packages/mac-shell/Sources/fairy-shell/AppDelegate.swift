@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var copyPairingItem: NSMenuItem?
   private var pairingCode: String?
   private var settingsWindow: SettingsWindowController!
+  private var panelWindow: PanelWindowController!
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -43,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     settingsWindow = SettingsWindowController {
       SettingsClient(baseURL: baseURL, tokenURL: tokenURL, transport: URLSessionTransport())
     }
+    panelWindow = PanelWindowController(baseURL: baseURL, tokenURL: tokenURL)
     controller = DaemonController(launcher: ProcessDaemonLauncher(), status: status, config: config)
     controller.onState = { [weak self] state in
       DispatchQueue.main.async { self?.render(state) }
@@ -88,6 +90,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     menu.addItem(copy)
     menu.addItem(.separator())
 
+    let panel = NSMenuItem(title: "Open Panel", action: #selector(openPanel), keyEquivalent: "o")
+    panel.target = self
+    menu.addItem(panel)
+    menu.addItem(.separator())
+
     let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
     settings.target = self
     menu.addItem(settings)
@@ -109,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   @objc private func restart() { Task { await controller.restart() } }
   @objc private func quit() { controller.stop(); NSApp.terminate(nil) }
   @objc private func openSettings() { settingsWindow.show() }
+  @objc private func openPanel() { panelWindow.show() }
 
   func menuWillOpen(_ menu: NSMenu) {
     refreshPairing()

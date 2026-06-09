@@ -40,3 +40,6 @@ shopt -u nullglob
 sed "s/@VERSION@/$VERSION/g" "$SCRIPT_DIR/Info.plist" > "$APP/Contents/Info.plist"
 
 echo "==> built $APP (unsigned)"
+echo "==> WARNING: Sparkle.framework is NOT embedded — this .app will NOT launch yet."
+echo "             Embedding Sparkle (+ its XPC services) into Contents/Frameworks and"
+echo "             code-signing are M5-5c. Until then this bundle is for structure only."

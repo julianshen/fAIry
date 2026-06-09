@@ -37,9 +37,25 @@ shopt -s nullglob
 for b in "$BIN"/*.bundle; do cp -R "$b" "$APP/"; done
 shopt -u nullglob
 
-sed "s/@VERSION@/$VERSION/g" "$SCRIPT_DIR/Info.plist" > "$APP/Contents/Info.plist"
+# Embed Sparkle.framework (its XPC services live inside) so the app can load it,
+# and add the Frameworks rpath to the main binary. Signing the embedded framework
+# is sign.sh (M5-5c).
+SPARKLE_FW="$SHELL_DIR/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+[ -d "$SPARKLE_FW" ] || { echo "ERROR: Sparkle.framework not at $SPARKLE_FW — run 'swift build -c release' first." >&2; exit 1; }
+mkdir -p "$APP/Contents/Frameworks"
+# ditto (not cp -R) preserves the framework's symlinks/xattrs exactly — important
+# before code-signing.
+ditto "$SPARKLE_FW" "$APP/Contents/Frameworks/Sparkle.framework"
+if ! otool -l "$APP/Contents/MacOS/Fairy" | grep -q "@executable_path/../Frameworks"; then
+  install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Fairy"
+fi
 
-echo "==> built $APP (unsigned)"
-echo "==> WARNING: Sparkle.framework is NOT embedded — this .app will NOT launch yet."
-echo "             Embedding Sparkle (+ its XPC services) into Contents/Frameworks and"
-echo "             code-signing are M5-5c. Until then this bundle is for structure only."
+# Info.plist: version via sed (safe — dotted digits), then the Sparkle feed/key via
+# PlistBuddy so a URL query string (`&`, `|`, …) can't corrupt a sed replacement.
+FEED="${FAIRY_UPDATE_FEED_URL:-https://EXAMPLE-REPLACE-IN-5C.invalid/appcast.xml}"
+PUBKEY="${FAIRY_SPARKLE_PUBLIC_KEY:-REPLACE-WITH-EDDSA-PUBLIC-KEY-IN-5C}"
+sed "s/@VERSION@/$VERSION/g" "$SCRIPT_DIR/Info.plist" > "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :SUFeedURL $FEED" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :SUPublicEDKey $PUBKEY" "$APP/Contents/Info.plist"
+
+echo "==> built $APP (unsigned — sign with scripts/sign.sh)"

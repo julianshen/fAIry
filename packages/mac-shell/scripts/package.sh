@@ -26,7 +26,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/fairy-shell" "$APP/Contents/MacOS/Fairy"
 cp "$ROOT/packages/pi-daemon/dist/fairy-daemon" "$APP/Contents/Resources/fairy-daemon"
 chmod +x "$APP/Contents/Resources/fairy-daemon"
-cp "$ROOT/packages/pi-extension/browser-bridge.ts" "$APP/Contents/Resources/browser-bridge.ts"
+cp "$ROOT/packages/pi-daemon/pi-extension/browser-bridge.ts" "$APP/Contents/Resources/browser-bridge.ts"
 cp -R "$ROOT/packages/pi-daemon/skills" "$APP/Contents/Resources/skills"
 
 # The SPM panel resource bundle, so Bundle.module resolves the panel inside the .app.

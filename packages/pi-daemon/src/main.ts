@@ -12,6 +12,7 @@ import { createDomainSkills } from "./domainSkills";
 import { createHelperRegistry } from "./helperRegistry";
 import { createPairingStore } from "./pairing";
 import { resolvePaths, type DaemonPaths } from "./paths";
+import { resolveAssetPath } from "./assetPath";
 import { createFileSettingsStore } from "./settingsStore";
 import { createSkillsLibrary } from "./skillsLibrary";
 import { acquireSingleInstanceLock, type LockHandle } from "./singleInstance";
@@ -91,13 +92,18 @@ async function main(): Promise<void> {
 const DEFAULT_HTTP_PORT = 51789;
 
 /** The Pi `browser` extension script, shipped alongside the daemon. */
-const BROWSER_EXTENSION = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../pi-extension/browser-bridge.ts",
+const BROWSER_EXTENSION = resolveAssetPath(
+  process.env,
+  "FAIRY_BROWSER_BRIDGE",
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../pi-extension/browser-bridge.ts"),
 );
 
 /** Bundled skills the daemon's tool-router serves (SKILL.md + interaction-skills/). */
-const SKILLS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../skills");
+const SKILLS_ROOT = resolveAssetPath(
+  process.env,
+  "FAIRY_SKILLS_ROOT",
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../skills"),
+);
 
 /**
  * Spawn `pi --mode rpc` against the daemon's isolated config dir, loading the

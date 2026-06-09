@@ -89,4 +89,12 @@ final class ConversationClientTests: XCTestCase {
     XCTAssertEqual(s.sent.count, before)   // nothing sent after close
     XCTAssertEqual(s.closeCount, 1)
   }
+
+  func testCloseBeforeOpenSuppressesAuthAndQueuedSends() {
+    let s = FakeConversationSocket(); let c = make(s); c.connect()
+    c.start("queued")   // queued before the socket opened
+    c.close()           // closed before open
+    s.simulateOpen()    // a late open callback must NOT send auth or flush the queue
+    XCTAssertTrue(s.sent.isEmpty)
+  }
 }

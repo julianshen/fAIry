@@ -38,12 +38,15 @@ public final class ConversationClient {
 
   public func close() {
     closed = true
+    open = false
+    queue.removeAll()       // drop anything queued before open so a late open can't flush it
     socket.close()
   }
 
   // MARK: - Socket callbacks
 
   private func handleOpen() {
+    guard !closed else { return }  // closed before the socket opened — send nothing
     open = true
     socket.send(encode(["type": "auth", "token": token]))  // auth must be the first frame
     for frame in queue { socket.send(frame) }

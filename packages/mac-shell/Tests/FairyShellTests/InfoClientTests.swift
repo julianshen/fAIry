@@ -41,4 +41,10 @@ final class InfoClientTests: XCTestCase {
     let r = await client(FakeTransport((status: 200, body: Data("nope".utf8)))).fetch()
     XCTAssertEqual(r, .failure(.decode))
   }
+  func testDecodeErrorOnOutOfRangePort() async {
+    let zero = await client(FakeTransport((status: 200, body: Data(#"{"bridgePort":0,"conversationPort":222}"#.utf8)))).fetch()
+    XCTAssertEqual(zero, .failure(.decode))
+    let huge = await client(FakeTransport((status: 200, body: Data(#"{"bridgePort":111,"conversationPort":70000}"#.utf8)))).fetch()
+    XCTAssertEqual(huge, .failure(.decode))
+  }
 }

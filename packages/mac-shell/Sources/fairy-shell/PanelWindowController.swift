@@ -63,11 +63,20 @@ final class PanelWindowController: NSObject, WKNavigationDelegate {
     let c = ConversationClient(
       socket: URLSessionConversationSocket(url: wsURL),
       token: token,
-      onBeat: { [weak self] json in self?.deliverBeat(json) }
+      onBeat: { [weak self] json in self?.deliverBeat(json) },
+      onClose: { [weak self] in self?.handleDisconnect() }
     )
     client = c
     c.connect()
     hideOverlay()
+  }
+
+  // The conversation socket dropped unsolicited (daemon restart / network loss) —
+  // surface the Retry overlay so the panel isn't silently dead.
+  private nonisolated func handleDisconnect() {
+    DispatchQueue.main.async { [weak self] in
+      self?.showOverlay("Connection lost — the daemon may have restarted.", retry: true)
+    }
   }
 
   private func handleCommand(_ body: [String: Any]) {

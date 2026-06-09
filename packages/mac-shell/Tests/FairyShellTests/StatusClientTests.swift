@@ -1,14 +1,20 @@
 import XCTest
 @testable import FairyShell
 
-/// A transport that returns a canned (status, body) or nil (connection error).
+/// A transport that returns canned (status, body) values (or nil = connection error)
+/// for GET and PUT, recording the last request for assertions.
 final class FakeTransport: HTTPTransport {
-  var result: (status: Int, body: Data)?
+  var result: (status: Int, body: Data)?     // GET result
+  var putResult: (status: Int, body: Data)?  // PUT result
   var lastURL: URL?
   var lastBearer: String?
+  var lastPutBody: Data?
   init(_ result: (status: Int, body: Data)?) { self.result = result }
   func get(_ url: URL, bearer: String) async -> (status: Int, body: Data)? {
     lastURL = url; lastBearer = bearer; return result
+  }
+  func put(_ url: URL, bearer: String, body: Data) async -> (status: Int, body: Data)? {
+    lastURL = url; lastBearer = bearer; lastPutBody = body; return putResult
   }
 }
 

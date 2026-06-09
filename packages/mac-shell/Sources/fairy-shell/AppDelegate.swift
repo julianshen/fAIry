@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var pairingMenuItem: NSMenuItem?
   private var copyPairingItem: NSMenuItem?
   private var pairingCode: String?
+  private var settingsWindow: SettingsWindowController!
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -36,11 +37,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       arguments: ["run", "src/main.ts"],
       workdir: packagesDir.appendingPathComponent("pi-daemon")
     )
-    let status = StatusClient(
-      baseURL: URL(string: "http://127.0.0.1:51789")!,
-      tokenURL: appData.appendingPathComponent("token.json"),
-      transport: URLSessionTransport()
-    )
+    let baseURL = URL(string: "http://127.0.0.1:51789")!
+    let tokenURL = appData.appendingPathComponent("token.json")
+    let status = StatusClient(baseURL: baseURL, tokenURL: tokenURL, transport: URLSessionTransport())
+    settingsWindow = SettingsWindowController {
+      SettingsClient(baseURL: baseURL, tokenURL: tokenURL, transport: URLSessionTransport())
+    }
     controller = DaemonController(launcher: ProcessDaemonLauncher(), status: status, config: config)
     controller.onState = { [weak self] state in
       DispatchQueue.main.async { self?.render(state) }
@@ -86,6 +88,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     menu.addItem(copy)
     menu.addItem(.separator())
 
+    let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+    settings.target = self
+    menu.addItem(settings)
+    menu.addItem(.separator())
+
     let restart = NSMenuItem(title: "Restart daemon", action: #selector(restart), keyEquivalent: "")
     restart.target = self
     menu.addItem(restart)
@@ -101,6 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
   @objc private func restart() { Task { await controller.restart() } }
   @objc private func quit() { controller.stop(); NSApp.terminate(nil) }
+  @objc private func openSettings() { settingsWindow.show() }
 
   func menuWillOpen(_ menu: NSMenu) {
     refreshPairing()

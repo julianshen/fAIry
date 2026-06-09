@@ -12,4 +12,15 @@ struct URLSessionTransport: HTTPTransport {
           let http = resp as? HTTPURLResponse else { return nil }
     return (http.statusCode, data)
   }
+  func put(_ url: URL, bearer: String, body: Data) async -> (status: Int, body: Data)? {
+    var req = URLRequest(url: url)
+    req.httpMethod = "PUT"
+    req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.httpBody = body
+    req.timeoutInterval = 5
+    guard let (data, resp) = try? await URLSession.shared.data(for: req),
+          let http = resp as? HTTPURLResponse else { return nil }
+    return (http.statusCode, data)
+  }
 }

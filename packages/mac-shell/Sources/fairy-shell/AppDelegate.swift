@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let config = DaemonLocator.resolve(
       resourcesURL: Bundle.main.resourceURL,
       devPackagesDir: packagesDir,
+      homeDir: FileManager.default.homeDirectoryForCurrentUser,
+      currentPath: ProcessInfo.processInfo.environment["PATH"] ?? "",
       exists: { FileManager.default.fileExists(atPath: $0.path) }
     )
     let baseURL = URL(string: "http://127.0.0.1:51789")!

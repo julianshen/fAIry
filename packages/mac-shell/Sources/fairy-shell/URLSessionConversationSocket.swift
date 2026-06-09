@@ -27,20 +27,22 @@ final class URLSessionConversationSocket: ConversationSocket {
     task = t
     t.resume()
     openHandler?()       // sends queue until the socket actually connects
-    receive()
+    receive(on: t)
   }
 
-  private func receive() {
-    task?.receive { [weak self] result in
+  private func receive(on task: URLSessionWebSocketTask) {
+    task.receive { [weak self] result in
       // The receive callback fires on a background queue. Hop to main so all access
       // to task/didClose/handlers stays serialized with connect/send/close (which the
       // UI calls on main) — no data race — and so downstream WebView calls run on main.
       DispatchQueue.main.async {
-        guard let self else { return }
+        // Ignore completions from a superseded/cancelled task (a retry replaced it),
+        // so a stale callback can't close the new connection.
+        guard let self, task === self.task else { return }
         switch result {
         case .success(let message):
           if case .string(let text) = message { self.textHandler?(text) }
-          self.receive()
+          self.receive(on: task)
         case .failure:
           self.fireClose()
         }

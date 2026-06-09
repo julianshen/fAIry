@@ -17,7 +17,8 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "build:compile": "bun build src/main.ts --compile --outfile dist/fairy-daemon"
   },
   "dependencies": {
     "ws": "^8.18.0"

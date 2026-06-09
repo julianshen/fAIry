@@ -14,7 +14,8 @@ APP="$SHELL_DIR/dist/Fairy.app"
 sign() { codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID_APP" "$@"; }
 
 FW="$APP/Contents/Frameworks/Sparkle.framework"
-V="$FW/Versions/B"
+# Resolve the framework version dir via the Current symlink (don't hardcode "B").
+V="$FW/Versions/$(readlink "$FW/Versions/Current" 2>/dev/null || echo "B")"
 
 echo "==> signing Sparkle's nested components (inside-out)"
 sign "$V/XPCServices/Downloader.xpc"

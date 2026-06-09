@@ -11,6 +11,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${FAIRY_UPDATE_FEED_URL:?set FAIRY_UPDATE_FEED_URL (the URL your appcast.xml is served at)}"
 : "${FAIRY_SPARKLE_PUBLIC_KEY:?set FAIRY_SPARKLE_PUBLIC_KEY (the public key from generate_keys)}"
 
+# Export so the sub-scripts (run as child bash processes) inherit them regardless
+# of how the caller set them.
+export FAIRY_VERSION DEVELOPER_ID_APP NOTARY_PROFILE FAIRY_UPDATE_FEED_URL FAIRY_SPARKLE_PUBLIC_KEY
+
 echo "==> preflight: signing identity in the keychain?"
 security find-identity -v -p codesigning | grep -q "$DEVELOPER_ID_APP" \
   || { echo "signing identity '$DEVELOPER_ID_APP' not found in the keychain" >&2; exit 1; }

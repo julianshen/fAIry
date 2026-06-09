@@ -17,7 +17,8 @@ STAGE="$SHELL_DIR/dist/dmg-stage"
 echo "==> staging the DMG contents"
 rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
-cp -R "$APP" "$STAGE/"
+# ditto (not cp -R) preserves the code signature + xattrs of the signed/stapled app.
+ditto "$APP" "$STAGE/Fairy.app"
 ln -s /Applications "$STAGE/Applications"
 
 echo "==> creating $DMG"

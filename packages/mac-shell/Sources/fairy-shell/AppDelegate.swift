@@ -33,10 +33,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       .deletingLastPathComponent() // Sources/
       .deletingLastPathComponent() // mac-shell/
       .deletingLastPathComponent() // packages/
-    let config = DaemonLaunchConfig(
-      executable: "bun",
-      arguments: ["run", "src/main.ts"],
-      workdir: packagesDir.appendingPathComponent("pi-daemon")
+    // Bundled: launch the compiled daemon from the .app's Resources (with bundled
+    // asset envs). Dev: Bundle.main.resourceURL is the build dir — no fairy-daemon
+    // there — so this falls back to `bun run src/main.ts`.
+    let config = DaemonLocator.resolve(
+      resourcesURL: Bundle.main.resourceURL,
+      devPackagesDir: packagesDir,
+      exists: { FileManager.default.fileExists(atPath: $0.path) }
     )
     let baseURL = URL(string: "http://127.0.0.1:51789")!
     let tokenURL = appData.appendingPathComponent("token.json")

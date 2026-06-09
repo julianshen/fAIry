@@ -29,9 +29,12 @@ chmod +x "$APP/Contents/Resources/fairy-daemon"
 cp "$ROOT/packages/pi-daemon/pi-extension/browser-bridge.ts" "$APP/Contents/Resources/browser-bridge.ts"
 cp -R "$ROOT/packages/pi-daemon/skills" "$APP/Contents/Resources/skills"
 
-# The SPM panel resource bundle, so Bundle.module resolves the panel inside the .app.
+# The SPM panel resource bundle. The generated Bundle.module accessor looks at
+# Bundle.main.bundleURL — the .app ROOT — so the bundle must sit there, NOT in
+# Contents/Resources (otherwise the shipped app falls back to a build-dir path
+# that doesn't exist on other machines, and fatalErrors).
 shopt -s nullglob
-for b in "$BIN"/*.bundle; do cp -R "$b" "$APP/Contents/Resources/"; done
+for b in "$BIN"/*.bundle; do cp -R "$b" "$APP/"; done
 shopt -u nullglob
 
 sed "s/@VERSION@/$VERSION/g" "$SCRIPT_DIR/Info.plist" > "$APP/Contents/Info.plist"

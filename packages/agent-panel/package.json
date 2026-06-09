@@ -13,6 +13,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:shell": "vite build --config vite.shell.config.ts && rm -rf ../mac-shell/Sources/fairy-shell/Resources/panel && mkdir -p ../mac-shell/Sources/fairy-shell/Resources/panel && cp -R dist-shell/. ../mac-shell/Sources/fairy-shell/Resources/panel/",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

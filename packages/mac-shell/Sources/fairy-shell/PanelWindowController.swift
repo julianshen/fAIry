@@ -26,12 +26,19 @@ final class PanelWindowController: NSObject, WKNavigationDelegate {
     let frame = NSRect(x: 0, y: 0, width: 420, height: 640)
     let wv = WKWebView(frame: frame, configuration: config)
     wv.navigationDelegate = self
+    wv.autoresizingMask = [.width, .height]
     webView = wv
+
+    // A container is the window's contentView (NOT the WebView itself), so the
+    // overlay can be a SIBLING added above the WebView. Adding native subviews to
+    // a WKWebView is unsupported, and a view can't be positioned relative to itself.
+    let container = NSView(frame: frame)
+    container.addSubview(wv)
 
     let w = NSWindow(contentRect: frame, styleMask: [.titled, .closable, .resizable],
                      backing: .buffered, defer: false)
     w.title = "Fairy"
-    w.contentView = wv
+    w.contentView = container
     w.isReleasedWhenClosed = false
     w.center()
     window = w

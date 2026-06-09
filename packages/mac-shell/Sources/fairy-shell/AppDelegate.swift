@@ -12,6 +12,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var pairingCode: String?
   private var settingsWindow: SettingsWindowController!
   private var panelWindow: PanelWindowController!
+  private let loginItem = LoginItemController(service: SMAppServiceLoginItem())
+  private var loginMenuItem: NSMenuItem?
+  private var updateController: UpdateController!
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -50,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       SettingsClient(baseURL: baseURL, tokenURL: tokenURL, transport: URLSessionTransport())
     }
     panelWindow = PanelWindowController(baseURL: baseURL, tokenURL: tokenURL)
+    updateController = UpdateController()
     controller = DaemonController(launcher: ProcessDaemonLauncher(), status: status, config: config)
     controller.onState = { [weak self] state in
       DispatchQueue.main.async { self?.render(state) }
@@ -104,6 +108,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     settings.target = self
     menu.addItem(settings)
     menu.addItem(.separator())
+    let updates = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+    updates.target = self
+    menu.addItem(updates)
+    let login = NSMenuItem(title: "Launch at login", action: #selector(toggleLoginItem), keyEquivalent: "")
+    login.target = self
+    loginMenuItem = login
+    menu.addItem(login)
+    menu.addItem(.separator())
 
     let restart = NSMenuItem(title: "Restart daemon", action: #selector(restart), keyEquivalent: "")
     restart.target = self
@@ -122,9 +134,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   @objc private func quit() { controller.stop(); NSApp.terminate(nil) }
   @objc private func openSettings() { settingsWindow.show() }
   @objc private func openPanel() { panelWindow.show() }
+  @objc private func checkForUpdates() { updateController.checkForUpdates() }
+  @objc private func toggleLoginItem() { loginItem.toggle(); refreshLoginItem() }
+
+  private func refreshLoginItem() {
+    loginMenuItem?.state = loginItem.isEnabled ? .on : .off
+  }
 
   func menuWillOpen(_ menu: NSMenu) {
     refreshPairing()
+    refreshLoginItem()
   }
 
   private func refreshPairing() {

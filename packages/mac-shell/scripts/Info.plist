@@ -12,5 +12,10 @@
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <!-- Sparkle auto-update (M5-5b wiring). SUFeedURL/SUPublicEDKey are placeholders
+       filled in M5-5c from the EdDSA keypair + release host. -->
+  <key>SUFeedURL</key><string>https://EXAMPLE-REPLACE-IN-5C.invalid/appcast.xml</string>
+  <key>SUPublicEDKey</key><string>REPLACE-WITH-EDDSA-PUBLIC-KEY-IN-5C</string>
+  <key>SUEnableAutomaticChecks</key><true/>
 </dict>
 </plist>

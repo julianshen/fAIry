@@ -7,7 +7,7 @@ import { createNativeBridge, type NativeBridge } from "./nativeBridge";
 declare global {
   interface Window {
     __fairyBridge?: { onBeat: (beat: unknown) => void };
-    webkit?: { messageHandlers: { fairy: { postMessage: (msg: unknown) => void } } };
+    webkit?: { messageHandlers?: { fairy?: { postMessage: (msg: unknown) => void } } };
   }
 }
 
@@ -19,7 +19,7 @@ function App(): ReactElement {
     // native → JS: the Swift side calls window.__fairyBridge.onBeat(beat) per beat.
     window.__fairyBridge = { onBeat: (beat) => controller.apply(beat as Beat) };
     // JS → native: commands post to the "fairy" handler the shell registered.
-    bridgeRef.current = createNativeBridge((msg) => window.webkit?.messageHandlers.fairy.postMessage(msg));
+    bridgeRef.current = createNativeBridge((msg) => window.webkit?.messageHandlers?.fairy?.postMessage(msg));
     return () => { window.__fairyBridge = undefined; };
   }, [controller.apply]);
 

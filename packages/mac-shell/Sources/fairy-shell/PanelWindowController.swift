@@ -51,6 +51,8 @@ final class PanelWindowController: NSObject, WKNavigationDelegate {
   }
 
   private func connect() async {
+    client?.close()   // tear down any prior connection (e.g. a retry) before reconnecting
+    client = nil
     let info = await InfoClient(baseURL: baseURL, tokenURL: tokenURL, transport: URLSessionTransport()).fetch()
     guard case .success(let daemonInfo) = info,
           let token = TokenReader.read(from: tokenURL),
@@ -73,16 +75,23 @@ final class PanelWindowController: NSObject, WKNavigationDelegate {
     case "start": if let task = body["task"] as? String { client?.start(task) }
     case "stop": client?.stop()
     case "resolveProposal":
+      // isValidJSONObject first: data(withJSONObject:) raises an Obj-C exception
+      // (uncatchable by try?) on a top-level fragment / non-JSON value.
       if let proposal = body["proposal"],
+         JSONSerialization.isValidJSONObject(proposal),
          let data = try? JSONSerialization.data(withJSONObject: proposal),
          let json = String(data: data, encoding: .utf8) { client?.resolveProposal(json) }
     default: break
     }
   }
 
-  private func deliverBeat(_ beatJSON: String) {
-    // beatJSON is well-formed JSON (a valid JS object literal) — embed directly.
-    webView?.evaluateJavaScript("window.__fairyBridge && window.__fairyBridge.onBeat(\(beatJSON))")
+  private nonisolated func deliverBeat(_ beatJSON: String) {
+    // onBeat may fire off-main depending on the socket; force the WebKit call onto
+    // the main thread (evaluateJavaScript must run there). beatJSON is well-formed
+    // JSON (a valid JS object literal) — embed directly.
+    DispatchQueue.main.async { [weak self] in
+      self?.webView?.evaluateJavaScript("window.__fairyBridge && window.__fairyBridge.onBeat(\(beatJSON))")
+    }
   }
 
   // MARK: - Connection overlay (native, over the WebView)

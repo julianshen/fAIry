@@ -9,14 +9,20 @@ public final class ConversationClient {
   private let socket: ConversationSocket
   private let token: String
   private let onBeat: (String) -> Void
+  private let onClose: (() -> Void)?
   private var open = false
   private var closed = false
   private var queue: [String] = []
 
-  public init(socket: ConversationSocket, token: String, onBeat: @escaping (String) -> Void) {
+  /// `onClose` fires when the socket drops *unsolicited* (daemon restart / network
+  /// loss) — not when the caller invokes `close()` — so a consumer can surface a
+  /// reconnect prompt without flashing it on an intentional teardown.
+  public init(socket: ConversationSocket, token: String,
+              onBeat: @escaping (String) -> Void, onClose: (() -> Void)? = nil) {
     self.socket = socket
     self.token = token
     self.onBeat = onBeat
+    self.onClose = onClose
     socket.onOpen { [weak self] in self?.handleOpen() }
     socket.onText { [weak self] in self?.handleText($0) }
     socket.onClose { [weak self] in self?.handleClose() }
@@ -64,8 +70,10 @@ public final class ConversationClient {
   }
 
   private func handleClose() {
+    let wasClosed = closed   // distinguish an unsolicited drop from our own close()
     open = false
     closed = true
+    if !wasClosed { onClose?() }
   }
 
   // MARK: - Outbound

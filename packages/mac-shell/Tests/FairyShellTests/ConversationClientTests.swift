@@ -97,4 +97,23 @@ final class ConversationClientTests: XCTestCase {
     s.simulateOpen()    // a late open callback must NOT send auth or flush the queue
     XCTAssertTrue(s.sent.isEmpty)
   }
+
+  func testOnCloseFiresOnUnsolicitedDrop() {
+    var closes = 0
+    let s = FakeConversationSocket()
+    let c = ConversationClient(socket: s, token: "tok", onBeat: { _ in }, onClose: { closes += 1 })
+    c.connect(); s.simulateOpen()
+    s.simulateClose()              // the daemon/socket dropped
+    XCTAssertEqual(closes, 1)
+  }
+
+  func testOnCloseNotFiredOnIntentionalClose() {
+    var closes = 0
+    let s = FakeConversationSocket()
+    let c = ConversationClient(socket: s, token: "tok", onBeat: { _ in }, onClose: { closes += 1 })
+    c.connect(); s.simulateOpen()
+    c.close()                      // WE closed it — no "connection lost"
+    s.simulateClose()              // the socket's resulting close callback must stay silent
+    XCTAssertEqual(closes, 0)
+  }
 }

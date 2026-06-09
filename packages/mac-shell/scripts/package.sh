@@ -50,12 +50,12 @@ if ! otool -l "$APP/Contents/MacOS/Fairy" | grep -q "@executable_path/../Framewo
   install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Fairy"
 fi
 
-# Info.plist: version + the Sparkle feed/key (from env, else the placeholders).
+# Info.plist: version via sed (safe — dotted digits), then the Sparkle feed/key via
+# PlistBuddy so a URL query string (`&`, `|`, …) can't corrupt a sed replacement.
 FEED="${FAIRY_UPDATE_FEED_URL:-https://EXAMPLE-REPLACE-IN-5C.invalid/appcast.xml}"
 PUBKEY="${FAIRY_SPARKLE_PUBLIC_KEY:-REPLACE-WITH-EDDSA-PUBLIC-KEY-IN-5C}"
-sed -e "s/@VERSION@/$VERSION/g" \
-    -e "s|@SUFeedURL@|$FEED|g" \
-    -e "s|@SUPublicEDKey@|$PUBKEY|g" \
-    "$SCRIPT_DIR/Info.plist" > "$APP/Contents/Info.plist"
+sed "s/@VERSION@/$VERSION/g" "$SCRIPT_DIR/Info.plist" > "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :SUFeedURL $FEED" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :SUPublicEDKey $PUBKEY" "$APP/Contents/Info.plist"
 
 echo "==> built $APP (unsigned — sign with scripts/sign.sh)"

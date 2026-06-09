@@ -21,6 +21,8 @@ final class URLSessionConversationSocket: ConversationSocket {
   func onClose(_ handler: @escaping () -> Void) { closeHandler = handler }
 
   func connect() {
+    task?.cancel(with: .goingAway, reason: nil)  // tear down any prior task (e.g. a retry)
+    didClose = false                              // let this connection's close fire again
     let t = URLSession.shared.webSocketTask(with: url)
     task = t
     t.resume()
@@ -30,13 +32,18 @@ final class URLSessionConversationSocket: ConversationSocket {
 
   private func receive() {
     task?.receive { [weak self] result in
-      guard let self else { return }
-      switch result {
-      case .success(let message):
-        if case .string(let text) = message { self.textHandler?(text) }
-        self.receive()
-      case .failure:
-        self.fireClose()
+      // The receive callback fires on a background queue. Hop to main so all access
+      // to task/didClose/handlers stays serialized with connect/send/close (which the
+      // UI calls on main) — no data race — and so downstream WebView calls run on main.
+      DispatchQueue.main.async {
+        guard let self else { return }
+        switch result {
+        case .success(let message):
+          if case .string(let text) = message { self.textHandler?(text) }
+          self.receive()
+        case .failure:
+          self.fireClose()
+        }
       }
     }
   }

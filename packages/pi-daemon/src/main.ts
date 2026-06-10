@@ -105,13 +105,16 @@ const SKILLS_ROOT = resolveAssetPath(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../skills"),
 );
 
+/** The Pi agent binary — the bundled `fairy-pi` (via FAIRY_PI_BIN) or `pi` on PATH (dev). */
+const PI_BIN = resolveAssetPath(process.env, "FAIRY_PI_BIN", "pi");
+
 /**
  * Spawn `pi --mode rpc` against the daemon's isolated config dir, loading the
  * browser extension and pointing it back at the loopback piBridge via env.
  */
 function piSpawner(paths: DaemonPaths): (bridge: PiBridgeInfo) => ChildLike {
   return (bridge) =>
-    spawn("pi", ["--mode", "rpc", "-e", BROWSER_EXTENSION], {
+    spawn(PI_BIN, ["--mode", "rpc", "-e", BROWSER_EXTENSION], {
       env: {
         ...process.env,
         PI_CODING_AGENT_DIR: paths.piAgentDir,

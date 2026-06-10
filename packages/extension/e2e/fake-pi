@@ -1,0 +1,5 @@
+#!/usr/bin/env bun
+// Executable wrapper the daemon spawns via FAIRY_PI_BIN. The daemon passes
+// `--mode rpc -e <browser-bridge>` args, which fake-pi.ts IGNORES — it reads
+// FAIRY_PI_BRIDGE_PORT/TOKEN + FAIRY_FAKE_PI_SCRIPT from the env instead.
+import "./fake-pi.ts";

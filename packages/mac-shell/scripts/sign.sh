@@ -24,8 +24,9 @@ sign "$V/Updater.app"
 sign "$V/Autoupdate"
 sign "$FW"
 
-echo "==> signing the daemon + the panel resource bundle"
+echo "==> signing the bundled binaries + the panel resource bundle"
 sign "$APP/Contents/Resources/fairy-daemon"
+sign "$APP/Contents/Resources/fairy-pi"
 for b in "$APP"/*.bundle; do [ -e "$b" ] && sign "$b"; done
 
 echo "==> signing the app (last)"

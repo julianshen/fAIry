@@ -1,0 +1,22 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Fairy Demo Air</title>
+<style>
+  body { margin: 0; font: 16px system-ui; }
+  .at { position: absolute; }
+  #from  { left: 80px;  top: 80px;  width: 160px; height: 28px; }
+  #to    { left: 80px;  top: 130px; width: 160px; height: 28px; }
+  #date  { left: 80px;  top: 180px; width: 160px; height: 28px; }
+  #search{ left: 80px;  top: 230px; width: 120px; height: 32px; }
+  #results { left: 80px; top: 290px; width: 360px; }
+  #book  { left: 80px;  top: 430px; width: 120px; height: 32px; display: none; }
+  #confirmation { left: 80px; top: 500px; color: green; font-weight: 600; }
+</style></head><body>
+  <input id="from"  class="at" type="text" placeholder="From" />
+  <input id="to"    class="at" type="text" placeholder="To" />
+  <input id="date"  class="at" type="text" placeholder="Date" />
+  <button id="search" class="at">Search</button>
+  <div id="results" class="at"></div>
+  <button id="book" class="at">Book</button>
+  <div id="confirmation" class="at"></div>
+  <script src="./app.js"></script>
+</body></html>

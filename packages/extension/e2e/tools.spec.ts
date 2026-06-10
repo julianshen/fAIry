@@ -17,18 +17,27 @@ import { bookingScript } from "./bookingScript";
 // ─────────────────────────────────────────────────────────────────────────────
 
 test("TOOLS: fake-pi books a flight end-to-end and shows the confirmation", async () => {
-  const fixture = await serveFixture(path.join(HERE, "fixtures/flight-site"));
-  const { context, userDataDir, extensionLoaded } = await launchWithExtension();
-  test.skip(!extensionLoaded, "browser cannot side-load the MV3 extension (Chrome 137+)");
-
-  const script = JSON.stringify(bookingScript(fixture.url));
-  const { home, pairingCode, stop } = await startDaemon({
-    FAIRY_PI_BIN: path.join(HERE, "fake-pi"),
-    FAIRY_FAKE_PI_SCRIPT: script,
-  });
-
+  let context: import("@playwright/test").BrowserContext | undefined;
+  let userDataDir: string | undefined;
+  let home: string | undefined;
+  let stop: (() => void) | undefined;
+  let fixture: { url: string; close: () => Promise<void> } | undefined;
   let panel: { evalInPanel: (e: string) => Promise<unknown>; close: () => Promise<void> } | undefined;
+
   try {
+    fixture = await serveFixture(path.join(HERE, "fixtures/flight-site"));
+
+    let extensionLoaded: boolean;
+    ({ context, userDataDir, extensionLoaded } = await launchWithExtension());
+    test.skip(!extensionLoaded, "browser cannot side-load the MV3 extension (Chrome 137+)");
+
+    const script = JSON.stringify(bookingScript(fixture.url));
+    let pairingCode: string;
+    ({ home, pairingCode, stop } = await startDaemon({
+      FAIRY_PI_BIN: path.join(HERE, "fake-pi"),
+      FAIRY_FAKE_PI_SCRIPT: script,
+    }));
+
     // Pair: redeem the code → token, read the WS ports, persist `connection`.
     await pair(context, pairingCode);
 
@@ -53,15 +62,13 @@ test("TOOLS: fake-pi books a flight end-to-end and shows the confirmation", asyn
 
     // fake-pi now drives the full booking sequence on the bound tab. Wait for the
     // confirmation to carry the "FAIRY-" booking reference.
-    await expect
-      .poll(async () => agentTab.locator("#confirmation").textContent().catch(() => ""), { timeout: 30_000 })
-      .toContain("FAIRY-");
+    await expect(agentTab.locator("#confirmation")).toContainText("FAIRY-", { timeout: 30_000 });
     await expect(agentTab.locator("#confirmation")).toBeVisible();
   } finally {
     await panel?.close();
-    stop();
-    await context.close();
+    stop?.();
+    await context?.close();
     cleanup([home, userDataDir]);
-    await fixture.close();
+    await fixture?.close();
   }
 });

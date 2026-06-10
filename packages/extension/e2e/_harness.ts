@@ -119,14 +119,18 @@ export async function openSidePanel(
   const panelUrl = `chrome-extension://${EXTENSION_ID}/src/panel/index.html`;
   let wsUrl = "";
   for (let i = 0; i < 50 && !wsUrl; i++) {
-    const list = (await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/list`)).json()) as Array<{
-      type: string;
-      url: string;
-      webSocketDebuggerUrl?: string;
-    }>;
-    const sp = list.find((t) => t.type === "page" && t.url.includes(panelUrl) && t.webSocketDebuggerUrl);
-    if (sp?.webSocketDebuggerUrl) wsUrl = sp.webSocketDebuggerUrl;
-    else await new Promise((r) => setTimeout(r, 100));
+    try {
+      const list = (await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/list`)).json()) as Array<{
+        type: string;
+        url: string;
+        webSocketDebuggerUrl?: string;
+      }>;
+      const sp = list.find((t) => t.type === "page" && t.url.includes(panelUrl) && t.webSocketDebuggerUrl);
+      if (sp?.webSocketDebuggerUrl) wsUrl = sp.webSocketDebuggerUrl;
+    } catch {
+      // debugging port not listening yet (ECONNREFUSED) — fall through and retry
+    }
+    if (!wsUrl) await new Promise((r) => setTimeout(r, 100));
   }
   if (!wsUrl) throw new Error("side panel target did not appear over CDP");
 

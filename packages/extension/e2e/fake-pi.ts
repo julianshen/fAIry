@@ -45,9 +45,14 @@ function call(tool: string, args: Record<string, unknown>): Promise<unknown> {
 async function run() {
   // small settle so the daemon has promoted the active bridge session
   await new Promise((r) => setTimeout(r, 500));
-  for (const step of STEPS) {
-    await call(step.tool, step.args);
-    await new Promise((r) => setTimeout(r, 150)); // let the page settle between actions
+  try {
+    for (const step of STEPS) {
+      await call(step.tool, step.args);
+      await new Promise((r) => setTimeout(r, 150)); // let the page settle between actions
+    }
+  } catch (err) {
+    console.error("fake-pi: step failed:", (err as Error).message);
+    process.exit(1);
   }
   console.log("fake-pi: script complete");
   sock.end();

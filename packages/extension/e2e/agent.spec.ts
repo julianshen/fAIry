@@ -28,19 +28,28 @@ const KEY = process.env.FAIRY_E2E_PROVIDER_KEY;
 test("AGENT: the real Pi agent books a flight from a natural-language task", async () => {
   test.skip(!KEY, "set FAIRY_E2E_PROVIDER_KEY (an LLM provider key) to run the agent e2e");
 
-  const fixture = await serveFixture(path.join(HERE, "fixtures/flight-site"));
-  const { context, userDataDir, extensionLoaded } = await launchWithExtension();
-  test.skip(!extensionLoaded, "browser cannot side-load the MV3 extension (Chrome 137+)");
-
-  // The real agent: prefer the bundled, single-file `fairy-pi` produced by the
-  // pi-daemon build; fall back to a `pi` on PATH if it isn't built.
-  const BUNDLED_PI = path.resolve(HERE, "../../pi-daemon/dist/fairy-pi");
-  const piBin = existsSync(BUNDLED_PI) ? BUNDLED_PI : "pi";
-
-  const { home, pairingCode, stop } = await startDaemon({ FAIRY_PI_BIN: piBin });
-
+  let context: import("@playwright/test").BrowserContext | undefined;
+  let userDataDir: string | undefined;
+  let home: string | undefined;
+  let stop: (() => void) | undefined;
+  let fixture: { url: string; close: () => Promise<void> } | undefined;
   let panel: { evalInPanel: (e: string) => Promise<unknown>; close: () => Promise<void> } | undefined;
+
   try {
+    fixture = await serveFixture(path.join(HERE, "fixtures/flight-site"));
+
+    let extensionLoaded: boolean;
+    ({ context, userDataDir, extensionLoaded } = await launchWithExtension());
+    test.skip(!extensionLoaded, "browser cannot side-load the MV3 extension (Chrome 137+)");
+
+    // The real agent: prefer the bundled, single-file `fairy-pi` produced by the
+    // pi-daemon build; fall back to a `pi` on PATH if it isn't built.
+    const BUNDLED_PI = path.resolve(HERE, "../../pi-daemon/dist/fairy-pi");
+    const piBin = existsSync(BUNDLED_PI) ? BUNDLED_PI : "pi";
+
+    let pairingCode: string;
+    ({ home, pairingCode, stop } = await startDaemon({ FAIRY_PI_BIN: piBin }));
+
     // Pair: redeem the code → token, read the WS ports, persist `connection`.
     await pair(context, pairingCode);
 
@@ -101,16 +110,14 @@ test("AGENT: the real Pi agent books a flight from a natural-language task", asy
     expect((sent as { ok?: boolean })?.ok, `composer-drive failed: ${JSON.stringify(sent)}`).toBe(true);
 
     // The live agent now decides + drives the booking sequence on the bound tab.
-    // Lenient, generous budget: poll #confirmation for the "FAIRY-" reference.
-    await expect
-      .poll(async () => agentTab.locator("#confirmation").textContent().catch(() => ""), { timeout: 300_000 })
-      .toContain("FAIRY-");
+    // Lenient, generous budget: wait for #confirmation to carry the "FAIRY-" reference.
+    await expect(agentTab.locator("#confirmation")).toContainText("FAIRY-", { timeout: 300_000 });
     await expect(agentTab.locator("#confirmation")).toBeVisible();
   } finally {
     await panel?.close();
-    stop();
-    await context.close();
+    stop?.();
+    await context?.close();
     cleanup([home, userDataDir]);
-    await fixture.close();
+    await fixture?.close();
   }
 });

@@ -10,15 +10,22 @@ import { EXTENSION_ID, startDaemon, launchWithExtension, cleanup } from "./_harn
 // ─────────────────────────────────────────────────────────────────────────────
 
 test("the options page pairs with the daemon", async () => {
-  const { context, userDataDir, extensionLoaded } = await launchWithExtension();
-  test.skip(
-    !extensionLoaded,
-    "Chrome did not load the unpacked extension (137+ removed --load-extension) — run with a compatible Chromium.",
-  );
-
-  const { home, pairingCode, stop } = await startDaemon({});
+  let context: import("@playwright/test").BrowserContext | undefined;
+  let userDataDir: string | undefined;
+  let home: string | undefined;
+  let stop: (() => void) | undefined;
+  let pairingCode: string;
 
   try {
+    let extensionLoaded: boolean;
+    ({ context, userDataDir, extensionLoaded } = await launchWithExtension());
+    test.skip(
+      !extensionLoaded,
+      "Chrome did not load the unpacked extension (137+ removed --load-extension) — run with a compatible Chromium.",
+    );
+
+    ({ home, pairingCode, stop } = await startDaemon({}));
+
     const page = await context.newPage();
     await page.goto(`chrome-extension://${EXTENSION_ID}/src/options/index.html`);
 
@@ -31,8 +38,8 @@ test("the options page pairs with the daemon", async () => {
     // received and saveConnection() persisted it to chrome.storage.
     await expect(page.getByText(/Paired!/)).toBeVisible({ timeout: 15_000 });
   } finally {
-    stop();
-    await context.close();
+    stop?.();
+    await context?.close();
     cleanup([home, userDataDir]);
   }
 });

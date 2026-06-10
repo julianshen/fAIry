@@ -18,12 +18,14 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "build": "tsc --noEmit",
-    "build:compile": "bun build src/main.ts --compile --outfile dist/fairy-daemon"
+    "build:compile": "bun build src/main.ts --compile --outfile dist/fairy-daemon",
+    "build:pi": "bun build node_modules/@earendil-works/pi-coding-agent/dist/cli.js --compile --outfile dist/fairy-pi"
   },
   "dependencies": {
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.78.1",
     "@eslint/js": "^9.17.0",
     "@types/node": "^22.10.5",
     "@types/ws": "^8.5.13",

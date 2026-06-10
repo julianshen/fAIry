@@ -19,6 +19,7 @@ final class DaemonLocatorTests: XCTestCase {
     XCTAssertEqual(cfg.workdir.path, "/App/Contents/Resources")
     XCTAssertEqual(cfg.environment["FAIRY_BROWSER_BRIDGE"], "/App/Contents/Resources/browser-bridge.ts")
     XCTAssertEqual(cfg.environment["FAIRY_SKILLS_ROOT"], "/App/Contents/Resources/skills")
+    XCTAssertEqual(cfg.environment["FAIRY_PI_BIN"], "/App/Contents/Resources/fairy-pi")
   }
 
   func testBundledSeedsPathWithCommonInstallDirsThenInherited() {

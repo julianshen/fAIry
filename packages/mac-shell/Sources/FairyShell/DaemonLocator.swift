@@ -18,6 +18,7 @@ public enum DaemonLocator {
           environment: [
             "FAIRY_BROWSER_BRIDGE": resources.appendingPathComponent("browser-bridge.ts").path,
             "FAIRY_SKILLS_ROOT": resources.appendingPathComponent("skills").path,
+            "FAIRY_PI_BIN": resources.appendingPathComponent("fairy-pi").path,
             "PATH": seededPath(home: homeDir, inherited: currentPath),
           ]
         )

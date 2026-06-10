@@ -15,6 +15,9 @@ echo "==> building the panel (agent-panel)"
 echo "==> compiling the daemon (pi-daemon)"
 ( cd "$ROOT/packages/pi-daemon" && bun run build:compile )
 
+echo "==> compiling Pi (pi-daemon → fairy-pi)"
+( cd "$ROOT/packages/pi-daemon" && bun run build:pi )
+
 echo "==> building the shell (release)"
 ( cd "$SHELL_DIR" && swift build -c release )
 BIN="$(cd "$SHELL_DIR" && swift build -c release --show-bin-path)"
@@ -26,6 +29,8 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/fairy-shell" "$APP/Contents/MacOS/Fairy"
 cp "$ROOT/packages/pi-daemon/dist/fairy-daemon" "$APP/Contents/Resources/fairy-daemon"
 chmod +x "$APP/Contents/Resources/fairy-daemon"
+cp "$ROOT/packages/pi-daemon/dist/fairy-pi" "$APP/Contents/Resources/fairy-pi"
+chmod +x "$APP/Contents/Resources/fairy-pi"
 cp "$ROOT/packages/pi-daemon/pi-extension/browser-bridge.ts" "$APP/Contents/Resources/browser-bridge.ts"
 cp -R "$ROOT/packages/pi-daemon/skills" "$APP/Contents/Resources/skills"
 
@@ -49,6 +54,34 @@ ditto "$SPARKLE_FW" "$APP/Contents/Frameworks/Sparkle.framework"
 if ! otool -l "$APP/Contents/MacOS/Fairy" | grep -q "@executable_path/../Frameworks"; then
   install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Fairy"
 fi
+
+# Bundle the MIT attribution for the third-party Pi agent we ship.
+cat > "$APP/Contents/Resources/THIRD-PARTY-LICENSES.txt" <<'LICENSE'
+Fairy bundles the following third-party software:
+
+────────────────────────────────────────────────────────────────────────────
+@earendil-works/pi-coding-agent (the "Pi" agent) — MIT License
+Copyright (c) earendil-works
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+────────────────────────────────────────────────────────────────────────────
+LICENSE
 
 # Info.plist: version via sed (safe — dotted digits), then the Sparkle feed/key via
 # PlistBuddy so a URL query string (`&`, `|`, …) can't corrupt a sed replacement.

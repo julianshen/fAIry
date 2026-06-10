@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 import path from "node:path";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { serveFixture, startDaemon, launchWithExtension, openSidePanel, pair, cleanup, HERE } from "./_harness";
 import { bookingScript } from "./bookingScript";
 
@@ -32,10 +34,14 @@ test("TOOLS: fake-pi books a flight end-to-end and shows the confirmation", asyn
     test.skip(!extensionLoaded, "browser cannot side-load the MV3 extension (Chrome 137+)");
 
     const script = JSON.stringify(bookingScript(fixture.url));
+    // Go-signal: fake-pi waits for this file before driving tools, so it can never
+    // race ahead of the tab bind below.
+    const goFile = path.join(mkdtempSync(path.join(tmpdir(), "fairy-go-")), "go");
     let pairingCode: string;
     ({ home, pairingCode, stop } = await startDaemon({
       FAIRY_PI_BIN: path.join(HERE, "fake-pi"),
       FAIRY_FAKE_PI_SCRIPT: script,
+      FAIRY_FAKE_PI_GO: goFile,
     }));
 
     // Pair: redeem the code → token, read the WS ports, persist `connection`.
@@ -59,6 +65,9 @@ test("TOOLS: fake-pi books a flight end-to-end and shows the confirmation", asyn
       `new Promise(res => chrome.runtime.sendMessage({type:"agent:taskStart"}).then(res, e => res({error:String(e)})))`,
     )) as { ok?: boolean };
     expect(bind?.ok, `tab bind failed: ${JSON.stringify(bind)}`).toBe(true);
+
+    // The tab is bound — release fake-pi to drive the booking (it was waiting on goFile).
+    writeFileSync(goFile, "");
 
     // fake-pi now drives the full booking sequence on the bound tab. Wait for the
     // confirmation to carry the "FAIRY-" booking reference.

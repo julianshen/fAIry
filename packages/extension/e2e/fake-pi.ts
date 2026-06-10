@@ -3,11 +3,15 @@
 // fixed sequence of browser tool calls — no LLM. The booking script is passed via
 // FAIRY_FAKE_PI_SCRIPT (a JSON array of {tool,args}); navigate URL via FAIRY_FAKE_PI_URL.
 import { createConnection } from "node:net";
+import { existsSync } from "node:fs";
 
 const PORT = Number(process.env.FAIRY_PI_BRIDGE_PORT ?? 0);
 const TOKEN = process.env.FAIRY_PI_BRIDGE_TOKEN ?? "";
 const STEPS: Array<{ tool: string; args: Record<string, unknown> }> =
   JSON.parse(process.env.FAIRY_FAKE_PI_SCRIPT ?? "[]");
+// Optional go-signal: a file the spec creates AFTER binding the tab, so the tool
+// script never races ahead of the bind (no fixed-delay guess).
+const GO_FILE = process.env.FAIRY_FAKE_PI_GO ?? "";
 
 if (!PORT) { console.error("fake-pi: FAIRY_PI_BRIDGE_PORT not set"); process.exit(2); }
 
@@ -43,8 +47,18 @@ function call(tool: string, args: Record<string, unknown>): Promise<unknown> {
 }
 
 async function run() {
-  // small settle so the daemon has promoted the active bridge session
-  await new Promise((r) => setTimeout(r, 500));
+  // Wait for the bind go-signal (the spec writes GO_FILE after agent:taskStart
+  // succeeds) so the script never drives tools before the tab is bound. Falls back
+  // to a fixed settle when no signal is configured.
+  if (GO_FILE) {
+    const deadline = Date.now() + 30_000;
+    while (!existsSync(GO_FILE)) {
+      if (Date.now() > deadline) { console.error("fake-pi: go-signal never arrived"); process.exit(4); }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  } else {
+    await new Promise((r) => setTimeout(r, 500));
+  }
   try {
     for (const step of STEPS) {
       await call(step.tool, step.args);

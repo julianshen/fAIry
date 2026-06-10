@@ -27,6 +27,9 @@ const KEY = process.env.FAIRY_E2E_PROVIDER_KEY;
 
 test("AGENT: the real Pi agent books a flight from a natural-language task", async () => {
   test.skip(!KEY, "set FAIRY_E2E_PROVIDER_KEY (an LLM provider key) to run the agent e2e");
+  // A live agent run takes minutes; raise the per-test budget above the 300s
+  // assertion wait (the global timeout in playwright.config.ts is only 60s).
+  test.setTimeout(360_000);
 
   let context: import("@playwright/test").BrowserContext | undefined;
   let userDataDir: string | undefined;

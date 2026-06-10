@@ -38,7 +38,7 @@ test("the options page pairs with the daemon", async () => {
     // received and saveConnection() persisted it to chrome.storage.
     await expect(page.getByText(/Paired!/)).toBeVisible({ timeout: 15_000 });
   } finally {
-    stop?.();
+    await stop?.();
     await context?.close();
     cleanup([home, userDataDir]);
   }

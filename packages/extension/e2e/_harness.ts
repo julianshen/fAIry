@@ -35,7 +35,7 @@ export function serveFixture(dir: string): Promise<{ url: string; close: () => P
 }
 
 /** Spawn the daemon (dev mode) with the given extra env; resolves when it's listening. */
-export function startDaemon(extraEnv: Record<string, string>): Promise<{ home: string; pairingCode: string; stop: () => void }> {
+export function startDaemon(extraEnv: Record<string, string>): Promise<{ home: string; pairingCode: string; stop: () => Promise<void> }> {
   const home = mkdtempSync(path.join(tmpdir(), "fairy-e2e-"));
   const daemon: ChildProcess = spawn("bun", ["run", DAEMON_MAIN], {
     env: { ...process.env, FAIRY_HOME: home, FAIRY_HTTP_PORT: HTTP_PORT, ...extraEnv },
@@ -49,7 +49,16 @@ export function startDaemon(extraEnv: Record<string, string>): Promise<{ home: s
       if (out.includes("listening")) {
         clearTimeout(timer);
         const code = (JSON.parse(readFileSync(path.join(home, "pairing.json"), "utf8")) as { code: string }).code;
-        resolve({ home, pairingCode: code, stop: () => daemon.kill("SIGTERM") });
+        // stop AWAITS the daemon's exit so the next serial spec's daemon can bind
+        // the fixed HTTP port cleanly (SIGTERM is async; don't race the next start).
+        const stop = (): Promise<void> =>
+          new Promise<void>((res) => {
+            if (daemon.exitCode !== null || daemon.signalCode !== null) { res(); return; }
+            daemon.once("exit", () => res());
+            daemon.kill("SIGTERM");
+            setTimeout(() => { try { daemon.kill("SIGKILL"); } catch { /* already gone */ } res(); }, 5_000);
+          });
+        resolve({ home, pairingCode: code, stop });
       }
     });
     daemon.on("exit", (c) => reject(new Error(`daemon exited early (${c})`)));

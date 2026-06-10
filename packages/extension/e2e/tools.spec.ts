@@ -75,7 +75,7 @@ test("TOOLS: fake-pi books a flight end-to-end and shows the confirmation", asyn
     await expect(agentTab.locator("#confirmation")).toBeVisible();
   } finally {
     await panel?.close();
-    stop?.();
+    await stop?.();
     await context?.close();
     cleanup([home, userDataDir]);
     await fixture?.close();

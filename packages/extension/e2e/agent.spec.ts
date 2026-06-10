@@ -118,7 +118,7 @@ test("AGENT: the real Pi agent books a flight from a natural-language task", asy
     await expect(agentTab.locator("#confirmation")).toBeVisible();
   } finally {
     await panel?.close();
-    stop?.();
+    await stop?.();
     await context?.close();
     cleanup([home, userDataDir]);
     await fixture?.close();

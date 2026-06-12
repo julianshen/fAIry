@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ts:
+    name: ts (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [extension, pi-daemon, agent-panel]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+        working-directory: packages/${{ matrix.package }}
+      - run: bun run typecheck
+        working-directory: packages/${{ matrix.package }}
+      - run: bun run test
+        working-directory: packages/${{ matrix.package }}
+
+  scripts:
+    name: shell-script tests + actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash packages/mac-shell/scripts/release-lib.test.sh
+      - run: bash packages/mac-shell/scripts/appcast-wiring.test.sh
+      - name: actionlint
+        run: |
+          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+  swift:
+    name: swift test (mac-shell)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: packages/mac-shell/.build
+          key: spm-${{ runner.os }}-${{ hashFiles('packages/mac-shell/Package.resolved') }}
+      - run: swift test
+        working-directory: packages/mac-shell
+
+  e2e:
+    name: e2e happy path (tools.spec)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+      - run: bun install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: bunx playwright install chromium
+        working-directory: packages/extension
+      - name: Build the extension
+        run: bun run build
+        working-directory: packages/extension
+      - name: Run the deterministic e2e (self-skips if the MV3 extension can't side-load)
+        run: bunx playwright test e2e/tools.spec.ts
+        working-directory: packages/extension

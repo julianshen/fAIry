@@ -11,7 +11,7 @@ Add GitHub Actions automation in two parts:
 1. **CI gate** — on every PR and push to `main`, run lint + typecheck + unit tests
    for the three TypeScript packages, `swift test` for the macOS shell, and the
    deterministic end-to-end test (`tools.spec`).
-2. **Release** — on a pushed version tag (`v*`), build a signed + notarized
+2. **Release** — on a pushed version tag (`v[0-9]*`), build a signed + notarized
    `Fairy.app`, package a DMG and an EdDSA-signed Sparkle `appcast.xml`, and
    publish both as assets on the corresponding GitHub Release.
 
@@ -35,13 +35,17 @@ Two workflow files, separated by trigger and secret surface:
 | File | Trigger | Runner(s) | Purpose |
 |---|---|---|---|
 | `.github/workflows/ci.yml` | `pull_request`, `push` to `main` | ubuntu + macOS | Lint, typecheck, unit tests, Swift tests, e2e |
-| `.github/workflows/release.yml` | `push` tag matching `v*` | macOS | Sign → notarize → DMG → appcast → publish to the GitHub Release |
+| `.github/workflows/release.yml` | `push` tag matching `v[0-9]*` | macOS | Sign → notarize → DMG → appcast → publish to the GitHub Release |
 
 A single combined file (jobs gated by `if:` on event type) was considered and
 rejected: the triggers and secret surfaces are disjoint, and keeping the release
 secrets out of every PR run is cleaner.
 
-### `ci.yml` — three parallel jobs
+### `ci.yml` — four parallel jobs
+
+- **`scripts` (ubuntu-latest)** — the two bash unit tests
+  (`release-lib.test.sh`, `appcast-wiring.test.sh`) plus a pinned `actionlint`
+  run over both workflow files.
 
 - **`ts` (ubuntu-latest)**
   - `oven-sh/setup-bun` (pin to `bun-version: 1.3.x` to match `engines.bun`).
@@ -65,8 +69,8 @@ secrets out of every PR run is cleaner.
     side-load the MV3 extension — it already guards on `extensionLoaded`
     (`test.skip(!extensionLoaded, …)`). A skipped test is a green job.
 
-All three jobs run in parallel. `ts` is cheap (ubuntu); the two macOS jobs are
-metered but bounded.
+All four jobs run in parallel. `ts` and `scripts` are cheap (ubuntu); the two
+macOS jobs are metered but bounded (each job carries a `timeout-minutes`).
 
 ### `release.yml` — one macOS job, tag-driven
 

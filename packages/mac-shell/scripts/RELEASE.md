@@ -3,8 +3,8 @@
 Produces a **signed, notarized, auto-updating** `Fairy.app` + a DMG + a Sparkle `appcast.xml`.
 Everything here runs on **your** Mac with **your** Apple Developer account — no secret is stored in the repo.
 
-> Heads-up: M5-5c does NOT bundle the Pi agent. The released app still expects `pi` on the user's `PATH`
-> (bundling Pi is M6). The daemon is bundled (`fairy-daemon`); Pi is not.
+> Since M6-1 the app bundles the Pi agent (`fairy-pi`) alongside the daemon —
+> no `pi` on the user's `PATH` is needed.
 
 ## One-time prerequisites
 
@@ -79,3 +79,54 @@ Installed copies (with the matching `SUPublicEDKey`) then see the update via Spa
   and the binary has the `@executable_path/../Frameworks` rpath (`otool -l dist/Fairy.app/Contents/MacOS/Fairy`).
 - **Update not offered** — `SUFeedURL` must match where `appcast.xml` is hosted, and the installed app's
   `SUPublicEDKey` must match the key that signed the appcast.
+
+## Releasing via CI (M6-3)
+
+Pushing a version tag builds, signs, notarizes, and publishes automatically:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`.github/workflows/release.yml` then produces a GitHub Release for the tag with
+two assets: `Fairy-0.1.0.dmg` and `appcast.xml`. Installed apps find updates via
+the stable `releases/latest/download/appcast.xml` redirect — no external host.
+(The trigger matches `v[0-9]*`, so tags like `v0.1.0` run it; `vNext` won't.)
+
+### One-time setup: repository secrets
+
+Settings → Secrets and variables → Actions → **Secrets**:
+
+| Secret | What it is | How to produce it |
+|---|---|---|
+| `MACOS_CERTIFICATE_P12_BASE64` | Developer ID Application cert + key, base64 | Keychain Access → export the cert as `.p12`, then `base64 -i cert.p12 \| pbcopy` |
+| `MACOS_CERTIFICATE_PASSWORD` | The `.p12` export password | chosen at export time |
+| `MACOS_SIGN_IDENTITY` | The identity string | `security find-identity -v -p codesigning` → `Developer ID Application: Name (TEAMID)` |
+| `NOTARY_API_KEY_P8_BASE64` | App Store Connect API key (`.p8`), base64 | App Store Connect → Users and Access → Integrations → create a key (Developer role), `base64 -i AuthKey_XXX.p8 \| pbcopy` |
+| `NOTARY_API_KEY_ID` | The API key's ID | shown next to the key in App Store Connect |
+| `NOTARY_API_ISSUER` | The issuer UUID | shown on the same Integrations page |
+| `SPARKLE_PRIVATE_KEY` | Sparkle EdDSA **private** key (file contents) | `generate_keys -x sparkle_ed25519` exports it; paste the file contents |
+
+…and one **Variable** on the same page:
+
+| Variable | Value |
+|---|---|
+| `FAIRY_SPARKLE_PUBLIC_KEY` | the `SUPublicEDKey` printed by `generate_keys` |
+
+The feed URL is derived in the workflow from the repo slug
+(`https://github.com/<owner>/<repo>/releases/latest/download/appcast.xml`) —
+no variable needed.
+
+### Verifying the first CI release
+
+1. Watch the run: `gh run watch` (or the Actions tab).
+2. Download the DMG from the Release page and check:
+   ```bash
+   spctl -a -t open -vvv --context context:primary-signature Fairy-0.1.0.dmg
+   xcrun stapler validate Fairy-0.1.0.dmg
+   ```
+3. Confirm `https://github.com/<owner>/<repo>/releases/latest/download/appcast.xml`
+   serves the appcast and its `<enclosure url>` points at the Release's DMG.
+4. Install, run, and use **Check for Updates…** against a later tag to confirm
+   Sparkle sees it.

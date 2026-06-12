@@ -109,6 +109,10 @@ env-driven seams (the same relocatable-asset pattern used in `assetPath.ts`):
 - `FAIRY_DOWNLOAD_URL_PREFIX` — when set and non-empty, pass
   `--download-url-prefix "$FAIRY_DOWNLOAD_URL_PREFIX"` so the appcast's
   `<enclosure url>` points at the GitHub Release asset, not a local path.
+- `FAIRY_GENERATE_APPCAST` — test-only override of the `generate_appcast`
+  binary path (same relocatable pattern as `FAIRY_PI_BIN`), letting the wiring
+  test inject a stub that records its argv. Defaults to the Sparkle SPM
+  artifact path.
 
 Both default to empty → the existing local-runbook behavior (keychain key,
 local-relative enclosure) is unchanged. The conditional argument assembly is

@@ -1,7 +1,7 @@
-import { chromium, type BrowserContext, type Page } from "@playwright/test";
+import { chromium, type BrowserContext } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, type Server } from "node:http";
-import { mkdtempSync, readFileSync, rmSync, readdirSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
